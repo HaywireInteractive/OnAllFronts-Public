@@ -8,9 +8,34 @@ public class ProjectR : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore",
+			"StateTreeModule",
+			"StructUtils",
+		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		PrivateDependencyModuleNames.AddRange(new string[] {
+			"MassAIBehavior",
+			"MassAIDebug",
+			
+			// AI/MassCrowd Plugin Modules
+			"MassCrowd",
+
+			// Runtime/MassEntity Plugin Modules
+			"MassEntity",
+
+			// Runtime/MassGameplay Plugin Modules
+			"MassActors",
+			"MassCommon",
+			"MassGameplayDebug",
+			"MassLOD",
+			"MassMovement",
+			"MassNavigation",
+			"MassRepresentation",
+			"MassReplication",
+			"MassSpawner",
+			"MassSimulation",
+			"MassSignals",
+		});
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
