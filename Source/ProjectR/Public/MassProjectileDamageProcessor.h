@@ -53,7 +53,7 @@ class PROJECTR_API UMassProjectileWithDamageTrait : public UMassEntityTraitBase
 	GENERATED_BODY()
 
 protected:
-	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
+	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 
 	UPROPERTY(Category = "Damage", EditAnywhere)
 	int16 DamagePerHit = 10;
@@ -74,7 +74,7 @@ class PROJECTR_API UMassProjectileDamagableTrait : public UMassEntityTraitBase
 	GENERATED_BODY()
 
 protected:
-	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
+	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 };
 
 UCLASS()

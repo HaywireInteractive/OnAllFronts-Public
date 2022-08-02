@@ -46,7 +46,7 @@ class PROJECTR_API UMassProjectileTrait : public UMassEntityTraitBase
 	GENERATED_BODY()
 
 protected:
-	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
+	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 };
 
 UCLASS(meta = (DisplayName = "ProjectileUpdateCollision"))
@@ -55,7 +55,7 @@ class PROJECTR_API UMassProjectileUpdateCollisionTrait : public UMassEntityTrait
 	GENERATED_BODY()
 
 protected:
-	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
+	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 };
 
 /**
@@ -67,7 +67,7 @@ class PROJECTR_API UMassAgentLocationSyncTrait : public UMassAgentSyncTrait
 	GENERATED_BODY()
 
 protected:
-	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
+	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 };
 
 UCLASS()
@@ -139,7 +139,7 @@ public:
 	UMassProjectileVisualizationTrait();
 
 protected:
-	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
+	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 };
 
 UCLASS(meta = (DisplayName = "Mass Projectile Visualization"))

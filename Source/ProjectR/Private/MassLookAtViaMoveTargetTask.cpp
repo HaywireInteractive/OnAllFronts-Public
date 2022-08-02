@@ -6,6 +6,7 @@
 #include "MassEntitySubsystem.h"
 #include "MassMoveTargetCompleteProcessor.h"
 #include "MassNavigationTypes.h"
+#include "StateTreeLinker.h"
 
 bool FMassLookAtViaMoveTargetTask::Link(FStateTreeLinker& Linker)
 {
@@ -51,5 +52,5 @@ EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecution
 // TODO: Likely not needed (if superclass does same thing).
 EStateTreeRunStatus FMassLookAtViaMoveTargetTask::Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const
 {
-	return EStateTreeRunStatus::Running;
+	return EStateTreeRunStatus::Succeeded;
 }

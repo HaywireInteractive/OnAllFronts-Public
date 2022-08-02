@@ -13,6 +13,7 @@
 #include "MassMovementFragments.h"
 #include "MassSignalSubsystem.h"
 #include "Async/Async.h"
+#include "StateTreeLinker.h"
 
 bool FMassFireProjectileTask::Link(FStateTreeLinker& Linker)
 {
@@ -53,10 +54,8 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 			return;
 		}
 
-		AActor* FirstActor = World->GetLevel(0)->Actors[0]; // TODO: using first actor as the owner is a hack
-		
-		const FMassEntityTemplate* EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*FirstActor, *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
-		if (EntityTemplate && EntityTemplate->IsValid())
+		const FMassEntityTemplate& EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*World, *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
+		if (EntityTemplate.IsValid())
 		{
 			FMassEntitySpawnDataGeneratorResult Result;
 			Result.SpawnDataProcessor = UMassSpawnLocationProcessor::StaticClass();
@@ -69,7 +68,7 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 			SpawnDataTransform.SetLocation(SpawnLocation);
 
 			TArray<FMassEntityHandle> SpawnedEntities;
-			SpawnerSystem->SpawnEntities(EntityTemplate->GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
+			SpawnerSystem->SpawnEntities(EntityTemplate.GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
 
 			FMassVelocityFragment* SpawnedEntityVelocityFragment = EntitySubsystem.GetFragmentDataPtr<FMassVelocityFragment>(SpawnedEntities[0]);
 			if (SpawnedEntityVelocityFragment)

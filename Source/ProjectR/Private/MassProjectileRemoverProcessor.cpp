@@ -6,6 +6,7 @@
 #include "MassCommonFragments.h"
 
 UMassProjectileRemoverProcessor::UMassProjectileRemoverProcessor()
+	: EntityQuery(*this)
 {
 	bAutoRegisterWithProcessingPhases = true;
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;

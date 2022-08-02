@@ -12,7 +12,7 @@
 //----------------------------------------------------------------------//
 //  UMassProjectileTrait
 //----------------------------------------------------------------------//
-void UMassProjectileTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
+void UMassProjectileTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
 	BuildContext.AddTag<FMassProjectileTag>();
 }
@@ -20,7 +20,7 @@ void UMassProjectileTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildC
 //----------------------------------------------------------------------//
 //  UMassProjectileUpdateCollisionTrait
 //----------------------------------------------------------------------//
-void UMassProjectileUpdateCollisionTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
+void UMassProjectileUpdateCollisionTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
 	BuildContext.AddTag<FMassProjectileUpdateCollisionTag>();
 }
@@ -28,7 +28,7 @@ void UMassProjectileUpdateCollisionTrait::BuildTemplate(FMassEntityTemplateBuild
 //----------------------------------------------------------------------//
 //  UMassAgentLocationSyncTrait
 //----------------------------------------------------------------------//
-void UMassAgentLocationSyncTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
+void UMassAgentLocationSyncTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
 	BuildContext.AddFragment<FTransformFragment>();
 
@@ -47,6 +47,7 @@ void UMassAgentLocationSyncTrait::BuildTemplate(FMassEntityTemplateBuildContext&
 //  ULocationToActorTranslator
 //----------------------------------------------------------------------//
 ULocationToActorTranslator::ULocationToActorTranslator()
+	: EntityQuery(*this)
 {
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::UpdateWorldFromMass;
@@ -220,7 +221,7 @@ UMassProjectileVisualizationTrait::UMassProjectileVisualizationTrait()
 	LODParams.FilterTag = FMassProjectileVisualizationTag::StaticStruct();
 }
 
-void UMassProjectileVisualizationTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
+void UMassProjectileVisualizationTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
 	Super::BuildTemplate(BuildContext, World);
 	BuildContext.AddTag<FMassProjectileVisualizationTag>();

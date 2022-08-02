@@ -11,7 +11,7 @@
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
 //----------------------------------------------------------------------//
-void UMassTeamMemberTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
+void UMassTeamMemberTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
 	FTeamMemberFragment& TeamMemberTemplate = BuildContext.AddFragment_GetRef<FTeamMemberFragment>();
 	TeamMemberTemplate.IsOnTeam1 = IsOnTeam1;
@@ -20,7 +20,7 @@ void UMassTeamMemberTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildC
 //----------------------------------------------------------------------//
 //  UMassNeedsEnemyTargetTrait
 //----------------------------------------------------------------------//
-void UMassNeedsEnemyTargetTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
+void UMassNeedsEnemyTargetTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
 	BuildContext.AddFragment<FTargetEntityFragment>();
 	BuildContext.AddTag<FMassNeedsEnemyTargetTag>();
@@ -30,6 +30,7 @@ void UMassNeedsEnemyTargetTrait::BuildTemplate(FMassEntityTemplateBuildContext& 
 //  UMassEnemyTargetFinderProcessor
 //----------------------------------------------------------------------//
 UMassEnemyTargetFinderProcessor::UMassEnemyTargetFinderProcessor()
+	: EntityQuery(*this)
 {
 	bAutoRegisterWithProcessingPhases = true;
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;

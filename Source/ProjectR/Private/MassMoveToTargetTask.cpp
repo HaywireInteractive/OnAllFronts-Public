@@ -4,6 +4,7 @@
 #include "MassMoveToTargetTask.h"
 
 #include "MassStateTreeExecutionContext.h"
+#include "StateTreeLinker.h"
 
 bool FMassMoveToTargetTask::Link(FStateTreeLinker& Linker)
 {

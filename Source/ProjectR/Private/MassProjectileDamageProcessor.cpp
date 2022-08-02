@@ -7,7 +7,7 @@
 //----------------------------------------------------------------------//
 //  UMassProjectileWithDamageTrait
 //----------------------------------------------------------------------//
-void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
+void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
 	FProjectileDamageFragment& ProjectileDamageTemplate = BuildContext.AddFragment_GetRef<FProjectileDamageFragment>();
 	ProjectileDamageTemplate.DamagePerHit = DamagePerHit;
@@ -32,7 +32,7 @@ void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildConte
 //----------------------------------------------------------------------//
 //  UMassProjectileDamagableTrait
 //----------------------------------------------------------------------//
-void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
+void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
 	BuildContext.AddTag<FMassProjectileDamagableTag>();
 }
@@ -41,6 +41,7 @@ void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContex
 //  UMassProjectileDamageProcessor
 //----------------------------------------------------------------------//
 UMassProjectileDamageProcessor::UMassProjectileDamageProcessor()
+	: EntityQuery(*this)
 {
 	bAutoRegisterWithProcessingPhases = true;
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;
