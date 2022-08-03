@@ -160,6 +160,7 @@ void ProcessEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMa
 	}
 
 	TargetEntityFragment.Entity = TargetEntity;
+	Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(Entity);
 	Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(Entity);
 }
 

@@ -44,6 +44,12 @@ struct FMassNeedsEnemyTargetTag : public FMassTag
 	GENERATED_BODY()
 };
 
+USTRUCT()
+struct FMassWillNeedEnemyTargetTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
 UCLASS(meta = (DisplayName = "NeedsEnemyTarget"))
 class PROJECTR_API UMassNeedsEnemyTargetTrait : public UMassEntityTraitBase
 {
