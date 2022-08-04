@@ -74,4 +74,5 @@ protected:
 private:
 	TObjectPtr<UMassNavigationSubsystem> NavigationSubsystem;
 	FMassEntityQuery EntityQuery;
+	uint8 FinderPhase = 0;
 };

@@ -51,14 +51,48 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
 }
 
+static FBox GetBoxForFinderPhase(const uint8& FinderPhase, const FVector& Center, const float& SearchRadius)
+{
+	// assume x,y axes positive is up to right
+	switch (FinderPhase)
+	{
+	case 0: // bottom left
+	{
+		const FVector ExtentTopRight(SearchRadius, SearchRadius, 0.f);
+		return FBox(Center - ExtentTopRight, Center);
+		break;
+	}
+	case 1: // bottom right
+	{
+		const FVector ExtentBottomRight(SearchRadius, -SearchRadius, 0.f);
+		return FBox(Center, Center + ExtentBottomRight);
+		break;
+	}
+	case 2: // top left
+	{
+		const FVector ExtentBottomRight(SearchRadius, -SearchRadius, 0.f);
+		return FBox(Center - ExtentBottomRight, Center);
+		break;
+	}
+	case 3: // top right
+	{
+		const FVector ExtentTopRight(SearchRadius, SearchRadius, 0.f);
+		return FBox(Center, Center + ExtentTopRight);
+		break;
+	}
+	default:
+		check(false);
+		return FBox();
+	}
+}
+
 // TODO: Find out how to not duplicate from MassProjectileDamageProcessor.cpp. Right now only difference is number in template type for TFixedAllocator.
 static void FindCloseObstacles(const FVector& Center, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
-	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults)
+	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults, const uint8& FinderPhase)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_FindCloseObstacles);
 	OutCloseEntities.Reset();
-	const FVector Extent(SearchRadius, SearchRadius, 0.f);
-	const FBox QueryBox = FBox(Center - Extent, Center + Extent);
+	FBox QueryBox = GetBoxForFinderPhase(FinderPhase, Center, SearchRadius);
 
 	struct FSortingCell
 	{
@@ -112,16 +146,16 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 	}
 }
 
-bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1)
+bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1, const uint8& FinderPhase)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestEnemy);
 
-	static const float SearchRadius = 5000.f;
-	FindCloseObstacles(Location, SearchRadius, AvoidanceObstacleGrid, CloseEntities, 10);
+	static const float SearchRadius = 5000.f; // TODO: don't hard-code
+	FindCloseObstacles(Location, SearchRadius, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase);
 
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 	{
-		// Skip self
+		// Skip self.
 		if (OtherEntity.Entity == Entity)
 		{
 			continue;
@@ -154,10 +188,10 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 	return false;
 }
 
-void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities)
+void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase)
 {
 	FMassEntityHandle TargetEntity;
-	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), CloseEntities, TargetEntity, IsEntityOnTeam1);
+	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase);
 	if (!bFoundTarget) {
 		return;
 	}
@@ -176,7 +210,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		return;
 	}
 
-	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem](FMassExecutionContext& Context)
+	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 
@@ -207,7 +241,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 
 			for (int32 EntityIndex = JobIndex; EntityIndex < NumEntities; EntityIndex += NumJobs)
 			{
-				ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities);
+				ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase);
 			}
 		});
 
@@ -223,5 +257,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 				Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(TargetFinderEntity);
 			}
 		}
-});
+	});
+
+	FinderPhase = (FinderPhase + 1) % 4;
 }
