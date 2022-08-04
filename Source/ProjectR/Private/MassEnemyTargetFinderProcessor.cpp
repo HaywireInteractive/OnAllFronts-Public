@@ -151,7 +151,7 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 	return false;
 }
 
-void ProcessEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities)
+void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities)
 {
 	FMassEntityHandle TargetEntity;
 	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), CloseEntities, TargetEntity, IsEntityOnTeam1);
@@ -160,8 +160,8 @@ void ProcessEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMa
 	}
 
 	TargetEntityFragment.Entity = TargetEntity;
-	Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(Entity);
-	Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(Entity);
+
+	TargetFinderEntityQueue.Enqueue(Entity);
 }
 
 void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
@@ -174,31 +174,47 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	}
 
 	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem](FMassExecutionContext& Context)
+	{
+		const int32 NumEntities = Context.GetNumEntities();
+
+		const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
+		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
+		const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
+
+		// Used for storing sorted list of nearest entities.
+		struct FSortedObstacle
 		{
-			const int32 NumEntities = Context.GetNumEntities();
+			FVector LocationCached;
+			FVector Forward;
+			FMassNavigationObstacleItem ObstacleItem;
+			float SqDist;
+		};
 
-			const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
-			const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
-			const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
+		// TODO: We're incorrectly assuming all obstacles can be targets.
+		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGridMutable();
 
-			// Arrays used to store close obstacles
+		const int32 NumJobs = 60; // TODO
+
+		TQueue<FMassEntityHandle> TargetFinderEntityQueue;
+
+		ParallelFor(NumJobs, [&](int32 Index)
+		{
 			TArray<FMassNavigationObstacleItem, TFixedAllocator<10>> CloseEntities;
 
-			// Used for storing sorted list of nearest entities.
-			struct FSortedObstacle
+			for (int32 EntityIndex = Index; EntityIndex < NumEntities; EntityIndex += NumJobs)
 			{
-				FVector LocationCached;
-				FVector Forward;
-				FMassNavigationObstacleItem ObstacleItem;
-				float SqDist;
-			};
-
-			// TODO: We're incorrectly assuming all obstacles can be targets.
-			const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGridMutable();
-
-			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
-			{
-				ProcessEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities);
+				ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities);
 			}
 		});
+
+		while (!TargetFinderEntityQueue.IsEmpty())
+		{
+			FMassEntityHandle TargetFinderEntity;
+			bool bSuccess = TargetFinderEntityQueue.Dequeue(TargetFinderEntity);
+			check(bSuccess);
+
+			Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(TargetFinderEntity);
+			Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(TargetFinderEntity);
+		}
+});
 }
