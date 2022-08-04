@@ -55,6 +55,7 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 static void FindCloseObstacles(const FVector& Center, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
 	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_FindCloseObstacles);
 	OutCloseEntities.Reset();
 	const FVector Extent(SearchRadius, SearchRadius, 0.f);
 	const FBox QueryBox = FBox(Center - Extent, Center + Extent);
@@ -113,6 +114,8 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 
 bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestEnemy);
+
 	static const float SearchRadius = 5000.f;
 	FindCloseObstacles(Location, SearchRadius, AvoidanceObstacleGrid, CloseEntities, 10);
 
@@ -197,24 +200,28 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 
 		TQueue<FMassEntityHandle> TargetFinderEntityQueue;
 
-		ParallelFor(NumJobs, [&](int32 Index)
+		ParallelFor(NumJobs, [&](int32 JobIndex)
 		{
+			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ParallelFor);
 			TArray<FMassNavigationObstacleItem, TFixedAllocator<10>> CloseEntities;
 
-			for (int32 EntityIndex = Index; EntityIndex < NumEntities; EntityIndex += NumJobs)
+			for (int32 EntityIndex = JobIndex; EntityIndex < NumEntities; EntityIndex += NumJobs)
 			{
 				ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities);
 			}
 		});
 
-		while (!TargetFinderEntityQueue.IsEmpty())
 		{
-			FMassEntityHandle TargetFinderEntity;
-			bool bSuccess = TargetFinderEntityQueue.Dequeue(TargetFinderEntity);
-			check(bSuccess);
+			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessQueue);
+			while (!TargetFinderEntityQueue.IsEmpty())
+			{
+				FMassEntityHandle TargetFinderEntity;
+				bool bSuccess = TargetFinderEntityQueue.Dequeue(TargetFinderEntity);
+				check(bSuccess);
 
-			Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(TargetFinderEntity);
-			Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(TargetFinderEntity);
+				Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(TargetFinderEntity);
+				Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(TargetFinderEntity);
+			}
 		}
 });
 }
