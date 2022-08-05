@@ -214,7 +214,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		// TODO: We're incorrectly assuming all obstacles can be targets.
 		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGridMutable();
 
-		static const int32 NumJobs = 60; // TODO
+		static const int32 NumJobs = 60; // TODO: don't hard-code
 		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs;
 
 		TQueue<FMassEntityHandle> TargetFinderEntityQueue;
