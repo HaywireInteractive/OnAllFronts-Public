@@ -51,38 +51,22 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
 }
 
-static FBox GetBoxForFinderPhase(const uint8& FinderPhase, const FVector& Center, const float& SearchRadius)
+static const FVector ExtentForPhase(const uint8& FinderPhase, const float& SearchRadius)
 {
 	// assume x,y axes positive is up to right
 	switch (FinderPhase)
 	{
 	case 0: // bottom left
-	{
-		const FVector ExtentTopRight(SearchRadius, SearchRadius, 0.f);
-		return FBox(Center - ExtentTopRight, Center);
-		break;
-	}
+		return FVector(-SearchRadius, -SearchRadius, 0.f);
 	case 1: // bottom right
-	{
-		const FVector ExtentBottomRight(SearchRadius, -SearchRadius, 0.f);
-		return FBox(Center, Center + ExtentBottomRight);
-		break;
-	}
+		return FVector(SearchRadius, -SearchRadius, 0.f);
 	case 2: // top left
-	{
-		const FVector ExtentBottomRight(SearchRadius, -SearchRadius, 0.f);
-		return FBox(Center - ExtentBottomRight, Center);
-		break;
-	}
+		return FVector(-SearchRadius, SearchRadius, 0.f);
 	case 3: // top right
-	{
-		const FVector ExtentTopRight(SearchRadius, SearchRadius, 0.f);
-		return FBox(Center, Center + ExtentTopRight);
-		break;
-	}
+		return FVector(SearchRadius, SearchRadius, 0.f);
 	default:
 		check(false);
-		return FBox();
+		return FVector();
 	}
 }
 
@@ -92,7 +76,7 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_FindCloseObstacles);
 	OutCloseEntities.Reset();
-	FBox QueryBox = GetBoxForFinderPhase(FinderPhase, Center, SearchRadius);
+	const FBox QueryBox = FBox(Center, Center + ExtentForPhase(FinderPhase, SearchRadius));
 
 	struct FSortingCell
 	{
