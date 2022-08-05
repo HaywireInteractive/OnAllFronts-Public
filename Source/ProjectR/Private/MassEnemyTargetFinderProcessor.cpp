@@ -214,7 +214,8 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		// TODO: We're incorrectly assuming all obstacles can be targets.
 		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGridMutable();
 
-		const int32 NumJobs = 60; // TODO
+		static const int32 NumJobs = 60; // TODO
+		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs;
 
 		TQueue<FMassEntityHandle> TargetFinderEntityQueue;
 
@@ -223,7 +224,9 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ParallelFor);
 			TArray<FMassNavigationObstacleItem, TFixedAllocator<10>> CloseEntities;
 
-			for (int32 EntityIndex = JobIndex; EntityIndex < NumEntities; EntityIndex += NumJobs)
+			const int32 StartIndex = JobIndex * CountPerJob;
+			const int32 EndIndexExclusive = StartIndex + CountPerJob;
+			for (int32 EntityIndex = StartIndex; (EntityIndex < NumEntities) && (EntityIndex < EndIndexExclusive); ++EntityIndex)
 			{
 				ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase);
 			}
