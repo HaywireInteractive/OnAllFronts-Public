@@ -51,23 +51,20 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
 }
 
-static const FVector ExtentForPhase(const uint8& FinderPhase, const float& SearchRadius)
+static const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt = 8;
+static const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCount = UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt * UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
+
+static const FBox BoxForPhase(const uint8& FinderPhase, const float& SearchRadius, const FVector& Center)
 {
-	// assume x,y axes positive is up to right
-	switch (FinderPhase)
-	{
-	case 0: // bottom left
-		return FVector(-SearchRadius, -SearchRadius, 0.f);
-	case 1: // bottom right
-		return FVector(SearchRadius, -SearchRadius, 0.f);
-	case 2: // top left
-		return FVector(-SearchRadius, SearchRadius, 0.f);
-	case 3: // top right
-		return FVector(SearchRadius, SearchRadius, 0.f);
-	default:
-		check(false);
-		return FVector();
-	}
+	const uint8 BoxXSegment = FinderPhase % UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
+	const uint8 BoxYSegment = FinderPhase / UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
+	const float SegmentSize = SearchRadius / (UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt / 2);
+
+	const FVector BoxBottomLeft = Center - FVector(SearchRadius, SearchRadius, 0.f);
+	
+	const FVector PhaseBoxBottomLeft = BoxBottomLeft + FVector(BoxXSegment * SegmentSize, BoxYSegment * SegmentSize, 0.f);
+	const FVector PhaseBoxTopRight = PhaseBoxBottomLeft + FVector(SegmentSize, SegmentSize, 0.f);
+	return FBox(PhaseBoxBottomLeft, PhaseBoxTopRight);
 }
 
 // TODO: Find out how to not duplicate from MassProjectileDamageProcessor.cpp. Right now only difference is number in template type for TFixedAllocator.
@@ -76,7 +73,7 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_FindCloseObstacles);
 	OutCloseEntities.Reset();
-	const FBox QueryBox = FBox(Center, Center + ExtentForPhase(FinderPhase, SearchRadius));
+	const FBox QueryBox = BoxForPhase(FinderPhase, SearchRadius, Center);
 
 	struct FSortingCell
 	{
@@ -215,7 +212,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGridMutable();
 
 		static const int32 NumJobs = 60; // TODO: don't hard-code
-		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs;
+		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs; // ceil(NumEntities / NumJobs)
 
 		TQueue<FMassEntityHandle> TargetFinderEntityQueue;
 
@@ -246,5 +243,5 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		}
 	});
 
-	FinderPhase = (FinderPhase + 1) % 4;
+	FinderPhase = (FinderPhase + 1) % UMassEnemyTargetFinderProcessor_FinderPhaseCount;
 }
