@@ -58,7 +58,7 @@ static const FBox BoxForPhase(const uint8& FinderPhase, const float& SearchRadiu
 {
 	const uint8 BoxXSegment = FinderPhase % UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
 	const uint8 BoxYSegment = FinderPhase / UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
-	const float SegmentSize = SearchRadius / (UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt / 2);
+	const float SegmentSize = SearchRadius / (UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt / 2.0f);
 
 	const FVector BoxBottomLeft = Center - FVector(SearchRadius, SearchRadius, 0.f);
 	
