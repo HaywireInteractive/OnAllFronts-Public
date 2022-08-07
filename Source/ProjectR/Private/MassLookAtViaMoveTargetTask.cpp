@@ -45,7 +45,7 @@ EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecution
 	MoveTargetFragment.CreateNewAction(EMassMovementAction::Stand, *World);
 	MoveTargetFragment.Forward = NewGlobalDirection;
 
-	EntitySubsystem.AddTagToEntity(MassContext.GetEntity(), FMassNeedsMoveTargetCompleteSignalTag::StaticStruct());
+	EntitySubsystem.Defer().AddTag<FMassNeedsMoveTargetCompleteSignalTag>(MassContext.GetEntity());
 	return EStateTreeRunStatus::Running;
 }
 
