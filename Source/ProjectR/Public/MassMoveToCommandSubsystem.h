@@ -19,7 +19,8 @@ class PROJECTR_API UMassMoveToCommandSubsystem : public UWorldSubsystem
 
 public:
 	const FVector* GetLastMoveToCommandTarget() const;
-	void SetMoveToCommandTarget(const FVector target);
+	const bool IsLastMoveToCommandForTeam1() const;
+	void SetMoveToCommandTarget(const FVector target, const bool bIsOnTeam1);
 
 protected:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
@@ -38,4 +39,7 @@ protected:
 
 	UPROPERTY()
 	FVector MoveToCommandTarget = FVector::ZeroVector;
+
+	UPROPERTY()
+	bool bIsLastMoveToCommandForTeam1;
 };

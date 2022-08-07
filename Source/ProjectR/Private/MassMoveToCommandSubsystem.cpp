@@ -13,10 +13,16 @@ const FVector* UMassMoveToCommandSubsystem::GetLastMoveToCommandTarget() const
   return MoveToCommandTarget.IsZero() ? nullptr : &MoveToCommandTarget;
 }
 
-void UMassMoveToCommandSubsystem::SetMoveToCommandTarget(const FVector target)
+const bool UMassMoveToCommandSubsystem::IsLastMoveToCommandForTeam1() const
+{
+	return bIsLastMoveToCommandForTeam1;
+}
+
+void UMassMoveToCommandSubsystem::SetMoveToCommandTarget(const FVector target, const bool bIsOnTeam1)
 {
 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("UMassMoveToCommandSubsystem::SetMoveToCommandTarget, num entities: %d"), Entities.Num()));
 	MoveToCommandTarget = target;
+	bIsLastMoveToCommandForTeam1 = bIsOnTeam1;
 
 	// TODO: We are relying on fact that HitReceived triggers a state update in state tree, but this could lead to issues in the future if that behavior changes.
 	SignalSubsystem->SignalEntities(UE::Mass::Signals::HitReceived, Entities.Array());

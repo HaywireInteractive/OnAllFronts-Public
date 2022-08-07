@@ -38,5 +38,5 @@ void ACommanderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 void ACommanderCharacter::SetMoveToCommand() const
 {
-	MoveToCommandSystem->SetMoveToCommandTarget(FVector(100.f, 0.f, 0.f));
+	MoveToCommandSystem->SetMoveToCommandTarget(FVector(100.f, 0.f, 0.f), false);
 }
