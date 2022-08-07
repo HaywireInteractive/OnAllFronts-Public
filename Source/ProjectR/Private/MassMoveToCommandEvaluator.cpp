@@ -9,6 +9,7 @@
 bool FMassMoveToCommandEvaluator::Link(FStateTreeLinker& Linker)
 {
 	Linker.LinkExternalData(MoveToCommandSubsystemHandle);
+	Linker.LinkExternalData(TeamMemberHandle);
 
 	Linker.LinkInstanceDataProperty(GotMoveToCommandHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassMoveToCommandEvaluatorInstanceData, bGotMoveToCommand));
 	Linker.LinkInstanceDataProperty(LastMoveToCommandTargetHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassMoveToCommandEvaluatorInstanceData, LastMoveToCommandTarget));
@@ -18,8 +19,9 @@ bool FMassMoveToCommandEvaluator::Link(FStateTreeLinker& Linker)
 
 void FMassMoveToCommandEvaluator::Evaluate(FStateTreeExecutionContext& Context, const EStateTreeEvaluationType EvalType, const float DeltaTime) const
 {
-	//UE_LOG(LogTemp, Warning, TEXT("FMassMoveToCommandEvaluator::Evaluate: start"));
 	UMassMoveToCommandSubsystem& MoveToCommandSubsystem = Context.GetExternalData(MoveToCommandSubsystemHandle);
+	const FTeamMemberFragment& TeamMemberFragment = Context.GetExternalData(TeamMemberHandle);
+	const bool IsLastMoveToCommandForTeam1 = MoveToCommandSubsystem.IsLastMoveToCommandForTeam1();
 	const FVector* MoveToCommandTarget = MoveToCommandSubsystem.GetLastMoveToCommandTarget();
 
 	bool& bGotMoveToCommand = Context.GetInstanceData(GotMoveToCommandHandle);
@@ -28,11 +30,8 @@ void FMassMoveToCommandEvaluator::Evaluate(FStateTreeExecutionContext& Context, 
 	bGotMoveToCommand = false;
 	LastMoveToCommandTarget = FVector::ZeroVector;
 
-	//GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("FMassMoveToCommandEvaluator::Evaluate, MoveToCommandTarget is null: %d"), MoveToCommandTarget == nullptr));
-
-	if (MoveToCommandTarget != nullptr)
+	if (MoveToCommandTarget != nullptr && TeamMemberFragment.IsOnTeam1 == IsLastMoveToCommandForTeam1)
 	{
-		//UE_LOG(LogTemp, Warning, TEXT("FMassMoveToCommandEvaluator::Evaluate: setting bGotMoveToCommand = true"));
 		bGotMoveToCommand = true;
 		LastMoveToCommandTarget = *MoveToCommandTarget;
 	}

@@ -43,15 +43,18 @@ void UMassMoveTargetCompleteProcessor::Execute(UMassEntitySubsystem& EntitySubsy
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
 			const FTransform& CurrentTransform = LocationList[EntityIndex].GetTransform();
-			const FVector& MoveTargetForward = MoveTargetList[EntityIndex].Forward;
+			const FMassMoveTargetFragment& MoveTargetFragment = MoveTargetList[EntityIndex];
 
 			const FQuat& CurrentRotation = CurrentTransform.GetRotation();
 
-			const float MoveTargetForwardHeading = UE::MassNavigation::GetYawFromDirection(MoveTargetForward);
+			const float MoveTargetForwardHeading = UE::MassNavigation::GetYawFromDirection(MoveTargetFragment.Forward);
 			FQuat MoveTargetForwardRotation(FVector::UpVector, MoveTargetForwardHeading);
 
-			bool bAtMoveTargetForward = CurrentRotation.Equals(MoveTargetForwardRotation);
-			if (bAtMoveTargetForward) {
+			const bool bAtMoveTargetForward = CurrentRotation.Equals(MoveTargetForwardRotation);
+
+			const bool bAtMoveTargetLocation = CurrentTransform.GetLocation().Equals(MoveTargetFragment.Center);
+
+			if (bAtMoveTargetForward && bAtMoveTargetLocation) {
 				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
 				TransientEntitiesToSignal.Add(Entity);
 				Context.Defer().RemoveTag<FMassNeedsMoveTargetCompleteSignalTag>(Entity);

@@ -20,7 +20,6 @@ const bool UMassMoveToCommandSubsystem::IsLastMoveToCommandForTeam1() const
 
 void UMassMoveToCommandSubsystem::SetMoveToCommandTarget(const FVector target, const bool bIsOnTeam1)
 {
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("UMassMoveToCommandSubsystem::SetMoveToCommandTarget, num entities: %d"), Entities.Num()));
 	MoveToCommandTarget = target;
 	bIsLastMoveToCommandForTeam1 = bIsOnTeam1;
 

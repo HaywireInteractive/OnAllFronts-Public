@@ -3,6 +3,7 @@
 #pragma once
 
 #include "MassStateTreeTypes.h"
+#include "MassEnemyTargetFinderProcessor.h"
 #include "MassMoveToCommandEvaluator.generated.h"
 
 class UMassMoveToCommandSubsystem;
@@ -30,6 +31,7 @@ protected:
 	virtual void Evaluate(FStateTreeExecutionContext& Context, const EStateTreeEvaluationType EvalType, const float DeltaTime) const override;
 
 	TStateTreeExternalDataHandle<UMassMoveToCommandSubsystem> MoveToCommandSubsystemHandle;
+	TStateTreeExternalDataHandle<FTeamMemberFragment> TeamMemberHandle;
 
 	TStateTreeInstanceDataPropertyHandle<bool> GotMoveToCommandHandle;
 	TStateTreeInstanceDataPropertyHandle<FVector> LastMoveToCommandTargetHandle;
