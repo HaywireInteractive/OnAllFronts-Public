@@ -50,7 +50,7 @@ void UMassMoveTargetCompleteProcessor::Execute(UMassEntitySubsystem& EntitySubsy
 			const float MoveTargetForwardHeading = UE::MassNavigation::GetYawFromDirection(MoveTargetFragment.Forward);
 			FQuat MoveTargetForwardRotation(FVector::UpVector, MoveTargetForwardHeading);
 
-			const bool bAtMoveTargetForward = CurrentRotation.Equals(MoveTargetForwardRotation);
+			const bool bAtMoveTargetForward = CurrentRotation.Equals(MoveTargetForwardRotation, 1.0f);
 
 			const bool bAtMoveTargetLocation = CurrentTransform.GetLocation().Equals(MoveTargetFragment.Center);
 

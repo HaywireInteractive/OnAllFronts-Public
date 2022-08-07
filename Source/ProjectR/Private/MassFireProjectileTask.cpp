@@ -81,7 +81,7 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 	});
 
 	UMassSignalSubsystem& MassSignalSubsystem = Context.GetExternalData(MassSignalSubsystemHandle);
-	MassSignalSubsystem.DelaySignalEntity(UE::Mass::Signals::NewStateTreeTaskRequired, MassContext.GetEntity(), 0.1f); // TODO: needed?
+	MassSignalSubsystem.DelaySignalEntity(UE::Mass::Signals::NewStateTreeTaskRequired, MassContext.GetEntity(), 1.0f); // TODO: needed?
 
 	return EStateTreeRunStatus::Running;
 }

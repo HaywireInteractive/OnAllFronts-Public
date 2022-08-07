@@ -7,6 +7,7 @@
 #include "MassNavigationSubsystem.h"
 #include "MassLODTypes.h"
 #include "MassCommonFragments.h"
+#include "MassTrackTargetProcessor.h"
 
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
