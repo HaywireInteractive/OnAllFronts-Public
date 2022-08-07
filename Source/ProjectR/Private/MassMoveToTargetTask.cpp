@@ -25,7 +25,7 @@ EStateTreeRunStatus FMassMoveToTargetTask::EnterState(FStateTreeExecutionContext
 	FMassMoveTargetFragment& MoveTarget = MassContext.GetExternalData(MoveTargetHandle);
 	FTransformFragment& TransformFragment = MassContext.GetExternalData(TransformHandle);
 	FVector CurrentLocation = TransformFragment.GetTransform().GetLocation();
-	MoveTarget.Center = CurrentLocation + FVector(10000.f, 10000.f, 0.f); // TODO
+	MoveTarget.Center = FVector(0.f, 0.f, 0.f); // TODO
 	float Distance = (CurrentLocation - MoveTarget.Center).Size();
 	MoveTarget.DistanceToGoal = Distance;
 	MoveTarget.bOffBoundaries = true;
