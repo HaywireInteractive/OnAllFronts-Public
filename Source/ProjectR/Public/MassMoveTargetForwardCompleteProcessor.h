@@ -7,22 +7,22 @@
 #include "MassEntityTraitBase.h"
 #include "MassEntityTemplateRegistry.h"
 #include "MassEntityTypes.h"
-#include "MassMoveTargetCompleteProcessor.generated.h"
+#include "MassMoveTargetForwardCompleteProcessor.generated.h"
 
 class UMassSignalSubsystem;
 
 USTRUCT()
-struct FMassNeedsMoveTargetCompleteSignalTag : public FMassTag
+struct FMassNeedsMoveTargetForwardCompleteSignalTag : public FMassTag
 {
 	GENERATED_BODY()
 };
 
 UCLASS()
-class PROJECTR_API UMassMoveTargetCompleteProcessor : public UMassProcessor
+class PROJECTR_API UMassMoveTargetForwardCompleteProcessor : public UMassProcessor
 {
 	GENERATED_BODY()
 public:
-	UMassMoveTargetCompleteProcessor();
+	UMassMoveTargetForwardCompleteProcessor();
 
 protected:
 	virtual void Initialize(UObject& Owner) override;

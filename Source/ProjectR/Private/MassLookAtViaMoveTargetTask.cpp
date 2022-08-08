@@ -4,7 +4,7 @@
 #include "MassAIBehaviorTypes.h"
 #include "MassStateTreeExecutionContext.h"
 #include "MassEntitySubsystem.h"
-#include "MassMoveTargetCompleteProcessor.h"
+#include "MassMoveTargetForwardCompleteProcessor.h"
 #include "DestroyedTargetFinderProcessor.h"
 #include "MassTrackTargetProcessor.h"
 #include "MassNavigationTypes.h"
@@ -64,7 +64,7 @@ EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecution
 	MoveTargetFragment.Forward = NewGlobalDirection;
 
 	EntitySubsystem.Defer().AddTag<FMassTrackTargetTag>(Entity);
-	EntitySubsystem.Defer().AddTag<FMassNeedsMoveTargetCompleteSignalTag>(Entity);
+	EntitySubsystem.Defer().AddTag<FMassNeedsMoveTargetForwardCompleteSignalTag>(Entity);
 	return EStateTreeRunStatus::Running;
 }
 

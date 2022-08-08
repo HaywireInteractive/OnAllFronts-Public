@@ -6,7 +6,7 @@
 #include "MassStateTreeExecutionContext.h"
 #include "StateTreeLinker.h"
 #include "MassEntitySubsystem.h"
-#include "MassMoveTargetCompleteProcessor.h"
+#include "MassMoveTargetForwardCompleteProcessor.h"
 
 bool FMassMoveToTargetTask::Link(FStateTreeLinker& Linker)
 {
@@ -35,7 +35,7 @@ EStateTreeRunStatus FMassMoveToTargetTask::EnterState(FStateTreeExecutionContext
 	MoveTarget.CreateNewAction(EMassMovementAction::Move, *World);
 
 	UMassEntitySubsystem& EntitySubsystem = MassContext.GetEntitySubsystem();
-	EntitySubsystem.Defer().AddTag<FMassNeedsMoveTargetCompleteSignalTag>(MassContext.GetEntity());
+	EntitySubsystem.Defer().AddTag<FMassNeedsMoveTargetForwardCompleteSignalTag>(MassContext.GetEntity());
 
 	return EStateTreeRunStatus::Running;
 }

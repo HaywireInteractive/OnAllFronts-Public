@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "MassMoveTargetCompleteProcessor.h"
+#include "MassMoveTargetForwardCompleteProcessor.h"
 
 #include "MassCommonFragments.h"
 #include "MassNavigationFragments.h"
@@ -9,7 +9,7 @@
 #include "MassSignalSubsystem.h"
 #include "MassStateTreeTypes.h"
 
-UMassMoveTargetCompleteProcessor::UMassMoveTargetCompleteProcessor()
+UMassMoveTargetForwardCompleteProcessor::UMassMoveTargetForwardCompleteProcessor()
 	: EntityQuery(*this)
 {
 	bAutoRegisterWithProcessingPhases = true;
@@ -17,19 +17,19 @@ UMassMoveTargetCompleteProcessor::UMassMoveTargetCompleteProcessor()
 	ExecutionOrder.ExecuteBefore.Add(UE::Mass::ProcessorGroupNames::Behavior);
 }
 
-void UMassMoveTargetCompleteProcessor::Initialize(UObject& Owner)
+void UMassMoveTargetForwardCompleteProcessor::Initialize(UObject& Owner)
 {
 	SignalSubsystem = UWorld::GetSubsystem<UMassSignalSubsystem>(Owner.GetWorld());
 }
 
-void UMassMoveTargetCompleteProcessor::ConfigureQueries()
+void UMassMoveTargetForwardCompleteProcessor::ConfigureQueries()
 {
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddTagRequirement<FMassNeedsMoveTargetCompleteSignalTag>(EMassFragmentPresence::All);
+	EntityQuery.AddTagRequirement<FMassNeedsMoveTargetForwardCompleteSignalTag>(EMassFragmentPresence::All);
 }
 
-void UMassMoveTargetCompleteProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
+void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
 	TransientEntitiesToSignal.Reset();
 
@@ -52,12 +52,10 @@ void UMassMoveTargetCompleteProcessor::Execute(UMassEntitySubsystem& EntitySubsy
 
 			const bool bAtMoveTargetForward = CurrentRotation.Equals(MoveTargetForwardRotation, 1.0f);
 
-			const bool bAtMoveTargetLocation = CurrentTransform.GetLocation().Equals(MoveTargetFragment.Center);
-
-			if (bAtMoveTargetForward && bAtMoveTargetLocation) {
+			if (bAtMoveTargetForward) {
 				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
 				TransientEntitiesToSignal.Add(Entity);
-				Context.Defer().RemoveTag<FMassNeedsMoveTargetCompleteSignalTag>(Entity);
+				Context.Defer().RemoveTag<FMassNeedsMoveTargetForwardCompleteSignalTag>(Entity);
 			}
 		}
 	});
