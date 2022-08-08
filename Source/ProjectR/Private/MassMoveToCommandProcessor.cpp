@@ -54,6 +54,7 @@ void ProcessEntity(const FTeamMemberFragment& TeamMemberFragment, FMassMoveTarge
 	UWorld* World = EntitySubsystem.GetWorld();
 	MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Move, *World);
 	MoveTargetFragmentToModify.Center = LastMoveToCommandTarget;
+	MoveTargetFragmentToModify.Forward = (LastMoveToCommandTarget - EntityLocation).GetSafeNormal();
 	float Distance = (EntityLocation - LastMoveToCommandTarget).Size();
 	MoveTargetFragmentToModify.DistanceToGoal = Distance;
 	MoveTargetFragmentToModify.bOffBoundaries = true;
