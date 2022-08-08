@@ -14,8 +14,8 @@ USTRUCT()
 struct PROJECTR_API FTargetEntityFragment : public FMassFragment
 {
 	GENERATED_BODY()
-		UPROPERTY(EditAnywhere, Category = "")
-		FMassEntityHandle Entity;
+	UPROPERTY(EditAnywhere, Category = "")
+	FMassEntityHandle Entity;
 };
 
 USTRUCT()

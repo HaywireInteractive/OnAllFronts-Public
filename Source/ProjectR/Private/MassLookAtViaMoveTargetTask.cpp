@@ -5,6 +5,7 @@
 #include "MassStateTreeExecutionContext.h"
 #include "MassEntitySubsystem.h"
 #include "MassMoveTargetCompleteProcessor.h"
+#include "DestroyedTargetFinderProcessor.h"
 #include "MassTrackTargetProcessor.h"
 #include "MassNavigationTypes.h"
 #include "StateTreeLinker.h"
@@ -12,6 +13,7 @@
 bool FMassLookAtViaMoveTargetTask::Link(FStateTreeLinker& Linker)
 {
 	Linker.LinkExternalData(MoveTargetHandle);
+	Linker.LinkExternalData(StashedMoveTargetHandle);
 	Linker.LinkExternalData(TransformHandle);
 
 	Linker.LinkInstanceDataProperty(TargetEntityHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassLookAtViaMoveTargetTaskInstanceData, TargetEntity));
@@ -19,10 +21,20 @@ bool FMassLookAtViaMoveTargetTask::Link(FStateTreeLinker& Linker)
 	return true;
 }
 
+void StashCurrentMoveTargetIfNeeded(FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem&  EntitySubsystem, const FMassEntityHandle& Entity)
+{
+	if (MoveTargetFragment.GetCurrentAction() == EMassMovementAction::Move && MoveTargetFragment.GetCurrentActionID() > 0)
+	{
+		CopyMoveTarget(MoveTargetFragment, StashedMoveTargetFragment, World);
+		EntitySubsystem.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
+	}
+}
+
 EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecutionContext& Context, const EStateTreeStateChangeType ChangeType, const FStateTreeTransitionResult& Transition) const
 {
 	const FMassStateTreeExecutionContext& MassContext = static_cast<FMassStateTreeExecutionContext&>(Context);
 	FMassMoveTargetFragment& MoveTargetFragment = MassContext.GetExternalData(MoveTargetHandle);
+	FMassStashedMoveTargetFragment& StashedMoveTargetFragment = MassContext.GetExternalData(StashedMoveTargetHandle);
 	const FTransformFragment& TransformFragment = MassContext.GetExternalData(TransformHandle);
 
 	const FMassEntityHandle* TargetEntity = Context.GetInstanceDataPtr(TargetEntityHandle);
@@ -43,11 +55,16 @@ EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecution
 	const FVector NewGlobalDirection = (TargetTransformFragment->GetTransform().GetLocation() - EntityLocation).GetSafeNormal();
 
 	const UWorld* World = Context.GetWorld();
+
+	const FMassEntityHandle& Entity = MassContext.GetEntity();
+	StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, *World, EntitySubsystem, Entity);
+
 	MoveTargetFragment.CreateNewAction(EMassMovementAction::Stand, *World);
+	MoveTargetFragment.Center = EntityLocation;
 	MoveTargetFragment.Forward = NewGlobalDirection;
 
-	EntitySubsystem.Defer().AddTag<FMassTrackTargetTag>(MassContext.GetEntity());
-	EntitySubsystem.Defer().AddTag<FMassNeedsMoveTargetCompleteSignalTag>(MassContext.GetEntity());
+	EntitySubsystem.Defer().AddTag<FMassTrackTargetTag>(Entity);
+	EntitySubsystem.Defer().AddTag<FMassNeedsMoveTargetCompleteSignalTag>(Entity);
 	return EStateTreeRunStatus::Running;
 }
 

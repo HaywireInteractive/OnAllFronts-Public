@@ -21,25 +21,15 @@ public:
 	const FVector* GetLastMoveToCommandTarget() const;
 	const bool IsLastMoveToCommandForTeam1() const;
 	void SetMoveToCommandTarget(const FVector target, const bool bIsOnTeam1);
+	void ResetLastMoveToCommand();
 
 protected:
-	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-
-	void RegisterEntity(const FMassEntityHandle Entity);
-	void UnregisterEntity(FMassEntityHandle Entity);
-
-	UPROPERTY()
-	UMassSignalSubsystem* SignalSubsystem;
-
-	UPROPERTY()
-	UMassAgentSubsystem* AgentSubsystem;
-
-	UPROPERTY()
-	TSet<FMassEntityHandle> Entities;
-
 	UPROPERTY()
 	FVector MoveToCommandTarget = FVector::ZeroVector;
 
 	UPROPERTY()
 	bool bIsLastMoveToCommandForTeam1;
+
+	UPROPERTY()
+	bool bHasMoveToCommand = false;
 };

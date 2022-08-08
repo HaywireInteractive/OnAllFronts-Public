@@ -6,6 +6,7 @@
 #include "MassStateTreeTypes.h"
 #include "MassNavigationFragments.h"
 #include "MassCommonFragments.h"
+#include "MassMoveToCommandProcessor.h"
 #include "MassLookAtViaMoveTargetTask.generated.h"
 
 USTRUCT()
@@ -29,6 +30,7 @@ protected:
 	virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
 
 	TStateTreeExternalDataHandle<FMassMoveTargetFragment> MoveTargetHandle;
+	TStateTreeExternalDataHandle<FMassStashedMoveTargetFragment> StashedMoveTargetHandle;
 	TStateTreeExternalDataHandle<FTransformFragment> TransformHandle;
 
 	TStateTreeInstanceDataPropertyHandle<FMassEntityHandle> TargetEntityHandle;
