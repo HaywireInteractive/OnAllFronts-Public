@@ -6,6 +6,10 @@ ProjectR is a proof of concept [MilSim](https://en.wikipedia.org/wiki/MilSim) FP
 
 The project is open sourced to make it easy for others to contribute and to help others learn the MassEntity system which is not very well-documented/supported yet.
 
+## Latest Demo
+
+https://youtu.be/6SLBVRI6MUI
+
 ## Motivation
 
 In today's "MilSim" games players frequently end up doing things or seeing this that would not happen in an actual MilSim. Examples:
