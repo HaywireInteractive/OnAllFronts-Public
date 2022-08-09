@@ -9,7 +9,7 @@ The project is open sourced to make it easy for others to contribute and to help
 ## Latest Demo
 
 10,000 soliders with one team attacking and one defending:
-https://youtu.be/6SLBVRI6MUI
+https://youtu.be/Cg0k9XhYcQA
 
 ## Motivation
 
