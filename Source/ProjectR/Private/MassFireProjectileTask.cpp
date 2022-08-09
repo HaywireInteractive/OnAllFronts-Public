@@ -35,8 +35,9 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 	const UMassEntitySubsystem& EntitySubsystem = MassContext.GetEntitySubsystem();
 
 	const FTransformFragment& StateTreeEntityTransformFragment = Context.GetExternalData(EntityTransformHandle);
-	const FVector StateTreeEntityLocation = StateTreeEntityTransformFragment.GetTransform().GetLocation();
-	const FVector StateTreeEntityCurrentForward = StateTreeEntityTransformFragment.GetTransform().GetRotation().GetForwardVector();
+	const FTransform& StateTreeEntityTransform = StateTreeEntityTransformFragment.GetTransform();
+	const FVector StateTreeEntityLocation = StateTreeEntityTransform.GetLocation();
+	const FVector StateTreeEntityCurrentForward = StateTreeEntityTransform.GetRotation().GetForwardVector();
 
 	const FMassEntityConfig& EntityConfig = Context.GetInstanceData(EntityConfigHandle);
 	const float InitialVelocityMagnitude = Context.GetInstanceData(InitialVelocityHandle);
@@ -45,8 +46,9 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 	const FVector& ProjectileLocationOffset = Context.GetInstanceData(ProjectileLocationOffsetHandle);
 
 	const FVector SpawnLocation = StateTreeEntityLocation + StateTreeEntityCurrentForward * ForwardVectorMagnitude + ProjectileLocationOffset;
+	const FQuat SpawnRotation = StateTreeEntityTransform.GetRotation();
 
-	AsyncTask(ENamedThreads::GameThread, [EntityConfig, InitialVelocity, SpawnLocation, &EntitySubsystem, World]()
+	AsyncTask(ENamedThreads::GameThread, [EntityConfig, InitialVelocity, SpawnLocation, &EntitySubsystem, World, SpawnRotation]()
 	{
 		UMassSpawnerSubsystem* SpawnerSystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
 		if (SpawnerSystem == nullptr)
@@ -66,6 +68,7 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 			Transforms.Transforms.Reserve(1);
 			FTransform& SpawnDataTransform = Transforms.Transforms.AddDefaulted_GetRef();
 			SpawnDataTransform.SetLocation(SpawnLocation);
+			SpawnDataTransform.SetRotation(SpawnRotation);
 
 			TArray<FMassEntityHandle> SpawnedEntities;
 			SpawnerSystem->SpawnEntities(EntityTemplate.GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);

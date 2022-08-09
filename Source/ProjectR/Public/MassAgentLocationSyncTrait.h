@@ -86,19 +86,6 @@ protected:
 };
 
 UCLASS()
-class PROJECTR_API UMassProjectileUpdateISMProcessor : public UMassUpdateISMProcessor
-{
-	GENERATED_BODY()
-public:
-	UMassProjectileUpdateISMProcessor();
-
-protected:
-
-	/** Configure the owned FMassEntityQuery instances to express processor's requirements */
-	virtual void ConfigureQueries() override;
-};
-
-UCLASS()
 class PROJECTR_API UMassProjectileUpdateISMCollisionsProcessor : public UMassUpdateISMProcessor
 {
 	GENERATED_BODY()

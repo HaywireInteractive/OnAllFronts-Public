@@ -84,21 +84,6 @@ void ULocationToActorTranslator::Execute(UMassEntitySubsystem& EntitySubsystem, 
 }
 
 //----------------------------------------------------------------------//
-//  UMassProjectileUpdateISMProcessor
-//----------------------------------------------------------------------//
-UMassProjectileUpdateISMProcessor::UMassProjectileUpdateISMProcessor()
-{
-	ExecutionOrder.ExecuteAfter.Add(UE::Mass::ProcessorGroupNames::Tasks);
-}
-
-void UMassProjectileUpdateISMProcessor::ConfigureQueries()
-{
-	Super::ConfigureQueries();
-
-	EntityQuery.AddTagRequirement<FMassProjectileTag>(EMassFragmentPresence::All);
-}
-
-//----------------------------------------------------------------------//
 //  UMassProjectileUpdateISMCollisionsProcessor
 //----------------------------------------------------------------------//
 UMassProjectileUpdateISMCollisionsProcessor::UMassProjectileUpdateISMCollisionsProcessor()
