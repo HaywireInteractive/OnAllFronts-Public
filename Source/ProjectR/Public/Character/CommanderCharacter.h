@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "MassEntityConfigAsset.h"
 #include "CommanderCharacter.generated.h"
 
 class UMassMoveToCommandSubsystem;
@@ -21,11 +22,17 @@ protected:
 	UPROPERTY()
 	UMassMoveToCommandSubsystem* MoveToCommandSystem;
 
+	UPROPERTY(EditAnywhere, Category = "Mass")
+	FMassEntityConfig ProjectileEntityConfig;
+
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 	UFUNCTION(BlueprintCallable)
 	void SetMoveToCommand() const;
+
+	UFUNCTION(BlueprintCallable)
+	void SpawnProjectile() const;
 
 public:	
 	// Called every frame

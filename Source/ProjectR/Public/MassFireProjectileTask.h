@@ -10,6 +10,8 @@
 class UMassSignalSubsystem;
 struct FTransformFragment;
 
+void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQuat& SpawnRotation, const FVector& InitialVelocity, const FMassEntityConfig& EntityConfig);
+
 USTRUCT()
 struct PROJECTR_API FMassFireProjectileTaskInstanceData
 {

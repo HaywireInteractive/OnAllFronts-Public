@@ -15,6 +15,44 @@
 #include "Async/Async.h"
 #include "StateTreeLinker.h"
 
+void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQuat& SpawnRotation, const FVector& InitialVelocity, const FMassEntityConfig& EntityConfig)
+{
+	UMassSpawnerSubsystem* SpawnerSystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
+	if (SpawnerSystem == nullptr)
+	{
+		return;
+	}
+
+	const FMassEntityTemplate& EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*World, *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
+	if (EntityTemplate.IsValid())
+	{
+		FMassEntitySpawnDataGeneratorResult Result;
+		Result.SpawnDataProcessor = UMassSpawnLocationProcessor::StaticClass();
+		Result.SpawnData.InitializeAs<FMassTransformsSpawnData>();
+		Result.NumEntities = 1;
+		FMassTransformsSpawnData& Transforms = Result.SpawnData.GetMutable<FMassTransformsSpawnData>();
+
+		Transforms.Transforms.Reserve(1);
+		FTransform& SpawnDataTransform = Transforms.Transforms.AddDefaulted_GetRef();
+		SpawnDataTransform.SetLocation(SpawnLocation);
+		SpawnDataTransform.SetRotation(SpawnRotation);
+
+		TArray<FMassEntityHandle> SpawnedEntities;
+		SpawnerSystem->SpawnEntities(EntityTemplate.GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
+
+		const UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(World);
+		check(EntitySubsystem);
+		FMassVelocityFragment* SpawnedEntityVelocityFragment = EntitySubsystem->GetFragmentDataPtr<FMassVelocityFragment>(SpawnedEntities[0]);
+		if (SpawnedEntityVelocityFragment)
+		{
+			SpawnedEntityVelocityFragment->Value = InitialVelocity;
+		}
+		else {
+			UE_LOG(LogTemp, Warning, TEXT("SpawnProjectile: Spawned entity has no FMassVelocityFragment"));
+		}
+	}
+}
+
 bool FMassFireProjectileTask::Link(FStateTreeLinker& Linker)
 {
 	Linker.LinkExternalData(MassSignalSubsystemHandle);
@@ -32,7 +70,6 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 {
 	const UWorld* World = Context.GetWorld();
 	const FMassStateTreeExecutionContext& MassContext = static_cast<FMassStateTreeExecutionContext&>(Context);
-	const UMassEntitySubsystem& EntitySubsystem = MassContext.GetEntitySubsystem();
 
 	const FTransformFragment& StateTreeEntityTransformFragment = Context.GetExternalData(EntityTransformHandle);
 	const FTransform& StateTreeEntityTransform = StateTreeEntityTransformFragment.GetTransform();
@@ -48,39 +85,9 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 	const FVector SpawnLocation = StateTreeEntityLocation + StateTreeEntityCurrentForward * ForwardVectorMagnitude + ProjectileLocationOffset;
 	const FQuat SpawnRotation = StateTreeEntityTransform.GetRotation();
 
-	AsyncTask(ENamedThreads::GameThread, [EntityConfig, InitialVelocity, SpawnLocation, &EntitySubsystem, World, SpawnRotation]()
+	AsyncTask(ENamedThreads::GameThread, [EntityConfig, InitialVelocity, SpawnLocation, World, SpawnRotation]()
 	{
-		UMassSpawnerSubsystem* SpawnerSystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
-		if (SpawnerSystem == nullptr)
-		{
-			return;
-		}
-
-		const FMassEntityTemplate& EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*World, *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
-		if (EntityTemplate.IsValid())
-		{
-			FMassEntitySpawnDataGeneratorResult Result;
-			Result.SpawnDataProcessor = UMassSpawnLocationProcessor::StaticClass();
-			Result.SpawnData.InitializeAs<FMassTransformsSpawnData>();
-			Result.NumEntities = 1;
-			FMassTransformsSpawnData& Transforms = Result.SpawnData.GetMutable<FMassTransformsSpawnData>();
-
-			Transforms.Transforms.Reserve(1);
-			FTransform& SpawnDataTransform = Transforms.Transforms.AddDefaulted_GetRef();
-			SpawnDataTransform.SetLocation(SpawnLocation);
-			SpawnDataTransform.SetRotation(SpawnRotation);
-
-			TArray<FMassEntityHandle> SpawnedEntities;
-			SpawnerSystem->SpawnEntities(EntityTemplate.GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
-
-			FMassVelocityFragment* SpawnedEntityVelocityFragment = EntitySubsystem.GetFragmentDataPtr<FMassVelocityFragment>(SpawnedEntities[0]);
-			if (SpawnedEntityVelocityFragment)
-			{
-				SpawnedEntityVelocityFragment->Value = InitialVelocity;
-			} else {
-				UE_LOG(LogTemp, Warning, TEXT("FMassFireProjectileTask::EnterState: Spawned entity has no FMassVelocityFragment"));
-			}
-		}
+			SpawnProjectile(World, SpawnLocation, SpawnRotation, InitialVelocity, EntityConfig);
 	});
 
 	UMassSignalSubsystem& MassSignalSubsystem = Context.GetExternalData(MassSignalSubsystemHandle);
