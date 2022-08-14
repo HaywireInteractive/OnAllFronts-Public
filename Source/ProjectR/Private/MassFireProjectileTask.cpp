@@ -14,6 +14,7 @@
 #include "MassSignalSubsystem.h"
 #include "Async/Async.h"
 #include "StateTreeLinker.h"
+#include "MassProjectileDamageProcessor.h"
 
 void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQuat& SpawnRotation, const FVector& InitialVelocity, const FMassEntityConfig& EntityConfig)
 {
@@ -49,6 +50,15 @@ void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQ
 		}
 		else {
 			UE_LOG(LogTemp, Warning, TEXT("SpawnProjectile: Spawned entity has no FMassVelocityFragment"));
+		}
+
+		FMassPreviousLocationFragment* SpawnedEntityPreviousLocationFragment = EntitySubsystem->GetFragmentDataPtr<FMassPreviousLocationFragment>(SpawnedEntities[0]);
+		if (SpawnedEntityPreviousLocationFragment)
+		{
+			SpawnedEntityPreviousLocationFragment->Location = SpawnLocation;
+		}
+		else {
+			UE_LOG(LogTemp, Warning, TEXT("SpawnProjectile: Spawned entity has no SpawnedEntityPreviousLocationFragment"));
 		}
 	}
 }

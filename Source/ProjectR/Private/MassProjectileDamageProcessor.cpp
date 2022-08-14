@@ -3,12 +3,15 @@
 #include "MassEntityView.h"
 #include "MassLODTypes.h"
 #include "MassCommonFragments.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 //----------------------------------------------------------------------//
 //  UMassProjectileWithDamageTrait
 //----------------------------------------------------------------------//
 void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
+	BuildContext.AddFragment<FMassPreviousLocationFragment>();
+
 	FProjectileDamageFragment& ProjectileDamageTemplate = BuildContext.AddFragment_GetRef<FProjectileDamageFragment>();
 	ProjectileDamageTemplate.DamagePerHit = DamagePerHit;
 
@@ -27,6 +30,9 @@ void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildConte
 
 	const FConstSharedStruct MinZFragment = EntitySubsystem->GetOrCreateConstSharedFragment(UE::StructUtils::GetStructCrc32(FConstStructView::Make(MinZ)), MinZ);
 	BuildContext.AddConstSharedFragment(MinZFragment);
+
+	const FConstSharedStruct DebugParametersFragment = EntitySubsystem->GetOrCreateConstSharedFragment(UE::StructUtils::GetStructCrc32(FConstStructView::Make(DebugParameters)), DebugParameters);
+	BuildContext.AddConstSharedFragment(DebugParametersFragment);
 }
 
 //----------------------------------------------------------------------//
@@ -53,7 +59,9 @@ void UMassProjectileDamageProcessor::ConfigureQueries()
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FAgentRadiusFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FProjectileDamageFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FMassPreviousLocationFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FMassProjectileWithDamageTag>(EMassFragmentPresence::All);
+	EntityQuery.AddConstSharedRequirement<FDebugParameters>(EMassFragmentPresence::All);
 }
 
 static void FindCloseObstacles(const FVector& Center, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
@@ -148,11 +156,25 @@ bool GetClosestEntity(const FMassEntityHandle& Entity, UMassEntitySubsystem& Ent
 	return false;
 }
 
-void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const int16 DamagePerHit, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities)
+bool DidCollideViaLineTrace(const UWorld &World, const FVector& StartLocation, const FVector &EndLocation, const bool& DrawLineTraces)
+{
+	FHitResult Result;
+	const TArray<AActor*> ActorsToIgnore;
+	EDrawDebugTrace::Type DrawDebugTraceType = DrawLineTraces ? EDrawDebugTrace::Type::Persistent : EDrawDebugTrace::Type::None;
+	bool bSuccess = UKismetSystemLibrary::LineTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, TraceTypeQuery1, false, ActorsToIgnore, DrawDebugTraceType, Result, false);
+	return bSuccess;
+}
+
+void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const int16 DamagePerHit, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces)
 {
 	FMassEntityHandle OtherEntity;
 	auto bDidCollide = GetClosestEntity(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), Radius.Radius, CloseEntities, OtherEntity);
 	if (!bDidCollide) {
+		return;
+	}
+
+	if (!DidCollideViaLineTrace(*EntitySubsystem.GetWorld(), PreviousLocationFragment.Location, Location.GetTransform().GetLocation(), DrawLineTraces))
+	{
 		return;
 	}
 
@@ -189,6 +211,8 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 			const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
 			const TConstArrayView<FAgentRadiusFragment> RadiusList = Context.GetFragmentView<FAgentRadiusFragment>();
 			const TConstArrayView<FProjectileDamageFragment> ProjectileDamageList = Context.GetFragmentView<FProjectileDamageFragment>();
+			const TArrayView<FMassPreviousLocationFragment> PreviousLocationList = Context.GetMutableFragmentView<FMassPreviousLocationFragment>();
+			const FDebugParameters& DebugParameters = Context.GetConstSharedFragment<FDebugParameters>();
 
 			// Arrays used to store close obstacles
 			TArray<FMassNavigationObstacleItem, TFixedAllocator<2>> CloseEntities;
@@ -207,7 +231,8 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 
 			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 			{
-				ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex].DamagePerHit, CloseEntities);
+				ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex].DamagePerHit, CloseEntities, PreviousLocationList[EntityIndex], DebugParameters.DrawLineTraces);
+				PreviousLocationList[EntityIndex].Location = LocationList[EntityIndex].GetTransform().GetLocation();
 			}
 		});
 }

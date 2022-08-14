@@ -23,6 +23,14 @@ struct FMassProjectileDamagableTag : public FMassTag
 };
 
 USTRUCT()
+struct PROJECTR_API FMassPreviousLocationFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, Category = "")
+	FVector Location = FVector::ZeroVector;
+};
+
+USTRUCT()
 struct PROJECTR_API FMassHealthFragment : public FMassFragment
 {
 	GENERATED_BODY()
@@ -47,6 +55,15 @@ struct PROJECTR_API FMinZParameters : public FMassSharedFragment
 	float Value = 0.f;
 };
 
+USTRUCT()
+struct PROJECTR_API FDebugParameters : public FMassSharedFragment
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	bool DrawLineTraces = false;
+};
+
 UCLASS(meta = (DisplayName = "ProjectileWithDamage"))
 class PROJECTR_API UMassProjectileWithDamageTrait : public UMassEntityTraitBase
 {
@@ -66,6 +83,9 @@ protected:
 	/** Minimum Z value for projectiles at which they get destroyed */
 	UPROPERTY(Category = "Movement", EditAnywhere)
 	FMinZParameters MinZ;
+
+	UPROPERTY(Category = "Debug", EditAnywhere)
+	FDebugParameters DebugParameters;
 };
 
 UCLASS(meta = (DisplayName = "ProjectileDamagable"))
