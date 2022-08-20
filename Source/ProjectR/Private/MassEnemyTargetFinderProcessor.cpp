@@ -198,7 +198,9 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		return;
 	}
 
-	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase](FMassExecutionContext& Context)
+	TQueue<FMassEntityHandle> TargetFinderEntityQueue;
+
+	EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase, &TargetFinderEntityQueue](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 
@@ -222,8 +224,6 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		const int32 NumJobs = SharedParameters.ParallelJobCount;
 		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs; // ceil(NumEntities / NumJobs)
 
-		TQueue<FMassEntityHandle> TargetFinderEntityQueue;
-
 		ParallelFor(NumJobs, [&](int32 JobIndex)
 		{
 			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ParallelFor);
@@ -236,20 +236,20 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 				ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase);
 			}
 		});
-
-		{
-			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessQueue);
-			while (!TargetFinderEntityQueue.IsEmpty())
-			{
-				FMassEntityHandle TargetFinderEntity;
-				bool bSuccess = TargetFinderEntityQueue.Dequeue(TargetFinderEntity);
-				check(bSuccess);
-
-				Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(TargetFinderEntity);
-				Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(TargetFinderEntity);
-			}
-		}
 	});
+
+	{
+		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessQueue);
+		while (!TargetFinderEntityQueue.IsEmpty())
+		{
+			FMassEntityHandle TargetFinderEntity;
+			bool bSuccess = TargetFinderEntityQueue.Dequeue(TargetFinderEntity);
+			check(bSuccess);
+
+			Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(TargetFinderEntity);
+			Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(TargetFinderEntity);
+		}
+	}
 
 	FinderPhase = (FinderPhase + 1) % UMassEnemyTargetFinderProcessor_FinderPhaseCount;
 }
