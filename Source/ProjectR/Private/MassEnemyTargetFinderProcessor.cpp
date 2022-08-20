@@ -25,6 +25,11 @@ void UMassNeedsEnemyTargetTrait::BuildTemplate(FMassEntityTemplateBuildContext& 
 {
 	BuildContext.AddFragment<FTargetEntityFragment>();
 	BuildContext.AddTag<FMassNeedsEnemyTargetTag>();
+
+	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(&World);
+	check(EntitySubsystem);
+	const FConstSharedStruct SharedParametersFragment = EntitySubsystem->GetOrCreateConstSharedFragment(UE::StructUtils::GetStructCrc32(FConstStructView::Make(SharedParameters)), SharedParameters);
+	BuildContext.AddConstSharedFragment(SharedParametersFragment);
 }
 
 //----------------------------------------------------------------------//
@@ -43,6 +48,7 @@ void UMassEnemyTargetFinderProcessor::ConfigureQueries()
 	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
+	EntityQuery.AddConstSharedRequirement<FNeedsEnemyTargetSharedParameters>(EMassFragmentPresence::All);
 }
 
 void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
@@ -199,6 +205,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 		const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
+		const FNeedsEnemyTargetSharedParameters& SharedParameters = Context.GetConstSharedFragment<FNeedsEnemyTargetSharedParameters>();
 
 		// Used for storing sorted list of nearest entities.
 		struct FSortedObstacle
@@ -212,7 +219,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		// TODO: We're incorrectly assuming all obstacles can be targets.
 		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGridMutable();
 
-		static const int32 NumJobs = 60; // TODO: don't hard-code
+		const int32 NumJobs = SharedParameters.ParallelJobCount;
 		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs; // ceil(NumEntities / NumJobs)
 
 		TQueue<FMassEntityHandle> TargetFinderEntityQueue;

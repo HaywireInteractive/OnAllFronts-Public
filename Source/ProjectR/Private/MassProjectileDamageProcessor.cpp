@@ -205,34 +205,34 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 	}
 
 	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem](FMassExecutionContext& Context)
+	{
+		const int32 NumEntities = Context.GetNumEntities();
+
+		const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
+		const TConstArrayView<FAgentRadiusFragment> RadiusList = Context.GetFragmentView<FAgentRadiusFragment>();
+		const TConstArrayView<FProjectileDamageFragment> ProjectileDamageList = Context.GetFragmentView<FProjectileDamageFragment>();
+		const TArrayView<FMassPreviousLocationFragment> PreviousLocationList = Context.GetMutableFragmentView<FMassPreviousLocationFragment>();
+		const FDebugParameters& DebugParameters = Context.GetConstSharedFragment<FDebugParameters>();
+
+		// Arrays used to store close obstacles
+		TArray<FMassNavigationObstacleItem, TFixedAllocator<2>> CloseEntities;
+
+		// Used for storing sorted list or nearest obstacles.
+		struct FSortedObstacle
 		{
-			const int32 NumEntities = Context.GetNumEntities();
+			FVector LocationCached;
+			FVector Forward;
+			FMassNavigationObstacleItem ObstacleItem;
+			float SqDist;
+		};
 
-			const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
-			const TConstArrayView<FAgentRadiusFragment> RadiusList = Context.GetFragmentView<FAgentRadiusFragment>();
-			const TConstArrayView<FProjectileDamageFragment> ProjectileDamageList = Context.GetFragmentView<FProjectileDamageFragment>();
-			const TArrayView<FMassPreviousLocationFragment> PreviousLocationList = Context.GetMutableFragmentView<FMassPreviousLocationFragment>();
-			const FDebugParameters& DebugParameters = Context.GetConstSharedFragment<FDebugParameters>();
+		// TODO: We're incorrectly assuming all obstacles can get damaged by projectile.
+		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGridMutable();
 
-			// Arrays used to store close obstacles
-			TArray<FMassNavigationObstacleItem, TFixedAllocator<2>> CloseEntities;
-
-			// Used for storing sorted list or nearest obstacles.
-			struct FSortedObstacle
-			{
-				FVector LocationCached;
-				FVector Forward;
-				FMassNavigationObstacleItem ObstacleItem;
-				float SqDist;
-			};
-
-			// TODO: We're incorrectly assuming all obstacles can get damaged by projectile.
-			const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGridMutable();
-
-			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
-			{
-				ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex].DamagePerHit, CloseEntities, PreviousLocationList[EntityIndex], DebugParameters.DrawLineTraces);
-				PreviousLocationList[EntityIndex].Location = LocationList[EntityIndex].GetTransform().GetLocation();
-			}
-		});
+		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+		{
+			ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex].DamagePerHit, CloseEntities, PreviousLocationList[EntityIndex], DebugParameters.DrawLineTraces);
+			PreviousLocationList[EntityIndex].Location = LocationList[EntityIndex].GetTransform().GetLocation();
+		}
+	});
 }

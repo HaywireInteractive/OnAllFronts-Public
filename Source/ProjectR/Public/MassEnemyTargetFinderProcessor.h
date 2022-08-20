@@ -50,6 +50,15 @@ struct FMassWillNeedEnemyTargetTag : public FMassTag
 	GENERATED_BODY()
 };
 
+USTRUCT()
+struct PROJECTR_API FNeedsEnemyTargetSharedParameters : public FMassSharedFragment
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Category = "", EditAnywhere)
+	int32 ParallelJobCount = 60;
+};
+
 UCLASS(meta = (DisplayName = "NeedsEnemyTarget"))
 class PROJECTR_API UMassNeedsEnemyTargetTrait : public UMassEntityTraitBase
 {
@@ -57,6 +66,9 @@ class PROJECTR_API UMassNeedsEnemyTargetTrait : public UMassEntityTraitBase
 
 protected:
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
+
+	UPROPERTY(Category = "", EditAnywhere)
+	FNeedsEnemyTargetSharedParameters SharedParameters;
 };
 
 UCLASS()
