@@ -61,9 +61,8 @@ These ideas below would be explored in one of the phases above.
 
 # Development Environment Setup
 
-1. [Build UE5 from source](https://docs.unrealengine.com/5.0/en-US/building-unreal-engine-from-source/). This is currently needed because it fixes a [bug in StateTree](https://forums.unrealengine.com/t/why-is-statetree-triggering-an-array-index-out-of-bounds-exception/617609).
-    1. Ensure you have [this commit](https://github.com/EpicGames/UnrealEngine/commit/6178e39cc4f6c1bca9872d231d87086530c29dd6). It's in the [ue5-main branch](https://github.com/EpicGames/UnrealEngine/tree/ue5-main).
-    1. Ensure you are using Visual Studio 2022.
+1. Install Visual Studio 2022.
+1. [Build UE5 from source](https://docs.unrealengine.com/5.0/en-US/building-unreal-engine-from-source/) using [this fork](https://github.com/LeroyTechnologies/UnrealEngine/tree/ue5-main-with-ParallelForEachEntityChunk). This is currently needed because it fixes a [bug in StateTree](https://forums.unrealengine.com/t/why-is-statetree-triggering-an-array-index-out-of-bounds-exception/617609) and it re-adds ParallelForEachEntityChunk to Mass Entity Processors which is needed for performance reasons.
 1. Clone this repo.
 1. Open project in UE5.
 1. The following content is large and unmodified from source, so it's Git ignored. Add it to the project manually:
