@@ -164,7 +164,7 @@ void UMassProjectileRepresentationSubsystem::OnPrePhysicsProcessingPhaseStarted(
 	{
 		bNeedUpdateCollisions = false;
 		UInstancedStaticMeshComponent* ismComponent = static_cast<UInstancedStaticMeshComponent*>(component);
-		ismComponent->SetCollisionProfileName(TEXT("OverlapAll"));
+		ismComponent->SetCollisionProfileName(TEXT("OverlapAll")); // TODO: don't hard-code
 		ismComponent->SetGenerateOverlapEvents(true);
 	}
 }
