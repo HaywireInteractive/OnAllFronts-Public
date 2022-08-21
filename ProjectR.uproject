@@ -10,7 +10,8 @@
 			"LoadingPhase": "Default",
 			"AdditionalDependencies": [
 				"MassEntity",
-				"MassActors"
+				"MassActors",
+				"Engine"
 			]
 		}
 	],
