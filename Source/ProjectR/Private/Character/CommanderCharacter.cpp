@@ -4,8 +4,27 @@
 #include "Character/CommanderCharacter.h"
 #include "MassMoveToCommandSubsystem.h"
 #include "MassFireProjectileTask.h"
+#include "MassEntityQuery.h"
+#include "MassProjectileDamageProcessor.h"
+#include "MassCommonFragments.h"
+#include "MassEnemyTargetFinderProcessor.h"
+#include "MassAgentComponent.h"
+#include "MassEntityView.h"
+#include "MassSpawnerSubsystem.h"
+#include "MassEntitySpawnDataGeneratorBase.h"
+#include "MassSpawnLocationProcessor.h"
 
-// Sets default values
+//----------------------------------------------------------------------//
+//  UMassPlayerControllableCharacterTrait
+//----------------------------------------------------------------------//
+void UMassPlayerControllableCharacterTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
+{
+	BuildContext.AddTag<FMassPlayerControllableCharacterTag>();
+}
+
+//----------------------------------------------------------------------//
+//  ACommanderCharacter
+//----------------------------------------------------------------------//
 ACommanderCharacter::ACommanderCharacter()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
@@ -55,4 +74,99 @@ void ACommanderCharacter::SpawnProjectile() const
 	const FVector SpawnLocation = ActorFeetLocation + ActorForward * ForwardVectorMagnitude + ProjectileLocationOffset;
 	const FVector InitialVelocity = ActorForward * InitialVelocityMagnitude;
 	::SpawnProjectile(World, SpawnLocation, GetActorQuat(), InitialVelocity, ProjectileEntityConfig);
+}
+
+void ChangePlayerEntityToSoliderEntity(const UWorld* World, const FMassEntityConfig& EntityConfig, const FTransform &Transform)
+{
+	UMassSpawnerSubsystem* SpawnerSystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
+	check(SpawnerSystem);
+
+	const FMassEntityTemplate& EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*World, *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
+	check(EntityTemplate.IsValid());
+
+	FMassEntitySpawnDataGeneratorResult Result;
+	Result.SpawnDataProcessor = UMassSpawnLocationProcessor::StaticClass();
+	Result.SpawnData.InitializeAs<FMassTransformsSpawnData>();
+	Result.NumEntities = 1;
+	FMassTransformsSpawnData& Transforms = Result.SpawnData.GetMutable<FMassTransformsSpawnData>();
+
+	Transforms.Transforms.Reserve(1);
+	FTransform& SpawnDataTransform = Transforms.Transforms.AddDefaulted_GetRef();
+	SpawnDataTransform = Transform;
+
+	TArray<FMassEntityHandle> SpawnedEntities;
+	SpawnerSystem->SpawnEntities(EntityTemplate.GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
+}
+
+void ACommanderCharacter::Respawn()
+{
+	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(GetWorld());
+	check(EntitySubsystem);
+
+	FMassEntityQuery EntityQuery;
+	EntityQuery.AddRequirement<FMassHealthFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddTagRequirement<FMassPlayerControllableCharacterTag>(EMassFragmentPresence::None);
+
+	FMassExecutionContext Context(0.0f);
+	bool bFoundRespawnTarget = false;
+	FTransform NewPlayerTransform;
+
+	UMassAgentComponent* AgentComponent = Cast<UMassAgentComponent>(GetComponentByClass(UMassAgentComponent::StaticClass()));
+	check(AgentComponent);
+
+	const FMassEntityHandle& PlayerEntityHandle = AgentComponent->GetEntityHandle();
+	FMassEntityView PlayerEntityView(*EntitySubsystem, PlayerEntityHandle);
+	FTeamMemberFragment* PlayerEntityTeamMemberFragment = PlayerEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
+	FTransformFragment* PlayerEntityTransformFragment = PlayerEntityView.GetFragmentDataPtr<FTransformFragment>();
+
+	check(PlayerEntityTeamMemberFragment);
+	check(PlayerEntityTransformFragment);
+
+	const bool IsPlayerOnTeam1 = PlayerEntityTeamMemberFragment->IsOnTeam1;
+
+	FMassEntityHandle EntityToDestroy;
+
+	EntityQuery.ForEachEntityChunk(*EntitySubsystem, Context, [&bFoundRespawnTarget, &NewPlayerTransform, &IsPlayerOnTeam1, &EntityToDestroy](FMassExecutionContext& Context)
+	{
+		if (bFoundRespawnTarget)
+		{
+			return;
+		}
+
+		const TConstArrayView<FMassHealthFragment> HealthList = Context.GetFragmentView<FMassHealthFragment>();
+		const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
+		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
+		const int32 NumEntities = Context.GetNumEntities();
+		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+		{
+			const FMassHealthFragment& HealthFragment = HealthList[EntityIndex]; // TODO: copy health and any other required fragments to player
+			const FTransformFragment& TransformFragment = TransformList[EntityIndex];
+			const FTeamMemberFragment& TeamMemberFragment = TeamMemberList[EntityIndex];
+
+			const bool bIsSameTeam = TeamMemberFragment.IsOnTeam1 == IsPlayerOnTeam1;
+			if (!bIsSameTeam)
+			{
+				continue;
+			}
+
+			NewPlayerTransform = TransformFragment.GetTransform();
+			bFoundRespawnTarget = true;
+			EntityToDestroy = Context.GetEntity(EntityIndex);
+			break;
+		}
+	});
+
+	if (!bFoundRespawnTarget)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Unable to find respawn target"));
+		return;
+	}
+
+	EntitySubsystem->DestroyEntity(EntityToDestroy);
+	ChangePlayerEntityToSoliderEntity(GetWorld(), SoldierEntityConfig, PlayerEntityTransformFragment->GetTransform());
+
+	NewPlayerTransform.SetLocation(NewPlayerTransform.GetLocation() + FVector(0.f, 0.f, RootComponent->Bounds.BoxExtent.Z));
+	SetActorTransform(NewPlayerTransform);
 }
