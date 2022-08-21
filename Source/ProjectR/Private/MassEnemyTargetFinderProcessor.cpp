@@ -189,6 +189,9 @@ void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEnti
 	TargetFinderEntityQueue.Enqueue(Entity);
 }
 
+bool UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk = true;
+FAutoConsoleVariableRef CVarEnsureUnweldModifiesGTOnly(TEXT("pr.UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk"), UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassEnemyTargetFinderProcessor::Execute to improve performance"));
+
 void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor);
@@ -200,7 +203,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 
 	TQueue<FMassEntityHandle> TargetFinderEntityQueue;
 
-	EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase, &TargetFinderEntityQueue](FMassExecutionContext& Context)
+	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase, &TargetFinderEntityQueue](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 
@@ -225,18 +228,25 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs; // ceil(NumEntities / NumJobs)
 
 		ParallelFor(NumJobs, [&](int32 JobIndex)
-		{
-			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ParallelFor);
-			TArray<FMassNavigationObstacleItem, TFixedAllocator<10>> CloseEntities;
-
-			const int32 StartIndex = JobIndex * CountPerJob;
-			const int32 EndIndexExclusive = StartIndex + CountPerJob;
-			for (int32 EntityIndex = StartIndex; (EntityIndex < NumEntities) && (EntityIndex < EndIndexExclusive); ++EntityIndex)
 			{
-				ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase);
-			}
-		});
-	});
+				QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ParallelFor);
+				TArray<FMassNavigationObstacleItem, TFixedAllocator<10>> CloseEntities;
+
+				const int32 StartIndex = JobIndex * CountPerJob;
+				const int32 EndIndexExclusive = StartIndex + CountPerJob;
+				for (int32 EntityIndex = StartIndex; (EntityIndex < NumEntities) && (EntityIndex < EndIndexExclusive); ++EntityIndex)
+				{
+					ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase);
+				}
+			});
+	};
+
+	if (UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk)
+	{
+		EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
+	} else {
+		EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
+	}
 
 	{
 		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessQueue);
