@@ -165,22 +165,158 @@ bool DidCollideViaLineTrace(const UWorld &World, const FVector& StartLocation, c
 	return bSuccess;
 }
 
+struct FCapsule
+{
+	FVector a;
+	FVector b;
+	float r;
+};
+
+float ClosestPtSegmentSegment(FVector p1, FVector q1, FVector p2, FVector q2,
+	float& s, float& t, FVector& c1, FVector& c2)
+{
+	FVector d1 = q1 - p1; // Direction vector of segment S1
+	FVector d2 = q2 - p2; // Direction vector of segment S2
+	FVector r = p1 - p2;
+	float a = FVector::DotProduct(d1, d1); // Squared length of segment S1, always nonnegative
+	float e = FVector::DotProduct(d2, d2); // Squared length of segment S2, always nonnegative
+	float f = FVector::DotProduct(d2, r);
+	// Check if either or both segments degenerate into points
+	if (a <= UE_SMALL_NUMBER && e <= UE_SMALL_NUMBER) {
+		// Both segments degenerate into points
+		s = t = 0.0f;
+		c1 = p1;
+		c2 = p2;
+		return FVector::DotProduct(c1 - c2, c1 - c2);
+	}
+	if (a <= UE_SMALL_NUMBER) {
+		// First segment degenerates into a point
+		s = 0.0f;
+		t = f / e; // s = 0 => t = (b*s + f) / e = f / e
+		t = FMath::Clamp(t, 0.0f, 1.0f);
+	}
+	else {
+		float c = FVector::DotProduct(d1, r);
+		if (e <= UE_SMALL_NUMBER) {
+			// Second segment degenerates into a point
+			t = 0.0f;
+			s = FMath::Clamp(-c / a, 0.0f, 1.0f); // t = 0 => s = (b*t - c) / a = -c / a
+		}
+		else {
+			// The general nondegenerate case starts here
+			float b = FVector::DotProduct(d1, d2);
+			float denom = a * e - b * b; // Always nonnegative
+			// If segments not parallel, compute closest point on L1 to L2 and
+			// clamp to segment S1. Else pick arbitrary s (here 0)
+			if (denom != 0.0f) {
+				s = FMath::Clamp((b * f - c * e) / denom, 0.0f, 1.0f);
+			}
+			else s = 0.0f;
+			// Compute point on L2 closest to S1(s) using
+			// t = Dot((P1 + D1*s) - P2,D2) / Dot(D2,D2) = (b*s + f) / e
+			t = (b * s + f) / e;
+			// If t in [0,1] done. Else clamp t, recompute s for the new value
+			// of t using s = Dot((P2 + D2*t) - P1,D1) / Dot(D1,D1)= (t*b - c) / a
+			// and clamp s to [0, 1]
+			if (t < 0.0f) {
+				t = 0.0f;
+				s = FMath::Clamp(-c / a, 0.0f, 1.0f);
+			}
+			else if (t > 1.0f) {
+				t = 1.0f;
+				s = FMath::Clamp((b - c) / a, 0.0f, 1.0f);
+			}
+		}
+	}
+	c1 = p1 + d1 * s;
+	c2 = p2 + d2 * t;
+	return FVector::DotProduct(c1 - c2, c1 - c2);
+}
+
+bool TestCapsuleCapsule(FCapsule capsule1, FCapsule capsule2)
+{
+	// Compute (squared) distance between the inner structures of the capsules
+	float s, t;
+	FVector c1, c2;
+	float dist2 = ClosestPtSegmentSegment(capsule1.a, capsule1.b,
+		capsule2.a, capsule2.b, s, t, c1, c2);
+	// If (squared) distance smaller than (squared) sum of radii, they collide
+	float radius = capsule1.r + capsule2.r;
+	return dist2 <= radius * radius;
+}
+
+FVector GetCapsuleCenter(const FCapsule& Capsule)
+{
+	return (Capsule.b - Capsule.a) / 2.f + Capsule.a;
+}
+
+float GetCapsuleHalfHeight(const FCapsule& Capsule)
+{
+	return (Capsule.b - Capsule.a).Size() / 2.f;
+}
+
+void DrawCapsule(const FCapsule& Capsule, const UWorld& World, const FLinearColor &Color = FLinearColor::Red)
+{
+	FQuat const CapsuleRot = FRotationMatrix::MakeFromZ(Capsule.b - Capsule.a).ToQuat();
+	DrawDebugCapsule(&World, GetCapsuleCenter(Capsule), GetCapsuleHalfHeight(Capsule), Capsule.r, CapsuleRot, Color.ToFColor(true), true);
+}
+
+bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, FTransformFragment* OtherTransformFragment, const bool& DrawCapsules, const UWorld& World)
+{
+	if (!OtherTransformFragment)
+	{
+		return false;
+	}
+
+	FVector OtherEntityLocation = OtherTransformFragment->GetTransform().GetLocation();
+
+	FCapsule ProjectileCapsule;
+	ProjectileCapsule.a = StartLocation;
+	ProjectileCapsule.b = EndLocation;
+	ProjectileCapsule.r = Radius;
+
+	FCapsule OtherEntityCapsule;
+	OtherEntityCapsule.a = OtherEntityLocation;
+	static const float EntityHeight = 200.0f; // TODO: don't hard-code; add new fragment for this?
+	static const float EntityRadius = 40.0f; // TODO: don't hard-code; read from other entity's AgentRadius?
+	OtherEntityCapsule.b = OtherEntityLocation + FVector(0.f, 0.f, EntityHeight);
+	OtherEntityCapsule.r = EntityRadius;
+
+	if (DrawCapsules)
+	{
+		DrawCapsule(ProjectileCapsule, World);
+		DrawCapsule(OtherEntityCapsule, World, FLinearColor::White);
+	}
+
+	return TestCapsuleCapsule(ProjectileCapsule, OtherEntityCapsule);
+}
+
 void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const int16 DamagePerHit, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces)
 {
-	FMassEntityHandle OtherEntity;
-	auto bDidCollide = GetClosestEntity(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), Radius.Radius, CloseEntities, OtherEntity);
-	if (!bDidCollide) {
+	// If collide via line trace, we hit the environment, so destroy projectile.
+	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
+	if (DidCollideViaLineTrace(*EntitySubsystem.GetWorld(), PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces))
+	{
+		Context.Defer().DestroyEntity(Entity);
 		return;
 	}
 
-	if (!DidCollideViaLineTrace(*EntitySubsystem.GetWorld(), PreviousLocationFragment.Location, Location.GetTransform().GetLocation(), DrawLineTraces))
+	FMassEntityHandle OtherEntity;
+	bool bHasCloseEntity = GetClosestEntity(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), Radius.Radius, CloseEntities, OtherEntity);
+	if (!bHasCloseEntity) {
+		return;
+	}
+
+	FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity);
+	FTransformFragment* OtherTransformFragment = OtherEntityView.GetFragmentDataPtr<FTransformFragment>();
+
+	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *EntitySubsystem.GetWorld()))
 	{
 		return;
 	}
 
 	Context.Defer().DestroyEntity(Entity);
 
-	FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity);
 	FMassHealthFragment* OtherHealthFragment = OtherEntityView.GetFragmentDataPtr<FMassHealthFragment>();
 	if (!OtherHealthFragment)
 	{
