@@ -54,7 +54,7 @@ protected:
 	void SpawnProjectile() const;
 
 	UFUNCTION(BlueprintCallable)
-	void Respawn();
+	void Respawn(const bool bDidDie = false);
 
 public:	
 	// Called every frame

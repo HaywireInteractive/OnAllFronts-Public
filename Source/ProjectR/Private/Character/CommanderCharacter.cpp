@@ -76,7 +76,7 @@ void ACommanderCharacter::SpawnProjectile() const
 	::SpawnProjectile(World, SpawnLocation, GetActorQuat(), InitialVelocity, ProjectileEntityConfig);
 }
 
-void ChangePlayerEntityToSoliderEntity(const UWorld* World, const FMassEntityConfig& EntityConfig, const FTransform &Transform)
+void ChangePlayerEntityToSoliderEntity(const UWorld* World, const FMassEntityConfig& EntityConfig, const FTransform &Transform, UMassEntitySubsystem* EntitySubsystem, const int16 &PlayerHealth)
 {
 	UMassSpawnerSubsystem* SpawnerSystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
 	check(SpawnerSystem);
@@ -96,9 +96,13 @@ void ChangePlayerEntityToSoliderEntity(const UWorld* World, const FMassEntityCon
 
 	TArray<FMassEntityHandle> SpawnedEntities;
 	SpawnerSystem->SpawnEntities(EntityTemplate.GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
+
+	FMassHealthFragment* SpawnedEntityHealthFragment = EntitySubsystem->GetFragmentDataPtr<FMassHealthFragment>(SpawnedEntities[0]);
+	check(SpawnedEntityHealthFragment);
+	SpawnedEntityHealthFragment->Value = PlayerHealth;
 }
 
-void ACommanderCharacter::Respawn()
+void ACommanderCharacter::Respawn(const bool bDidDie)
 {
 	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(GetWorld());
 	check(EntitySubsystem);
@@ -111,6 +115,7 @@ void ACommanderCharacter::Respawn()
 
 	FMassExecutionContext Context(0.0f);
 	bool bFoundRespawnTarget = false;
+	int16 NewPlayerHealth;
 	FTransform NewPlayerTransform;
 
 	UMassAgentComponent* AgentComponent = Cast<UMassAgentComponent>(GetComponentByClass(UMassAgentComponent::StaticClass()));
@@ -120,15 +125,17 @@ void ACommanderCharacter::Respawn()
 	FMassEntityView PlayerEntityView(*EntitySubsystem, PlayerEntityHandle);
 	FTeamMemberFragment* PlayerEntityTeamMemberFragment = PlayerEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
 	FTransformFragment* PlayerEntityTransformFragment = PlayerEntityView.GetFragmentDataPtr<FTransformFragment>();
+	FMassHealthFragment* PlayerEntityHealthFragment = PlayerEntityView.GetFragmentDataPtr<FMassHealthFragment>();
 
 	check(PlayerEntityTeamMemberFragment);
 	check(PlayerEntityTransformFragment);
+	check(PlayerEntityHealthFragment);
 
 	const bool IsPlayerOnTeam1 = PlayerEntityTeamMemberFragment->IsOnTeam1;
 
 	FMassEntityHandle EntityToDestroy;
 
-	EntityQuery.ForEachEntityChunk(*EntitySubsystem, Context, [&bFoundRespawnTarget, &NewPlayerTransform, &IsPlayerOnTeam1, &EntityToDestroy](FMassExecutionContext& Context)
+	EntityQuery.ForEachEntityChunk(*EntitySubsystem, Context, [&bFoundRespawnTarget, &NewPlayerTransform, &IsPlayerOnTeam1, &EntityToDestroy, &NewPlayerHealth](FMassExecutionContext& Context)
 	{
 		if (bFoundRespawnTarget)
 		{
@@ -141,7 +148,7 @@ void ACommanderCharacter::Respawn()
 		const int32 NumEntities = Context.GetNumEntities();
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			const FMassHealthFragment& HealthFragment = HealthList[EntityIndex]; // TODO: copy health and any other required fragments to player
+			const FMassHealthFragment& HealthFragment = HealthList[EntityIndex];
 			const FTransformFragment& TransformFragment = TransformList[EntityIndex];
 			const FTeamMemberFragment& TeamMemberFragment = TeamMemberList[EntityIndex];
 
@@ -151,6 +158,7 @@ void ACommanderCharacter::Respawn()
 				continue;
 			}
 
+			NewPlayerHealth = HealthFragment.Value;
 			NewPlayerTransform = TransformFragment.GetTransform();
 			bFoundRespawnTarget = true;
 			EntityToDestroy = Context.GetEntity(EntityIndex);
@@ -165,8 +173,11 @@ void ACommanderCharacter::Respawn()
 	}
 
 	EntitySubsystem->DestroyEntity(EntityToDestroy);
-	ChangePlayerEntityToSoliderEntity(GetWorld(), SoldierEntityConfig, PlayerEntityTransformFragment->GetTransform());
-
+	if (!bDidDie)
+	{
+		ChangePlayerEntityToSoliderEntity(GetWorld(), SoldierEntityConfig, PlayerEntityTransformFragment->GetTransform(), EntitySubsystem, PlayerEntityHealthFragment->Value);
+	}
+	PlayerEntityHealthFragment->Value = NewPlayerHealth;
 	NewPlayerTransform.SetLocation(NewPlayerTransform.GetLocation() + FVector(0.f, 0.f, RootComponent->Bounds.BoxExtent.Z));
 	SetActorTransform(NewPlayerTransform);
 }
