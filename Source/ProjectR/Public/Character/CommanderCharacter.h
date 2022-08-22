@@ -53,9 +53,6 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void SpawnProjectile() const;
 
-	UFUNCTION(BlueprintCallable)
-	void Respawn(const bool bDidDie = false);
-
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -63,4 +60,6 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	UFUNCTION(BlueprintCallable)
+	void Respawn(const bool bDidDie = false);
 };

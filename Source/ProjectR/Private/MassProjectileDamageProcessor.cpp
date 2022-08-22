@@ -4,6 +4,8 @@
 #include "MassLODTypes.h"
 #include "MassCommonFragments.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "MassPlayerSubsystem.h"
+#include "Character/CommanderCharacter.h"
 
 //----------------------------------------------------------------------//
 //  UMassProjectileWithDamageTrait
@@ -325,9 +327,25 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 
 	OtherHealthFragment->Value -= DamagePerHit;
 
+	// Handle health reaching 0.
 	if (OtherHealthFragment->Value <= 0)
 	{
-		Context.Defer().DestroyEntity(OtherEntity);
+		bool bHasPlayerTag = OtherEntityView.HasTag<FMassPlayerControllableCharacterTag>();
+		if (!bHasPlayerTag)
+		{
+			Context.Defer().DestroyEntity(OtherEntity);
+		} else {
+			UMassPlayerSubsystem* PlayerSubsystem = UWorld::GetSubsystem<UMassPlayerSubsystem>(EntitySubsystem.GetWorld());
+			check(PlayerSubsystem);
+			AActor *otherActor = PlayerSubsystem->GetActorForEntity(OtherEntity);
+			check(otherActor);
+			ACommanderCharacter* Character = Cast<ACommanderCharacter>(otherActor);
+			check(Character);
+			AsyncTask(ENamedThreads::GameThread, [Character]()
+			{
+				Character->Respawn(true);
+			});
+		}
 	}
 }
 
