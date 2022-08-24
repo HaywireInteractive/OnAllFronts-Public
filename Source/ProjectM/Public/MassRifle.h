@@ -8,11 +8,11 @@
 #include "MassRifle.generated.h"
 
 UCLASS()
-class PROJECTR_API AMassRifle : public AActor
+class PROJECTM_API AMassRifle : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	AMassRifle();
 
 protected:

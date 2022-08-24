@@ -10,10 +10,10 @@ class UMassAgentSubsystem;
 class UMassSignalSubsystem;
 
 /**
- * 
+ *
  */
 UCLASS()
-class PROJECTR_API UMassMoveToCommandSubsystem : public UWorldSubsystem
+class PROJECTM_API UMassMoveToCommandSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
 

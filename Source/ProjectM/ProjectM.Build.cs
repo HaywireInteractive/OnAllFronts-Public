@@ -2,12 +2,12 @@
 
 using UnrealBuildTool;
 
-public class ProjectR : ModuleRules
+public class ProjectM : ModuleRules
 {
-	public ProjectR(ReadOnlyTargetRules Target) : base(Target)
+	public ProjectM(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-	
+
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore",
 			"Niagara",
 			"StateTreeModule",
@@ -17,7 +17,7 @@ public class ProjectR : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] {
 			"MassAIBehavior",
 			"MassAIDebug",
-			
+
 			// AI/MassCrowd Plugin Modules
 			"MassCrowd",
 
@@ -40,7 +40,7 @@ public class ProjectR : ModuleRules
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
-		
+
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
 

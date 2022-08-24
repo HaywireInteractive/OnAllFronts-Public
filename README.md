@@ -67,7 +67,7 @@ These ideas below would be explored in one of the phases above.
 1. Generate VS project from right clicking .uproject at root.
 1. Open VS .sln.
 1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing argument to editor on launch:
-    1. In VS Solution Explorer, right click Project R > Properties.
+    1. In VS Solution Explorer, right click ProjectM > Properties.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
 1. Run project from VS.
 1. The following content is large and unmodified from source, so it's Git ignored. Add it to the project manually:

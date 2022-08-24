@@ -11,7 +11,7 @@
 class UMassMoveToCommandSubsystem;
 
 UCLASS(meta = (DisplayName = "PlayerControllableCharacter"))
-class PROJECTR_API UMassPlayerControllableCharacterTrait : public UMassEntityTraitBase
+class PROJECTM_API UMassPlayerControllableCharacterTrait : public UMassEntityTraitBase
 {
 	GENERATED_BODY()
 
@@ -26,7 +26,7 @@ struct FMassPlayerControllableCharacterTag : public FMassTag
 };
 
 UCLASS()
-class PROJECTR_API ACommanderCharacter : public ACharacter
+class PROJECTM_API ACommanderCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
@@ -53,7 +53,7 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void SpawnProjectile() const;
 
-public:	
+public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 

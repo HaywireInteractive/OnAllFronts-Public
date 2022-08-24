@@ -9,7 +9,7 @@
 class UMassMoveToCommandSubsystem;
 
 USTRUCT()
-struct PROJECTR_API FMassMoveToCommandEvaluatorInstanceData
+struct PROJECTM_API FMassMoveToCommandEvaluatorInstanceData
 {
 	GENERATED_BODY()
 
@@ -21,7 +21,7 @@ struct PROJECTR_API FMassMoveToCommandEvaluatorInstanceData
 };
 
 USTRUCT(meta = (DisplayName = "Mass MoveToCommand Eval"))
-struct PROJECTR_API FMassMoveToCommandEvaluator : public FMassStateTreeEvaluatorBase
+struct PROJECTM_API FMassMoveToCommandEvaluator : public FMassStateTreeEvaluatorBase
 {
 	GENERATED_BODY()
 

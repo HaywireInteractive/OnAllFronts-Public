@@ -8,7 +8,7 @@
 #include "MassGotTargetEvaluator.generated.h"
 
 USTRUCT()
-struct PROJECTR_API FMassGotTargetEvaluatorInstanceData
+struct PROJECTM_API FMassGotTargetEvaluatorInstanceData
 {
 	GENERATED_BODY()
 
@@ -20,7 +20,7 @@ struct PROJECTR_API FMassGotTargetEvaluatorInstanceData
 };
 
 USTRUCT(meta = (DisplayName = "Mass GotTarget Eval"))
-struct PROJECTR_API FMassGotTargetEvaluator : public FMassStateTreeEvaluatorBase
+struct PROJECTM_API FMassGotTargetEvaluator : public FMassStateTreeEvaluatorBase
 {
 	GENERATED_BODY()
 

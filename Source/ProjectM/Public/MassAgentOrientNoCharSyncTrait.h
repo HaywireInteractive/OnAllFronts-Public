@@ -21,16 +21,16 @@ struct FMassSceneComponentOrientationCopyToActorTag : public FMassTag
 
 // Unlike UMassAgentOrientationSyncTrait, this trait doesn't depend on actor being a Character subclass.
 UCLASS(BlueprintType, EditInlineNew, CollapseCategories, meta = (DisplayName = "Agent Orientation (Without Character) Sync"))
-class PROJECTR_API UMassAgentOrientNoCharSyncTrait : public UMassAgentSyncTrait
+class PROJECTM_API UMassAgentOrientNoCharSyncTrait : public UMassAgentSyncTrait
 {
 	GENERATED_BODY()
-	
+
 protected:
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 };
 
 UCLASS()
-class PROJECTR_API UMassSceneComponentOrientationToMassTranslator : public UMassTranslator
+class PROJECTM_API UMassSceneComponentOrientationToMassTranslator : public UMassTranslator
 {
 	GENERATED_BODY()
 
@@ -45,7 +45,7 @@ protected:
 };
 
 UCLASS()
-class PROJECTR_API UMassSceneComponentOrientationToActorTranslator : public UMassTranslator
+class PROJECTM_API UMassSceneComponentOrientationToActorTranslator : public UMassTranslator
 {
 	GENERATED_BODY()
 

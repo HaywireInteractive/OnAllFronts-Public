@@ -9,7 +9,7 @@
 class UMassAgentSubsystem;
 
 UCLASS()
-class PROJECTR_API UMassPlayerSubsystem : public UWorldSubsystem
+class PROJECTM_API UMassPlayerSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
 

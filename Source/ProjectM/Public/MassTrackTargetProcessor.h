@@ -18,7 +18,7 @@ struct FMassTrackTargetTag : public FMassTag
 };
 
 UCLASS()
-class PROJECTR_API UMassTrackTargetProcessor : public UMassProcessor
+class PROJECTM_API UMassTrackTargetProcessor : public UMassProcessor
 {
 	GENERATED_BODY()
 

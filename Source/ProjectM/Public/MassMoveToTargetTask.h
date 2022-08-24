@@ -10,7 +10,7 @@
 #include "MassMoveToTargetTask.generated.h"
 
 USTRUCT()
-struct PROJECTR_API FMassMoveToTargetTaskInstanceData
+struct PROJECTM_API FMassMoveToTargetTaskInstanceData
 {
 	GENERATED_BODY()
 
@@ -19,7 +19,7 @@ struct PROJECTR_API FMassMoveToTargetTaskInstanceData
 };
 
 USTRUCT(meta = (DisplayName = "Move To Target"))
-struct PROJECTR_API FMassMoveToTargetTask : public FMassStateTreeTaskBase
+struct PROJECTM_API FMassMoveToTargetTask : public FMassStateTreeTaskBase
 {
 	GENERATED_BODY()
 

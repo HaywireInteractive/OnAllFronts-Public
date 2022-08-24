@@ -10,7 +10,7 @@
 #include "MassLookAtViaMoveTargetTask.generated.h"
 
 USTRUCT()
-struct PROJECTR_API FMassLookAtViaMoveTargetTaskInstanceData
+struct PROJECTM_API FMassLookAtViaMoveTargetTaskInstanceData
 {
 	GENERATED_BODY()
 
@@ -19,7 +19,7 @@ struct PROJECTR_API FMassLookAtViaMoveTargetTaskInstanceData
 };
 
 USTRUCT(meta = (DisplayName = "Mass LookAtViaMoveTarget Task"))
-struct PROJECTR_API FMassLookAtViaMoveTargetTask : public FMassStateTreeTaskBase
+struct PROJECTM_API FMassLookAtViaMoveTargetTask : public FMassStateTreeTaskBase
 {
 	GENERATED_BODY()
 

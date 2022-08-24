@@ -11,7 +11,7 @@
 class UMassNavigationSubsystem;
 
 USTRUCT()
-struct PROJECTR_API FTargetEntityFragment : public FMassFragment
+struct PROJECTM_API FTargetEntityFragment : public FMassFragment
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, Category = "")
@@ -19,7 +19,7 @@ struct PROJECTR_API FTargetEntityFragment : public FMassFragment
 };
 
 USTRUCT()
-struct PROJECTR_API FTeamMemberFragment : public FMassFragment
+struct PROJECTM_API FTeamMemberFragment : public FMassFragment
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, Category = "")
@@ -27,7 +27,7 @@ struct PROJECTR_API FTeamMemberFragment : public FMassFragment
 };
 
 UCLASS(meta = (DisplayName = "TeamMember"))
-class PROJECTR_API UMassTeamMemberTrait : public UMassEntityTraitBase
+class PROJECTM_API UMassTeamMemberTrait : public UMassEntityTraitBase
 {
 	GENERATED_BODY()
 
@@ -51,7 +51,7 @@ struct FMassWillNeedEnemyTargetTag : public FMassTag
 };
 
 USTRUCT()
-struct PROJECTR_API FNeedsEnemyTargetSharedParameters : public FMassSharedFragment
+struct PROJECTM_API FNeedsEnemyTargetSharedParameters : public FMassSharedFragment
 {
 	GENERATED_BODY()
 
@@ -60,7 +60,7 @@ struct PROJECTR_API FNeedsEnemyTargetSharedParameters : public FMassSharedFragme
 };
 
 UCLASS(meta = (DisplayName = "NeedsEnemyTarget"))
-class PROJECTR_API UMassNeedsEnemyTargetTrait : public UMassEntityTraitBase
+class PROJECTM_API UMassNeedsEnemyTargetTrait : public UMassEntityTraitBase
 {
 	GENERATED_BODY()
 
@@ -72,7 +72,7 @@ protected:
 };
 
 UCLASS()
-class PROJECTR_API UMassEnemyTargetFinderProcessor : public UMassProcessor
+class PROJECTM_API UMassEnemyTargetFinderProcessor : public UMassProcessor
 {
 	GENERATED_BODY()
 public:

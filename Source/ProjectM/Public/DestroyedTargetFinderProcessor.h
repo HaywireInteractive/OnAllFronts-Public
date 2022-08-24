@@ -4,25 +4,19 @@
 
 #include "CoreMinimal.h"
 #include "MassProcessor.h"
-#include "MassEntityTraitBase.h"
-#include "MassEntityTemplateRegistry.h"
-#include "MassEntityTypes.h"
-#include "MassMoveTargetForwardCompleteProcessor.generated.h"
+#include "MassNavigationFragments.h"
+#include "DestroyedTargetFinderProcessor.generated.h"
 
 class UMassSignalSubsystem;
 
-USTRUCT()
-struct FMassNeedsMoveTargetForwardCompleteSignalTag : public FMassTag
-{
-	GENERATED_BODY()
-};
+void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World);
 
 UCLASS()
-class PROJECTR_API UMassMoveTargetForwardCompleteProcessor : public UMassProcessor
+class PROJECTM_API UDestroyedTargetFinderProcessor : public UMassProcessor
 {
 	GENERATED_BODY()
 public:
-	UMassMoveTargetForwardCompleteProcessor();
+	UDestroyedTargetFinderProcessor();
 
 protected:
 	virtual void Initialize(UObject& Owner) override;

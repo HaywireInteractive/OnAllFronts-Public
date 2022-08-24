@@ -23,7 +23,7 @@ struct FMassProjectileDamagableTag : public FMassTag
 };
 
 USTRUCT()
-struct PROJECTR_API FMassPreviousLocationFragment : public FMassFragment
+struct PROJECTM_API FMassPreviousLocationFragment : public FMassFragment
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, Category = "")
@@ -31,7 +31,7 @@ struct PROJECTR_API FMassPreviousLocationFragment : public FMassFragment
 };
 
 USTRUCT()
-struct PROJECTR_API FMassHealthFragment : public FMassFragment
+struct PROJECTM_API FMassHealthFragment : public FMassFragment
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, Category = "")
@@ -39,7 +39,7 @@ struct PROJECTR_API FMassHealthFragment : public FMassFragment
 };
 
 USTRUCT()
-struct PROJECTR_API FProjectileDamageFragment : public FMassFragment
+struct PROJECTM_API FProjectileDamageFragment : public FMassFragment
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, Category = "")
@@ -47,7 +47,7 @@ struct PROJECTR_API FProjectileDamageFragment : public FMassFragment
 };
 
 USTRUCT()
-struct PROJECTR_API FMinZParameters : public FMassSharedFragment
+struct PROJECTM_API FMinZParameters : public FMassSharedFragment
 {
 	GENERATED_BODY()
 
@@ -56,7 +56,7 @@ struct PROJECTR_API FMinZParameters : public FMassSharedFragment
 };
 
 USTRUCT()
-struct PROJECTR_API FDebugParameters : public FMassSharedFragment
+struct PROJECTM_API FDebugParameters : public FMassSharedFragment
 {
 	GENERATED_BODY()
 
@@ -65,7 +65,7 @@ struct PROJECTR_API FDebugParameters : public FMassSharedFragment
 };
 
 UCLASS(meta = (DisplayName = "ProjectileWithDamage"))
-class PROJECTR_API UMassProjectileWithDamageTrait : public UMassEntityTraitBase
+class PROJECTM_API UMassProjectileWithDamageTrait : public UMassEntityTraitBase
 {
 	GENERATED_BODY()
 
@@ -89,7 +89,7 @@ protected:
 };
 
 UCLASS(meta = (DisplayName = "ProjectileDamagable"))
-class PROJECTR_API UMassProjectileDamagableTrait : public UMassEntityTraitBase
+class PROJECTM_API UMassProjectileDamagableTrait : public UMassEntityTraitBase
 {
 	GENERATED_BODY()
 
@@ -98,7 +98,7 @@ protected:
 };
 
 UCLASS()
-class PROJECTR_API UMassProjectileDamageProcessor : public UMassProcessor
+class PROJECTM_API UMassProjectileDamageProcessor : public UMassProcessor
 {
 	GENERATED_BODY()
 public:

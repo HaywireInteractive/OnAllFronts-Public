@@ -7,10 +7,10 @@
 #include "MassProjectileRemoverProcessor.generated.h"
 
 /**
- * 
+ *
  */
 UCLASS()
-class PROJECTR_API UMassProjectileRemoverProcessor : public UMassProcessor
+class PROJECTM_API UMassProjectileRemoverProcessor : public UMassProcessor
 {
 	GENERATED_BODY()
 public:

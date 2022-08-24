@@ -8,7 +8,7 @@
 class UMassSignalSubsystem;
 
 USTRUCT()
-struct PROJECTR_API FMassIdleForDurationTaskInstanceData
+struct PROJECTM_API FMassIdleForDurationTaskInstanceData
 {
 	GENERATED_BODY()
 
@@ -21,7 +21,7 @@ struct PROJECTR_API FMassIdleForDurationTaskInstanceData
 };
 
 USTRUCT(meta = (DisplayName = "Idle for Duration"))
-struct PROJECTR_API FMassIdleForDurationTask : public FMassStateTreeTaskBase
+struct PROJECTM_API FMassIdleForDurationTask : public FMassStateTreeTaskBase
 {
 	GENERATED_BODY()
 

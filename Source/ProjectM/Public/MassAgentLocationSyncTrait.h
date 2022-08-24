@@ -41,7 +41,7 @@ struct FMassProjectileUpdateCollisionTag : public FMassTag
 };
 
 UCLASS(meta = (DisplayName = "Projectile"))
-class PROJECTR_API UMassProjectileTrait : public UMassEntityTraitBase
+class PROJECTM_API UMassProjectileTrait : public UMassEntityTraitBase
 {
 	GENERATED_BODY()
 
@@ -50,7 +50,7 @@ protected:
 };
 
 UCLASS(meta = (DisplayName = "ProjectileUpdateCollision"))
-class PROJECTR_API UMassProjectileUpdateCollisionTrait : public UMassEntityTraitBase
+class PROJECTM_API UMassProjectileUpdateCollisionTrait : public UMassEntityTraitBase
 {
 	GENERATED_BODY()
 
@@ -59,10 +59,10 @@ protected:
 };
 
 /**
- * 
+ *
  */
 UCLASS(BlueprintType, EditInlineNew, CollapseCategories, meta = (DisplayName = "Agent Location Sync"))
-class PROJECTR_API UMassAgentLocationSyncTrait : public UMassAgentSyncTrait
+class PROJECTM_API UMassAgentLocationSyncTrait : public UMassAgentSyncTrait
 {
 	GENERATED_BODY()
 
@@ -71,7 +71,7 @@ protected:
 };
 
 UCLASS()
-class PROJECTR_API ULocationToActorTranslator : public UMassTranslator
+class PROJECTM_API ULocationToActorTranslator : public UMassTranslator
 {
 	GENERATED_BODY()
 
@@ -86,7 +86,7 @@ protected:
 };
 
 UCLASS()
-class PROJECTR_API UMassProjectileUpdateISMCollisionsProcessor : public UMassUpdateISMProcessor
+class PROJECTM_API UMassProjectileUpdateISMCollisionsProcessor : public UMassUpdateISMProcessor
 {
 	GENERATED_BODY()
 public:
@@ -101,7 +101,7 @@ protected:
 };
 
 UCLASS()
-class PROJECTR_API UMassProjectileRepresentationSubsystem : public UMassRepresentationSubsystem
+class PROJECTM_API UMassProjectileRepresentationSubsystem : public UMassRepresentationSubsystem
 {
 	GENERATED_BODY()
 
@@ -119,7 +119,7 @@ protected:
 };
 
 UCLASS(BlueprintType, EditInlineNew, CollapseCategories, meta = (DisplayName = "Projectile Visualization"))
-class PROJECTR_API UMassProjectileVisualizationTrait : public UMassVisualizationTrait
+class PROJECTM_API UMassProjectileVisualizationTrait : public UMassVisualizationTrait
 {
 	GENERATED_BODY()
 public:
@@ -130,7 +130,7 @@ protected:
 };
 
 UCLASS(meta = (DisplayName = "Mass Projectile Visualization"))
-class PROJECTR_API UMassProjectileVisualizationProcessor : public UMassVisualizationProcessor
+class PROJECTM_API UMassProjectileVisualizationProcessor : public UMassVisualizationProcessor
 {
 	GENERATED_BODY()
 public:
@@ -143,7 +143,7 @@ protected:
 };
 
 UCLASS(meta = (DisplayName = "Projectile visualization LOD"))
-class PROJECTR_API UMassProjectileVisualizationLODProcessor : public UMassVisualizationLODProcessor
+class PROJECTM_API UMassProjectileVisualizationLODProcessor : public UMassVisualizationLODProcessor
 {
 	GENERATED_BODY()
 public:
@@ -155,7 +155,7 @@ protected:
 };
 
 UCLASS(meta = (DisplayName = "Projectile LOD Collector"))
-class PROJECTR_API UMassProjectileLODCollectorProcessor : public UMassLODCollectorProcessor
+class PROJECTM_API UMassProjectileLODCollectorProcessor : public UMassLODCollectorProcessor
 {
 	GENERATED_BODY()
 

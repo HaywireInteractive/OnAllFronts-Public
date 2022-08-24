@@ -17,7 +17,7 @@ struct FMassHasStashedMoveTargetTag : public FMassTag
 };
 
 UCLASS(meta = (DisplayName = "Commandable"))
-class PROJECTR_API UMassCommandableTrait : public UMassEntityTraitBase
+class PROJECTM_API UMassCommandableTrait : public UMassEntityTraitBase
 {
 	GENERATED_BODY()
 
@@ -26,13 +26,13 @@ protected:
 };
 
 USTRUCT()
-struct PROJECTR_API FMassStashedMoveTargetFragment : public FMassMoveTargetFragment
+struct PROJECTM_API FMassStashedMoveTargetFragment : public FMassMoveTargetFragment
 {
 	GENERATED_BODY()
 };
 
 UCLASS()
-class PROJECTR_API UMassMoveToCommandProcessor : public UMassProcessor
+class PROJECTM_API UMassMoveToCommandProcessor : public UMassProcessor
 {
 	GENERATED_BODY()
 
