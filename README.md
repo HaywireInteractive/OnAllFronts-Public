@@ -61,14 +61,17 @@ These ideas below would be explored in one of the phases above.
 
 # Development Environment Setup
 
+1. Install [Git for Windows](https://gitforwindows.org/). Use the default options.
+1. Install Unreal Engine 5.0.3 from [Epic Games Launcher](https://store.epicgames.com/en-US/download).
+1. Create a new project using the [City Sample project](https://www.unrealengine.com/marketplace/en-US/product/city-sample) from UE Marketplace.
+1. In PowerShell:
+    1. cd to City Sample project folder
+    1. `cd Plugins`
+    1. `git clone https://github.com/LeroyTechnologies/ProjectM.git`
 1. Install Visual Studio 2022.
-1. [Build UE5 from source](https://docs.unrealengine.com/5.0/en-US/building-unreal-engine-from-source/) using [this fork](https://github.com/LeroyTechnologies/UnrealEngine/tree/ue5-main-with-ParallelForEachEntityChunk). This is currently needed because it fixes a [bug in StateTree](https://forums.unrealengine.com/t/why-is-statetree-triggering-an-array-index-out-of-bounds-exception/617609) and it re-adds ParallelForEachEntityChunk to Mass Entity Processors which is needed for performance reasons.
-1. Clone this repo.
-1. Generate VS project from right clicking .uproject at root.
-1. Open VS .sln.
+1. Generate VS project from right clicking CitySample.uproject in City Sample project folder.
+1. Open CitySample.sln.
 1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing argument to editor on launch:
-    1. In VS Solution Explorer, right click ProjectM > Properties.
+    1. In VS Solution Explorer, right click City Sample project > Properties.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
 1. Run project from VS.
-1. The following content is large and unmodified from source, so it's Git ignored. Add it to the project manually:
-    1. Third Person Content Pack: Content Drawer > Add > Add Feature or Content Pack > Blueprint > Third Person > Add to project. Note only the Content/Characters folder is ignored from this Content Pack, but adding it will still work correctly.
