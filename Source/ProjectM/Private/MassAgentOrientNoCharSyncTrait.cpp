@@ -11,10 +11,10 @@
 //----------------------------------------------------------------------//
 //  UMassAgentOrientNoCharSyncTrait
 //----------------------------------------------------------------------//
-void UMassAgentOrientNoCharSyncTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
+void UMassAgentOrientNoCharSyncTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
-	BuildContext.RequireFragment<FMassSceneComponentWrapperFragment>();
-	BuildContext.RequireFragment<FTransformFragment>();
+	BuildContext.AddFragment<FMassSceneComponentWrapperFragment>();
+	BuildContext.AddFragment<FTransformFragment>();
 
 	if (EnumHasAnyFlags(SyncDirection, EMassTranslationDirection::ActorToMass))
 	{
@@ -31,7 +31,6 @@ void UMassAgentOrientNoCharSyncTrait::BuildTemplate(FMassEntityTemplateBuildCont
 //  UMassSceneComponentOrientationToMassTranslator
 //----------------------------------------------------------------------//
 UMassSceneComponentOrientationToMassTranslator::UMassSceneComponentOrientationToMassTranslator()
-	: EntityQuery(*this)
 {
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::SyncWorldToMass;
@@ -67,7 +66,6 @@ void UMassSceneComponentOrientationToMassTranslator::Execute(UMassEntitySubsyste
 //  UMassSceneComponentOrientationToActorTranslator
 //----------------------------------------------------------------------//
 UMassSceneComponentOrientationToActorTranslator::UMassSceneComponentOrientationToActorTranslator()
-	: EntityQuery(*this)
 {
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::UpdateWorldFromMass;
@@ -81,7 +79,6 @@ void UMassSceneComponentOrientationToActorTranslator::ConfigureQueries()
 	AddRequiredTagsToQuery(EntityQuery);
 	EntityQuery.AddRequirement<FMassSceneComponentWrapperFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.RequireMutatingWorldAccess(); // due to mutating World by setting actor's transform
 }
 
 void UMassSceneComponentOrientationToActorTranslator::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)

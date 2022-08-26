@@ -72,6 +72,16 @@ These ideas below would be explored in one of the phases above.
 1. Generate VS project from right clicking CitySample.uproject in City Sample project folder.
 1. Open CitySample.sln.
 1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing argument to editor on launch:
-    1. In VS Solution Explorer, right click City Sample project > Properties.
+    1. In VS Solution Explorer, right click CitySample project > Properties.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
 1. Run project from VS.
+1. Add First Person Content Pack from Content Drawer > Add > Add Feature or Content Pack > Blueprint > First Person > Add to project.
+1. Add Military Weapons Silver to project: https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver
+    1. Then open M_WeaponMaster_01 > Used with Instanced Static Meshes > Apply > Save
+1. Edit > Project Settings
+    1. Engine - Input > Bindings > Action Mappings
+        1. Add "MoveToCommand", 1 key
+        1. Add "Spectate", F key
+        1. Add "Respawn", R key
+    1. Engine - Mass > Mass > Module Settings > Mass Entity > Processor CDOs > "MassUpdateISMProcessor'/Script/MassRepresentation.Default__MassUpdateISMProcessor'" > Auto Register with Processing Phases > check
+1. Now open L_Small level and use PIE to test out the project.

@@ -32,7 +32,7 @@ class PROJECTM_API UMassTeamMemberTrait : public UMassEntityTraitBase
 	GENERATED_BODY()
 
 protected:
-	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
+	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
 
 	UPROPERTY(Category = "Team", EditAnywhere)
 	bool IsOnTeam1 = true;
@@ -65,7 +65,7 @@ class PROJECTM_API UMassNeedsEnemyTargetTrait : public UMassEntityTraitBase
 	GENERATED_BODY()
 
 protected:
-	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
+	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
 
 	UPROPERTY(Category = "", EditAnywhere)
 	FNeedsEnemyTargetSharedParameters SharedParameters;

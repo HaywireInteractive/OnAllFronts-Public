@@ -24,7 +24,6 @@ void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragme
 }
 
 UDestroyedTargetFinderProcessor::UDestroyedTargetFinderProcessor()
-	: EntityQuery(*this)
 {
 	bAutoRegisterWithProcessingPhases = true;
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;

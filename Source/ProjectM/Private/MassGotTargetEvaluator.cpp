@@ -4,7 +4,6 @@
 #include "MassGotTargetEvaluator.h"
 #include "MassAIBehaviorTypes.h"
 #include "MassStateTreeExecutionContext.h"
-#include "StateTreeLinker.h"
 
 bool FMassGotTargetEvaluator::Link(FStateTreeLinker& Linker)
 {

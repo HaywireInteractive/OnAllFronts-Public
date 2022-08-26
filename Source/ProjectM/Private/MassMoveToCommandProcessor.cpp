@@ -10,7 +10,7 @@
 //----------------------------------------------------------------------//
 //  UMassCommandableTrait
 //----------------------------------------------------------------------//
-void UMassCommandableTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
+void UMassCommandableTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
 	BuildContext.AddFragment<FMassStashedMoveTargetFragment>();
 }
@@ -19,7 +19,6 @@ void UMassCommandableTrait::BuildTemplate(FMassEntityTemplateBuildContext& Build
 //  UMassMoveToCommandProcessor
 //----------------------------------------------------------------------//
 UMassMoveToCommandProcessor::UMassMoveToCommandProcessor()
-	: EntityQuery(*this)
 {
 	bAutoRegisterWithProcessingPhases = true;
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;

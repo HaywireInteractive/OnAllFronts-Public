@@ -17,7 +17,7 @@
 //----------------------------------------------------------------------//
 //  UMassPlayerControllableCharacterTrait
 //----------------------------------------------------------------------//
-void UMassPlayerControllableCharacterTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
+void UMassPlayerControllableCharacterTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
 	BuildContext.AddTag<FMassPlayerControllableCharacterTag>();
 }
@@ -81,8 +81,9 @@ void ChangePlayerEntityToSoliderEntity(const UWorld* World, const FMassEntityCon
 	UMassSpawnerSubsystem* SpawnerSystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
 	check(SpawnerSystem);
 
-	const FMassEntityTemplate& EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*World, *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
-	check(EntityTemplate.IsValid());
+	// TODO: A bit hacky to get first actor here.
+	const FMassEntityTemplate* EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*World->GetLevel(0)->Actors[0], *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
+	check(EntityTemplate->IsValid());
 
 	FMassEntitySpawnDataGeneratorResult Result;
 	Result.SpawnDataProcessor = UMassSpawnLocationProcessor::StaticClass();
@@ -95,7 +96,7 @@ void ChangePlayerEntityToSoliderEntity(const UWorld* World, const FMassEntityCon
 	SpawnDataTransform = Transform;
 
 	TArray<FMassEntityHandle> SpawnedEntities;
-	SpawnerSystem->SpawnEntities(EntityTemplate.GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
+	SpawnerSystem->SpawnEntities(EntityTemplate->GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
 
 	FMassHealthFragment* SpawnedEntityHealthFragment = EntitySubsystem->GetFragmentDataPtr<FMassHealthFragment>(SpawnedEntities[0]);
 	check(SpawnedEntityHealthFragment);

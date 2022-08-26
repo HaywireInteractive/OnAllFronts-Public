@@ -10,7 +10,6 @@
 #include "MassStateTreeTypes.h"
 
 UMassMoveTargetForwardCompleteProcessor::UMassMoveTargetForwardCompleteProcessor()
-	: EntityQuery(*this)
 {
 	bAutoRegisterWithProcessingPhases = true;
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;

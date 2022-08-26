@@ -10,7 +10,7 @@
 //----------------------------------------------------------------------//
 //  UMassProjectileWithDamageTrait
 //----------------------------------------------------------------------//
-void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
+void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
 	BuildContext.AddFragment<FMassPreviousLocationFragment>();
 
@@ -40,7 +40,7 @@ void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildConte
 //----------------------------------------------------------------------//
 //  UMassProjectileDamagableTrait
 //----------------------------------------------------------------------//
-void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
+void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
 	BuildContext.AddTag<FMassProjectileDamagableTag>();
 }
@@ -49,7 +49,6 @@ void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContex
 //  UMassProjectileDamageProcessor
 //----------------------------------------------------------------------//
 UMassProjectileDamageProcessor::UMassProjectileDamageProcessor()
-	: EntityQuery(*this)
 {
 	bAutoRegisterWithProcessingPhases = true;
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;
@@ -184,14 +183,14 @@ float ClosestPtSegmentSegment(FVector p1, FVector q1, FVector p2, FVector q2,
 	float e = FVector::DotProduct(d2, d2); // Squared length of segment S2, always nonnegative
 	float f = FVector::DotProduct(d2, r);
 	// Check if either or both segments degenerate into points
-	if (a <= UE_SMALL_NUMBER && e <= UE_SMALL_NUMBER) {
+	if (a <= SMALL_NUMBER && e <= SMALL_NUMBER) {
 		// Both segments degenerate into points
 		s = t = 0.0f;
 		c1 = p1;
 		c2 = p2;
 		return FVector::DotProduct(c1 - c2, c1 - c2);
 	}
-	if (a <= UE_SMALL_NUMBER) {
+	if (a <= SMALL_NUMBER) {
 		// First segment degenerates into a point
 		s = 0.0f;
 		t = f / e; // s = 0 => t = (b*s + f) / e = f / e
@@ -199,7 +198,7 @@ float ClosestPtSegmentSegment(FVector p1, FVector q1, FVector p2, FVector q2,
 	}
 	else {
 		float c = FVector::DotProduct(d1, r);
-		if (e <= UE_SMALL_NUMBER) {
+		if (e <= SMALL_NUMBER) {
 			// Second segment degenerates into a point
 			t = 0.0f;
 			s = FMath::Clamp(-c / a, 0.0f, 1.0f); // t = 0 => s = (b*t - c) / a = -c / a

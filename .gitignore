@@ -1,16 +1,9 @@
 Binaries
-DerivedDataCache
 Intermediate
-Saved
 .vscode
 .vs
 *.VC.db
 *.opensdf
 *.opendb
 *.sdf
-*.sln
 *.suo
-*.xcodeproj
-*.xcworkspace
-Content/Characters
-enc_temp_folder/

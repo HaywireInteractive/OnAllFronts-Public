@@ -8,7 +8,6 @@
 #include "DestroyedTargetFinderProcessor.h"
 #include "MassTrackTargetProcessor.h"
 #include "MassNavigationTypes.h"
-#include "StateTreeLinker.h"
 
 bool FMassLookAtViaMoveTargetTask::Link(FStateTreeLinker& Linker)
 {

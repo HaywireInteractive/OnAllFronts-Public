@@ -4,7 +4,6 @@
 #include "MassMoveToCommandEvaluator.h"
 #include "MassMoveToCommandSubsystem.h"
 #include "MassStateTreeExecutionContext.h"
-#include "StateTreeLinker.h"
 
 bool FMassMoveToCommandEvaluator::Link(FStateTreeLinker& Linker)
 {

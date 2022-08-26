@@ -7,7 +7,6 @@
 #include "MassAIBehaviorTypes.h"
 #include "MassStateTreeExecutionContext.h"
 #include "MassSignalSubsystem.h"
-#include "StateTreeLinker.h"
 
 bool FMassIdleForDurationTask::Link(FStateTreeLinker& Linker)
 {

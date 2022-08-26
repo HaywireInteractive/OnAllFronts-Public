@@ -4,7 +4,6 @@
 #include "MassMoveToTargetTask.h"
 
 #include "MassStateTreeExecutionContext.h"
-#include "StateTreeLinker.h"
 #include "MassEntitySubsystem.h"
 #include "MassMoveTargetForwardCompleteProcessor.h"
 

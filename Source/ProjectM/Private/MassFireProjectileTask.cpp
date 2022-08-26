@@ -13,7 +13,6 @@
 #include "MassMovementFragments.h"
 #include "MassSignalSubsystem.h"
 #include "Async/Async.h"
-#include "StateTreeLinker.h"
 #include "MassProjectileDamageProcessor.h"
 
 void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQuat& SpawnRotation, const FVector& InitialVelocity, const FMassEntityConfig& EntityConfig)
@@ -24,8 +23,9 @@ void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQ
 		return;
 	}
 
-	const FMassEntityTemplate& EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*World, *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
-	if (EntityTemplate.IsValid())
+	// TODO: A bit hacky to get first actor here.
+	const FMassEntityTemplate* EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*World->GetLevel(0)->Actors[0], *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
+	if (EntityTemplate->IsValid())
 	{
 		FMassEntitySpawnDataGeneratorResult Result;
 		Result.SpawnDataProcessor = UMassSpawnLocationProcessor::StaticClass();
@@ -39,7 +39,7 @@ void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQ
 		SpawnDataTransform.SetRotation(SpawnRotation);
 
 		TArray<FMassEntityHandle> SpawnedEntities;
-		SpawnerSystem->SpawnEntities(EntityTemplate.GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
+		SpawnerSystem->SpawnEntities(EntityTemplate->GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
 
 		const UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(World);
 		check(EntitySubsystem);
