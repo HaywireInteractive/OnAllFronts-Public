@@ -30,10 +30,6 @@ class PROJECTM_API ACommanderCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-public:
-	// Sets default values for this character's properties
-	ACommanderCharacter();
-
 protected:
 	UPROPERTY()
 	UMassMoveToCommandSubsystem* MoveToCommandSystem;
@@ -54,12 +50,14 @@ protected:
 	void SpawnProjectile() const;
 
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	ACommanderCharacter();
 
 	UFUNCTION(BlueprintCallable)
 	void Respawn(const bool bDidDie = false);
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void DidDie();
+
+	UFUNCTION(BlueprintCallable)
+	void InitializeFromMassSoldier(const int32 MassEntityIndex, const int32 MassEntitySerialNumber);
 };

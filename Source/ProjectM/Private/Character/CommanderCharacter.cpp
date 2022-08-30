@@ -27,12 +27,9 @@ void UMassPlayerControllableCharacterTrait::BuildTemplate(FMassEntityTemplateBui
 //----------------------------------------------------------------------//
 ACommanderCharacter::ACommanderCharacter()
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-
+	PrimaryActorTick.bCanEverTick = false;
 }
 
-// Called when the game starts or when spawned
 void ACommanderCharacter::BeginPlay()
 {
 	Super::BeginPlay();
@@ -40,20 +37,6 @@ void ACommanderCharacter::BeginPlay()
 	UWorld* World = GetWorld();
 	check(World);
 	MoveToCommandSystem = UWorld::GetSubsystem<UMassMoveToCommandSubsystem>(World);
-}
-
-// Called every frame
-void ACommanderCharacter::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
-
-// Called to bind functionality to input
-void ACommanderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
 }
 
 void ACommanderCharacter::SetMoveToCommand() const
@@ -178,6 +161,39 @@ void ACommanderCharacter::Respawn(const bool bDidDie)
 	{
 		ChangePlayerEntityToSoliderEntity(GetWorld(), SoldierEntityConfig, PlayerEntityTransformFragment->GetTransform(), EntitySubsystem, PlayerEntityHealthFragment->Value);
 	}
+	PlayerEntityHealthFragment->Value = NewPlayerHealth;
+	NewPlayerTransform.SetLocation(NewPlayerTransform.GetLocation() + FVector(0.f, 0.f, RootComponent->Bounds.BoxExtent.Z));
+	SetActorTransform(NewPlayerTransform);
+}
+
+void ACommanderCharacter::DidDie_Implementation()
+{
+}
+
+
+void ACommanderCharacter::InitializeFromMassSoldier(const int32 MassEntityIndex, const int32 MassEntitySerialNumber)
+{
+	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(GetWorld());
+	check(EntitySubsystem);
+
+	const FMassEntityHandle SoldierEntity(MassEntityIndex, MassEntitySerialNumber);
+
+	const FMassHealthFragment& SoldierHealthFragment = EntitySubsystem->GetFragmentDataChecked<FMassHealthFragment>(SoldierEntity);
+	int16 NewPlayerHealth = SoldierHealthFragment.Value;
+
+	const FTransformFragment& SoldierTransformFragment = EntitySubsystem->GetFragmentDataChecked<FTransformFragment>(SoldierEntity);
+	FTransform NewPlayerTransform = SoldierTransformFragment.GetTransform();
+
+	EntitySubsystem->DestroyEntity(SoldierEntity);
+
+	UMassAgentComponent* AgentComponent = Cast<UMassAgentComponent>(GetComponentByClass(UMassAgentComponent::StaticClass()));
+	check(AgentComponent);
+
+	const FMassEntityHandle& PlayerEntityHandle = AgentComponent->GetEntityHandle();
+
+	FMassHealthFragment* PlayerEntityHealthFragment = EntitySubsystem->GetFragmentDataPtr<FMassHealthFragment>(PlayerEntityHandle);
+	check(PlayerEntityHealthFragment);
+	
 	PlayerEntityHealthFragment->Value = NewPlayerHealth;
 	NewPlayerTransform.SetLocation(NewPlayerTransform.GetLocation() + FVector(0.f, 0.f, RootComponent->Bounds.BoxExtent.Z));
 	SetActorTransform(NewPlayerTransform);

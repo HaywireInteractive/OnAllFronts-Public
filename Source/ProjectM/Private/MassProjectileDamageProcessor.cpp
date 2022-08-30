@@ -6,6 +6,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "MassPlayerSubsystem.h"
 #include "Character/CommanderCharacter.h"
+#include "MilitaryStructureSubsystem.h"
 
 //----------------------------------------------------------------------//
 //  UMassProjectileWithDamageTrait
@@ -333,6 +334,10 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 		if (!bHasPlayerTag)
 		{
 			Context.Defer().DestroyEntity(OtherEntity);
+
+			UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(EntitySubsystem.GetWorld());
+			check(MilitaryStructureSubsystem);
+			MilitaryStructureSubsystem->DestroyEntity(OtherEntity);
 		} else {
 			UMassPlayerSubsystem* PlayerSubsystem = UWorld::GetSubsystem<UMassPlayerSubsystem>(EntitySubsystem.GetWorld());
 			check(PlayerSubsystem);
@@ -342,7 +347,7 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 			check(Character);
 			AsyncTask(ENamedThreads::GameThread, [Character]()
 			{
-				Character->Respawn(true);
+					Character->DidDie();
 			});
 		}
 	}
