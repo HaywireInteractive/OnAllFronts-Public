@@ -56,7 +56,7 @@ int32 RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 D
 
 int32 UMilitaryStructureSubsystem::CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1)
 {
-	UMilitaryUnit* RootUnit = NewObject<UMilitaryUnit>();;
+	UMilitaryUnit* RootUnit = NewObject<UMilitaryUnit>();
 	int32 Count = RecursivelyCreateUnits(RootUnit, nullptr, MilitaryUnitIndex);
 	if (bIsTeam1)
 	{
@@ -104,4 +104,9 @@ void UMilitaryStructureSubsystem::DestroyEntity(FMassEntityHandle Entity)
 void UMilitaryUnit::RemoveFromParent()
 {
 	Parent->SubUnits.Remove(this);
+}
+
+UMilitaryUnit* UMilitaryStructureSubsystem::GetRootUnitForTeam(bool bIsTeam1)
+{
+	return bIsTeam1 ? Team1RootUnit : Team2RootUnit;
 }

@@ -10,50 +10,50 @@
 UCLASS(BlueprintType)
 class PROJECTM_API UTreeViewItem : public UObject
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FText Text;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Text;
 };
 
 USTRUCT(BlueprintType)
 struct PROJECTM_API FSoldier
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FText Name;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Name;
 };
 
 UCLASS(BlueprintType)
 class PROJECTM_API UMilitaryUnit : public UObject
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FText Name;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText Name;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    TArray<UMilitaryUnit*> SubUnits;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<UMilitaryUnit*> SubUnits;
 
-    UPROPERTY(BlueprintReadOnly)
-    uint8 Depth;
+	UPROPERTY(BlueprintReadOnly)
+	uint8 Depth;
 
-    UPROPERTY(BlueprintReadOnly)
-    int32 MassEntityIndex;
+	UPROPERTY(BlueprintReadOnly)
+	int32 MassEntityIndex;
 
-    UPROPERTY(BlueprintReadOnly)
-    int32 MassEntitySerialNumber;
+	UPROPERTY(BlueprintReadOnly)
+	int32 MassEntitySerialNumber;
 
-    UPROPERTY(BlueprintReadOnly)
-    UMilitaryUnit* Parent;
+	UPROPERTY(BlueprintReadOnly)
+	UMilitaryUnit* Parent;
 
-    UPROPERTY(BlueprintReadOnly)
-    bool bIsSoldier = false;
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsSoldier = false;
 
-    void RemoveFromParent();
+	void RemoveFromParent();
 };
 
 UCLASS(BlueprintType)
@@ -62,23 +62,25 @@ class PROJECTM_API UMilitaryStructureSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 protected:
-  UPROPERTY()
-  TMap<FMassEntityHandle, UMilitaryUnit*> EntityToUnitMap;
+	UPROPERTY()
+	TMap<FMassEntityHandle, UMilitaryUnit*> EntityToUnitMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UMilitaryUnit* Team1RootUnit;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UMilitaryUnit* Team2RootUnit;
 
 public:
-    // USubsystem BEGIN
-    virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-    // USubsystem END
+	// USubsystem BEGIN
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	// USubsystem END
 
-    // returns number of soldiers
-    int32 CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1);
+	// returns number of soldiers
+	int32 CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1);
 
-    void BindUnitToMassEntity(UMilitaryUnit* MilitaryUnit, FMassEntityHandle Entity);
-    void DestroyEntity(FMassEntityHandle Entity);
+	void BindUnitToMassEntity(UMilitaryUnit* MilitaryUnit, FMassEntityHandle Entity);
+	void DestroyEntity(FMassEntityHandle Entity);
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    UMilitaryUnit* Team1RootUnit;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    UMilitaryUnit* Team2RootUnit;
+	UMilitaryUnit* GetRootUnitForTeam(bool bIsTeam1);
 };

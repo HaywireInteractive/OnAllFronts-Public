@@ -26,4 +26,7 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	uint8 MilitaryUnitIndex = 0; // Index into MilitaryUnits in MilitaryStructureSubsystem.cpp; TODO: make this an enum
+
+	UPROPERTY(EditAnywhere)
+	bool bIsTeam1;
 };

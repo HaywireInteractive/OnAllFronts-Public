@@ -49,15 +49,20 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void SpawnProjectile() const;
 
+	void InitializeFromMassSoldierInternal(FMassEntityHandle MassSoldierEntityToInitializeWith);
+
 public:
 	ACommanderCharacter();
 
 	UFUNCTION(BlueprintCallable)
-	void Respawn(const bool bDidDie = false);
+	void ChangePlayerToAISoldier();
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void DidDie();
 
 	UFUNCTION(BlueprintCallable)
 	void InitializeFromMassSoldier(const int32 MassEntityIndex, const int32 MassEntitySerialNumber);
+
+	UFUNCTION(BlueprintCallable)
+	bool IsPlayerOnTeam1();
 };

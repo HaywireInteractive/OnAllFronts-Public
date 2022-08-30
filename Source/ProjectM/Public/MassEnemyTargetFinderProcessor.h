@@ -34,6 +34,7 @@ class PROJECTM_API UMassTeamMemberTrait : public UMassEntityTraitBase
 protected:
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
 
+public:
 	UPROPERTY(Category = "Team", EditAnywhere)
 	bool IsOnTeam1 = true;
 };
