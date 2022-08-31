@@ -40,6 +40,19 @@ void ACommanderCharacter::BeginPlay()
 	MoveToCommandSystem = UWorld::GetSubsystem<UMassMoveToCommandSubsystem>(World);
 }
 
+void ACommanderCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (OnMassAgentComponentEntityAssociatedHandle.IsValid())
+	{
+		UMassAgentSubsystem* AgentSubsystem = UWorld::GetSubsystem<UMassAgentSubsystem>(GetWorld());
+		check(AgentSubsystem);
+		AgentSubsystem->GetOnMassAgentComponentEntityAssociated().Remove(OnMassAgentComponentEntityAssociatedHandle);
+		OnMassAgentComponentEntityAssociatedHandle.Reset();
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void ACommanderCharacter::SetMoveToCommand() const
 {
 	MoveToCommandSystem->SetMoveToCommandTarget(FVector(0.f, 0.f, 20.f), false); // TODO
@@ -110,20 +123,32 @@ void ACommanderCharacter::DidDie_Implementation()
 {
 }
 
-void ACommanderCharacter::InitializeFromMassSoldier(const int32 MassEntityIndex, const int32 MassEntitySerialNumber)
+bool ACommanderCharacter::InitializeFromMassSoldier(const int32 MassEntityIndex, const int32 MassEntitySerialNumber)
 {
-	FMassEntityHandle MassSoldierEntityToInitializeWith = FMassEntityHandle(MassEntityIndex, MassEntitySerialNumber);
+	FMassEntityHandle MassSoldierEntityToInitializeWith(MassEntityIndex, MassEntitySerialNumber);
+
+	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(GetWorld());
+	check(EntitySubsystem);
+
+	if (!EntitySubsystem->IsEntityValid(MassSoldierEntityToInitializeWith))
+	{
+		return false;
+	}
 
 	UMassAgentSubsystem* AgentSubsystem = UWorld::GetSubsystem<UMassAgentSubsystem>(GetWorld());
 	check(AgentSubsystem);
 
-	AgentSubsystem->GetOnMassAgentComponentEntityAssociated().AddLambda([this, MassSoldierEntityToInitializeWith](const UMassAgentComponent& AgentComponent)
+	OnMassAgentComponentEntityAssociatedHandle = AgentSubsystem->GetOnMassAgentComponentEntityAssociated().AddLambda([this, MassSoldierEntityToInitializeWith, AgentSubsystem](const UMassAgentComponent& AgentComponent)
 	{
 		if (&AgentComponent == Cast<UMassAgentComponent>(GetComponentByClass(UMassAgentComponent::StaticClass())))
 		{
+			AgentSubsystem->GetOnMassAgentComponentEntityAssociated().Remove(OnMassAgentComponentEntityAssociatedHandle);
+			OnMassAgentComponentEntityAssociatedHandle.Reset();
 			InitializeFromMassSoldierInternal(MassSoldierEntityToInitializeWith);
 		}
 	});
+
+	return true;
 }
 
 void ACommanderCharacter::InitializeFromMassSoldierInternal(FMassEntityHandle MassSoldierEntityToInitializeWith)

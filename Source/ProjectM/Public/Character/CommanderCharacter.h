@@ -30,6 +30,11 @@ class PROJECTM_API ACommanderCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
+private:
+	void InitializeFromMassSoldierInternal(FMassEntityHandle MassSoldierEntityToInitializeWith);
+
+	FDelegateHandle OnMassAgentComponentEntityAssociatedHandle;
+
 protected:
 	UPROPERTY()
 	UMassMoveToCommandSubsystem* MoveToCommandSystem;
@@ -40,16 +45,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Mass")
 	FMassEntityConfig SoldierEntityConfig;
 
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UFUNCTION(BlueprintCallable)
 	void SetMoveToCommand() const;
 
 	UFUNCTION(BlueprintCallable)
 	void SpawnProjectile() const;
-
-	void InitializeFromMassSoldierInternal(FMassEntityHandle MassSoldierEntityToInitializeWith);
 
 public:
 	ACommanderCharacter();
@@ -61,7 +64,7 @@ public:
 	void DidDie();
 
 	UFUNCTION(BlueprintCallable)
-	void InitializeFromMassSoldier(const int32 MassEntityIndex, const int32 MassEntitySerialNumber);
+	bool InitializeFromMassSoldier(const int32 MassEntityIndex, const int32 MassEntitySerialNumber);
 
 	UFUNCTION(BlueprintCallable)
 	bool IsPlayerOnTeam1();
