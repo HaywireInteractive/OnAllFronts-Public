@@ -11,6 +11,7 @@ typedef TTuple<const uint8, FName> TUnitPair;
 
 static const TUnitPair MilitaryUnits[] = {
 	// pairs are in order of (SubUnitCount, UnitName)
+	TUnitPair(3, TEXT("Corps")),
 	TUnitPair(3, TEXT("Division")),
 	TUnitPair(4, TEXT("Brigade")),
 	TUnitPair(3, TEXT("Battalion")),
