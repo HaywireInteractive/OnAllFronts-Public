@@ -86,3 +86,13 @@ These ideas below would be explored in one of the phases above.
     1. (Unclear if this is actually needed, but if soldiers or projectiles don't render, do this) Engine - Mass > Mass > Module Settings > Mass Entity > Processor CDOs > "MassSimpleUpdateISMProcessor'/Script/ProjectM.Default__MassSimpleUpdateISMProcessor'" > Auto Register with Processing Phases > check
 1. Now open L_Small level and use PIE to test out the project.
 1. For a larger amount of soldiers see L_Large.
+
+## To add soldiers to City Sample Level
+1. Duplicate Small_City_LVL and call it Small_City_ProjectM_LVL
+1. Delete Mass Spawners: BP_MassTraffic* and BP_MassCrowdSpawner
+1. Delete BP_Nightmode
+1. Open L_Template
+1. Copy MilitaryUnitMassSpawner* and BP_MassRifle actors
+1. Paste in Small_City_ProjectM_LVL
+1. Position BP_MassRifle next to PlayerStart actor
+1. World Settings > GameMode Override > BP_FirstPersonGameModeCommander
