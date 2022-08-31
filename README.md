@@ -83,5 +83,6 @@ These ideas below would be explored in one of the phases above.
         1. Add "MoveToCommand", 1 key
         1. Add "Spectate", F key
         1. Add "Respawn", R key
-    1. Engine - Mass > Mass > Module Settings > Mass Entity > Processor CDOs > "MassUpdateISMProcessor'/Script/MassRepresentation.Default__MassUpdateISMProcessor'" > Auto Register with Processing Phases > check
+    1. (Unclear if this is actually needed, but if soldiers or projectiles don't render, do this) Engine - Mass > Mass > Module Settings > Mass Entity > Processor CDOs > "MassSimpleUpdateISMProcessor'/Script/ProjectM.Default__MassSimpleUpdateISMProcessor'" > Auto Register with Processing Phases > check
 1. Now open L_Small level and use PIE to test out the project.
+1. For a larger amount of soldiers see L_Large.

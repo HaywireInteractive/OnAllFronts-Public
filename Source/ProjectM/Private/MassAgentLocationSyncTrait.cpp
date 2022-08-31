@@ -2,12 +2,14 @@
 
 
 #include "MassAgentLocationSyncTrait.h"
+
 #include "MassVisualizer.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "MassSimulationSubsystem.h"
 #include "MassCommonFragments.h"
 #include "MassEntityTemplateRegistry.h"
 #include "MassActorSubsystem.h"
+#include "MassSimpleUpdateISMProcessor.h"
 
 //----------------------------------------------------------------------//
 //  UMassProjectileTrait
@@ -209,6 +211,7 @@ void UMassProjectileVisualizationTrait::BuildTemplate(FMassEntityTemplateBuildCo
 {
 	Super::BuildTemplate(BuildContext, World);
 	BuildContext.AddTag<FMassProjectileVisualizationTag>();
+	BuildContext.AddTag<FMassSimpleUpdateISMTag>();
 }
 
 //----------------------------------------------------------------------//

@@ -16,6 +16,8 @@
 class UMassNavigationSubsystem;
 struct FMassNavigationObstacleItem;
 
+// TODO: split up this file into more cohesive units
+
 USTRUCT()
 struct FMassProjectileTag : public FMassTag
 {
@@ -58,9 +60,6 @@ protected:
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
 };
 
-/**
- *
- */
 UCLASS(BlueprintType, EditInlineNew, CollapseCategories, meta = (DisplayName = "Agent Location Sync"))
 class PROJECTM_API UMassAgentLocationSyncTrait : public UMassAgentSyncTrait
 {
@@ -159,7 +158,7 @@ class PROJECTM_API UMassProjectileLODCollectorProcessor : public UMassLODCollect
 {
 	GENERATED_BODY()
 
-		UMassProjectileLODCollectorProcessor();
+	UMassProjectileLODCollectorProcessor();
 
 protected:
 	virtual void ConfigureQueries() override;
