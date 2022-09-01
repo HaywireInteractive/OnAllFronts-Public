@@ -31,7 +31,7 @@ Human players will never spawn soliders onto the battlefield. Instead they will 
 
 # Phases
 
-Currently this is a hobby project, so it's unclear how far it'll go. Therefore, the project is broken into multiple phases.
+Currently this is a hobby project, so it's unclear how far it'll go. Therefore, the project is broken into multiple phases. For current status, see [Project Tracker](https://github.com/users/LeroyTechnologies/projects/1).
 
 ## Phase 1: Single-player
 
@@ -58,6 +58,11 @@ These ideas below would be explored in one of the phases above.
 1. Railroad system for logistics. Railroads can be damaged and repaired.
 1. Pontoon bridges which can be built for river crossings. Bridges can be destroyed.
 1. Building destruction
+
+# FAQ
+
+- Where can I ask questions or get involved in the project? Email leroytech231+gh@gmail.com.
+
 
 # Development Environment Setup
 

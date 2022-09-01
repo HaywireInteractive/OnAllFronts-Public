@@ -189,7 +189,7 @@ void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEnti
 }
 
 bool UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk = true;
-FAutoConsoleVariableRef CVarEnsureUnweldModifiesGTOnly(TEXT("pr.UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk"), UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassEnemyTargetFinderProcessor::Execute to improve performance"));
+FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk(TEXT("pm.UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk"), UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassEnemyTargetFinderProcessor::Execute to improve performance"));
 
 void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
