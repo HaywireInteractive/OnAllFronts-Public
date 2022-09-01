@@ -12,6 +12,7 @@ public class ProjectM : ModuleRules
 			"Niagara",
 			"StateTreeModule",
 			"StructUtils",
+			"UMG",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
@@ -36,6 +37,9 @@ public class ProjectM : ModuleRules
 			"MassSpawner",
 			"MassSimulation",
 			"MassSignals",
-		});
+
+            "Slate",
+            "SlateCore",
+        });
 	}
 }
