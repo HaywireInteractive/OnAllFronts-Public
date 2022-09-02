@@ -94,10 +94,15 @@ These ideas below would be explored in one of the phases above.
 
 ## To add soldiers to City Sample Level
 1. Duplicate Small_City_LVL and call it Small_City_ProjectM_LVL
-1. Delete Mass Spawners: BP_MassTraffic* and BP_MassCrowdSpawner
-1. Delete BP_Nightmode
+1. Open Small_City_ProjectM_LVL
+1. Delete Actors
+    1. Mass Spawners: BP_MassTraffic* and BP_MassCrowdSpawner
+    1. BP_CitySampleWorldInfo
+    1. BP_Nightmode
 1. Open L_Template
-1. Copy MilitaryUnitMassSpawner* and BP_MassRifle actors
+1. Copy MilitaryUnitMassSpawner*, BP_MassRifle, and ProjectMWorldInfo actors
 1. Paste in Small_City_ProjectM_LVL
+1. Select each MilitaryUnitMassSpawner* actor > Details > World Partition > Is Spatially Loaded > uncheck
+1. In ProjectMWorldInfo actor, select WorldMapBoundingBox component and under Shape > Box Extent set the X and Y values so the box surrounds the map. If actor is at (0,0,0), a good extent is (100000.0, 100000.0).
 1. Position BP_MassRifle next to PlayerStart actor
 1. World Settings > GameMode Override > BP_FirstPersonGameModeCommander

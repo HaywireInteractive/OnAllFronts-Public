@@ -57,7 +57,7 @@ struct PROJECTM_API FNeedsEnemyTargetSharedParameters : public FMassSharedFragme
 	GENERATED_BODY()
 
 	UPROPERTY(Category = "", EditAnywhere)
-	int32 ParallelJobCount = 60;
+	int32 ParallelJobCount = 1; // This is not as useful anymore now that we use ParallelForEachEntityChunk since that parallelizes better.
 };
 
 UCLASS(meta = (DisplayName = "NeedsEnemyTarget"))
