@@ -92,7 +92,12 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
-			ProcessEntity(TeamMemberList[i], MoveTargetList[i], IsLastMoveToCommandForTeam1, LastMoveToCommandTarget, EntitySubsystem, TransformList[i].GetTransform().GetLocation(), Context, StashedMoveTargetList[i], Context.GetEntity(i));
+			// Change move to command target Z to make current entity's Z value since we don't know ground height.
+			const FVector& EntityLocation = TransformList[i].GetTransform().GetLocation();
+			FVector MoveToCommandTarget = LastMoveToCommandTarget;
+			MoveToCommandTarget.Z = EntityLocation.Z;
+
+			ProcessEntity(TeamMemberList[i], MoveTargetList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntitySubsystem, EntityLocation, Context, StashedMoveTargetList[i], Context.GetEntity(i));
 		}
 	});
 
