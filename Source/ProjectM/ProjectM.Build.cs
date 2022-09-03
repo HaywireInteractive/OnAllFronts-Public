@@ -9,7 +9,8 @@ public class ProjectM : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore",
-			"Niagara",
+            "MassZoneGraphNavigation",
+            "Niagara",
 			"StateTreeModule",
 			"StructUtils",
 			"UMG",
@@ -40,6 +41,8 @@ public class ProjectM : ModuleRules
 
             "Slate",
             "SlateCore",
+
+            "ZoneGraph",
         });
 	}
 }
