@@ -11,10 +11,6 @@
 
 AMilitaryUnitMassSpawner::AMilitaryUnitMassSpawner()
 {
-#if WITH_EDITOR
-	GetClass()->FindPropertyByName(FName("Count"))->ClearPropertyFlags(CPF_Edit);
-#endif
-
 	OnSpawningFinishedEvent.AddDynamic(this, &AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits);
 }
 
