@@ -4,12 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "MilitaryStructureSubsystem.h"
 
 #include "ProjectMMapWidget.generated.h"
 
 class USceneCaptureComponent2D;
 
-typedef TFunction< void(const FVector& /*EntityLocation*/, const bool& /*bIsOnTeam1*/) > FMapDisplayableEntityFunction;
+typedef TFunction< void(const FVector& /*EntityLocation*/, const bool& /*bIsOnTeam1*/, const FMassEntityHandle& /*Entity*/) > FMapDisplayableEntityFunction;
 
 // Adapted from UCitySampleMapWidget.
 UCLASS()
@@ -24,6 +25,9 @@ public:
 	UPROPERTY(EditAnywhere, meta = (BindWidget))
 	class UBorder* Border;
 
+	UFUNCTION(BlueprintCallable)
+	void SetSelectedUnit(UMilitaryUnit* Unit);
+
 	virtual void NativeOnInitialized() override;
 
 protected:
@@ -33,6 +37,7 @@ private:
 	FVector2D WorldPositionToMapPosition(const FVector& WorldLocation);
 	void InitializeMapViewProjectionMatrix(USceneCaptureComponent2D* const SceneCapture2D);
 	void UpdateSoldierButtons();
+	bool IsEntityChildOfSelectedUnit(const FMassEntityHandle& Entity);
 	void CreateSoldierButtons();
 	void CreateButton(const FVector2D& Position, const FLinearColor& Color);
 	void ForEachMapDisplayableEntity(const FMapDisplayableEntityFunction& EntityExecuteFunction);
@@ -45,4 +50,5 @@ private:
 	FMatrix MapViewProjectionMatrix;
 
 	bool bCreatedButtons = false;
+	UMilitaryUnit* SelectedUnit = nullptr;
 };

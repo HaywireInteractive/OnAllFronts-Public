@@ -54,6 +54,7 @@ public:
 	bool bIsSoldier = false;
 
 	void RemoveFromParent();
+	FMassEntityHandle GetMassEntityHandle();
 };
 
 UCLASS(BlueprintType)
@@ -81,6 +82,7 @@ public:
 
 	void BindUnitToMassEntity(UMilitaryUnit* MilitaryUnit, FMassEntityHandle Entity);
 	void DestroyEntity(FMassEntityHandle Entity);
-
+	
+	UMilitaryUnit* GetUnitForEntity(FMassEntityHandle Entity);
 	UMilitaryUnit* GetRootUnitForTeam(bool bIsTeam1);
 };

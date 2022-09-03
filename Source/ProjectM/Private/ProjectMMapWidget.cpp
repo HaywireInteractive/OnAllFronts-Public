@@ -8,7 +8,6 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
-#include "Components/HorizontalBoxSlot.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "MassEntitySubsystem.h"
 #include "MassEntityQuery.h"
@@ -23,6 +22,7 @@
 static const float GButtonSize = 10.f;
 
 // TODO: don't hard-code
+static const FLinearColor GSelectedUnitColor = FLinearColor(0.f, 1.f, 0.f);
 static const FLinearColor GTeamColors[] = {
   FLinearColor(0.f, 0.f, 1.f),
   FLinearColor(1.f, 0.f, 0.f),
@@ -49,7 +49,7 @@ void UProjectMMapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 
 void UProjectMMapWidget::CreateSoldierButtons()
 {
-  ForEachMapDisplayableEntity([this](const FVector& EntityLocation, const bool& bIsOnTeam1)
+  ForEachMapDisplayableEntity([this](const FVector& EntityLocation, const bool& bIsOnTeam1, const FMassEntityHandle& Entity)
   {
     FLinearColor Color = GTeamColors[bIsOnTeam1];
     CreateButton(WorldPositionToMapPosition(EntityLocation), Color);
@@ -76,7 +76,7 @@ void UProjectMMapWidget::ForEachMapDisplayableEntity(const FMapDisplayableEntity
 
     for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
     {
-      EntityExecuteFunction(TransformList[EntityIndex].GetTransform().GetLocation(), TeamMemberList[EntityIndex].IsOnTeam1);
+      EntityExecuteFunction(TransformList[EntityIndex].GetTransform().GetLocation(), TeamMemberList[EntityIndex].IsOnTeam1, Context.GetEntity(EntityIndex));
     }
   });
 }
@@ -97,15 +97,26 @@ void UProjectMMapWidget::CreateButton(const FVector2D& Position, const FLinearCo
 
 void UProjectMMapWidget::UpdateSoldierButtons()
 {
-  // We start at 1 because index 0 is the Border.
-  int32 ButtonIndex = 1;
+  int32 ButtonIndex = 0;
 
-  ForEachMapDisplayableEntity([&ButtonIndex, this](const FVector& EntityLocation, const bool& bIsOnTeam1)
+  // Find first button index.
+  // TODO: this is brittle in case not all buttons are at end of CanvasPanel's children. Find safer way to do this.
+  for (; ButtonIndex < CanvasPanel->GetChildrenCount(); ButtonIndex++)
+  {
+    UButton* Button = Cast<UButton>(CanvasPanel->GetChildAt(ButtonIndex));
+    if (Button)
+    {
+      break;
+    }
+  }
+
+  ForEachMapDisplayableEntity([&ButtonIndex, this](const FVector& EntityLocation, const bool& bIsOnTeam1, const FMassEntityHandle& Entity)
   {
     UButton* Button = CastChecked<UButton>(CanvasPanel->GetChildAt(ButtonIndex++));
-    Button->WidgetStyle.Normal.TintColor = GTeamColors[bIsOnTeam1];
+    Button->WidgetStyle.Normal.TintColor = IsEntityChildOfSelectedUnit(Entity) ? GSelectedUnitColor : GTeamColors[bIsOnTeam1];
     UCanvasPanelSlot* ButtonSlot = CastChecked<UCanvasPanelSlot>(Button->Slot.Get());
-    ButtonSlot->SetPosition(WorldPositionToMapPosition(EntityLocation));
+    const FVector2D& MapPosition = WorldPositionToMapPosition(EntityLocation);
+    ButtonSlot->SetPosition(MapPosition);
   });
 
   // Hide remaining buttons.
@@ -114,6 +125,33 @@ void UProjectMMapWidget::UpdateSoldierButtons()
     UButton* Button = CastChecked<UButton>(CanvasPanel->GetChildAt(ButtonIndex));
     Button->SetVisibility(ESlateVisibility::Collapsed);
   }
+}
+
+bool UProjectMMapWidget::IsEntityChildOfSelectedUnit(const FMassEntityHandle& Entity)
+{
+  if (!SelectedUnit) {
+    return false;
+  }
+
+  if (SelectedUnit->bIsSoldier)
+  {
+    return Entity == SelectedUnit->GetMassEntityHandle();
+  }
+
+  // If we got here, SelectedUnit is set to a non-soldier.
+  UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(GetWorld());
+  check(MilitaryStructureSubsystem);
+  UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+
+  while (Unit)
+  {
+    if (Unit == SelectedUnit) {
+      return true;
+    }
+    Unit = Unit->Parent;
+  }
+
+  return false;
 }
 
 FVector2D UProjectMMapWidget::WorldPositionToMapPosition(const FVector& WorldLocation)
@@ -176,4 +214,9 @@ void UProjectMMapWidget::InitializeMapViewProjectionMatrix(USceneCaptureComponen
     MapProjectionMatrix,
     MapViewProjectionMatrix
   );
+}
+
+void UProjectMMapWidget::SetSelectedUnit(UMilitaryUnit* Unit)
+{
+  SelectedUnit = Unit;
 }

@@ -55,6 +55,9 @@ int32 RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 D
 	return Result;
 }
 
+//----------------------------------------------------------------------//
+//  UMilitaryStructureSubsystem
+//----------------------------------------------------------------------//
 int32 UMilitaryStructureSubsystem::CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1)
 {
 	UMilitaryUnit* RootUnit = NewObject<UMilitaryUnit>();
@@ -102,12 +105,31 @@ void UMilitaryStructureSubsystem::DestroyEntity(FMassEntityHandle Entity)
 	}
 }
 
+UMilitaryUnit* UMilitaryStructureSubsystem::GetRootUnitForTeam(bool bIsTeam1)
+{
+	return bIsTeam1 ? Team1RootUnit : Team2RootUnit;
+}
+
+UMilitaryUnit* UMilitaryStructureSubsystem::GetUnitForEntity(FMassEntityHandle Entity)
+{
+	UMilitaryUnit** MilitaryUnit = EntityToUnitMap.Find(Entity);
+	if (!MilitaryUnit)
+	{
+		return nullptr;
+	}
+
+	return *MilitaryUnit;
+}
+
+//----------------------------------------------------------------------//
+//  UMilitaryUnit
+//----------------------------------------------------------------------//
 void UMilitaryUnit::RemoveFromParent()
 {
 	Parent->SubUnits.Remove(this);
 }
 
-UMilitaryUnit* UMilitaryStructureSubsystem::GetRootUnitForTeam(bool bIsTeam1)
+FMassEntityHandle UMilitaryUnit::GetMassEntityHandle()
 {
-	return bIsTeam1 ? Team1RootUnit : Team2RootUnit;
+	return FMassEntityHandle(MassEntityIndex, MassEntitySerialNumber);
 }
