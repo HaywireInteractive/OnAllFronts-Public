@@ -8,6 +8,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Components/TreeView.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "MassEntitySubsystem.h"
 #include "MassEntityQuery.h"
@@ -28,6 +29,9 @@ static const FLinearColor GTeamColors[] = {
   FLinearColor(1.f, 0.f, 0.f),
 };
 
+//----------------------------------------------------------------------//
+//  UProjectMMapWidget
+//----------------------------------------------------------------------//
 void UProjectMMapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
   Super::NativeTick(MyGeometry, InDeltaTime);
@@ -52,7 +56,9 @@ void UProjectMMapWidget::CreateSoldierButtons()
   ForEachMapDisplayableEntity([this](const FVector& EntityLocation, const bool& bIsOnTeam1, const FMassEntityHandle& Entity)
   {
     FLinearColor Color = GTeamColors[bIsOnTeam1];
-    CreateButton(WorldPositionToMapPosition(EntityLocation), Color);
+    UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+    UButton* Button = CreateButton(WorldPositionToMapPosition(EntityLocation), Color);
+    ButtonToMilitaryUnitMap.Add(Button, Unit);
   });
 
   bCreatedButtons = true;
@@ -81,7 +87,7 @@ void UProjectMMapWidget::ForEachMapDisplayableEntity(const FMapDisplayableEntity
   });
 }
 
-void UProjectMMapWidget::CreateButton(const FVector2D& Position, const FLinearColor& Color)
+UButton* UProjectMMapWidget::CreateButton(const FVector2D& Position, const FLinearColor& Color)
 {
   UButton* Button = NewObject<UButton>();
   Button->WidgetStyle.Normal.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
@@ -93,6 +99,18 @@ void UProjectMMapWidget::CreateButton(const FVector2D& Position, const FLinearCo
   CanvasPanelSlot->SetAlignment(FVector2D(0.5f, 0.5f));
   CanvasPanelSlot->SetPosition(Position);
   CanvasPanelSlot->SetSize(FVector2D(GButtonSize, GButtonSize));
+
+  SButton* ButtonWidget = (SButton*)&(Button->TakeWidget().Get());
+  ButtonWidget->SetOnClicked(FOnClicked::CreateLambda([this, Button]()
+  {
+    if (ButtonToMilitaryUnitMap.Contains(Button))
+    {
+      BP_OnSoldierButtonClicked(ButtonToMilitaryUnitMap[Button]);
+    }
+    return FReply::Handled();
+  }));
+
+  return Button;
 }
 
 void UProjectMMapWidget::UpdateSoldierButtons()
@@ -112,11 +130,14 @@ void UProjectMMapWidget::UpdateSoldierButtons()
 
   ForEachMapDisplayableEntity([&ButtonIndex, this](const FVector& EntityLocation, const bool& bIsOnTeam1, const FMassEntityHandle& Entity)
   {
+    UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
     UButton* Button = CastChecked<UButton>(CanvasPanel->GetChildAt(ButtonIndex++));
-    Button->WidgetStyle.Normal.TintColor = IsEntityChildOfSelectedUnit(Entity) ? GSelectedUnitColor : GTeamColors[bIsOnTeam1];
+    Button->WidgetStyle.Normal.TintColor = IsUnitChildOfSelectedUnit(Unit) ? GSelectedUnitColor : GTeamColors[bIsOnTeam1];
     UCanvasPanelSlot* ButtonSlot = CastChecked<UCanvasPanelSlot>(Button->Slot.Get());
     const FVector2D& MapPosition = WorldPositionToMapPosition(EntityLocation);
     ButtonSlot->SetPosition(MapPosition);
+
+    ButtonToMilitaryUnitMap[Button] = Unit;
   });
 
   // Hide remaining buttons.
@@ -127,7 +148,7 @@ void UProjectMMapWidget::UpdateSoldierButtons()
   }
 }
 
-bool UProjectMMapWidget::IsEntityChildOfSelectedUnit(const FMassEntityHandle& Entity)
+bool UProjectMMapWidget::IsUnitChildOfSelectedUnit(UMilitaryUnit* Unit)
 {
   if (!SelectedUnit) {
     return false;
@@ -135,13 +156,10 @@ bool UProjectMMapWidget::IsEntityChildOfSelectedUnit(const FMassEntityHandle& En
 
   if (SelectedUnit->bIsSoldier)
   {
-    return Entity == SelectedUnit->GetMassEntityHandle();
+    return Unit == SelectedUnit;
   }
 
   // If we got here, SelectedUnit is set to a non-soldier.
-  UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(GetWorld());
-  check(MilitaryStructureSubsystem);
-  UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
 
   while (Unit)
   {
@@ -164,6 +182,9 @@ FVector2D UProjectMMapWidget::WorldPositionToMapPosition(const FVector& WorldLoc
 void UProjectMMapWidget::NativeOnInitialized()
 {
   Super::NativeOnInitialized();
+
+  MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(GetWorld());
+  check(MilitaryStructureSubsystem);
 
   const AProjectMWorldInfo* const WorldInfo = Cast<AProjectMWorldInfo>(UGameplayStatics::GetActorOfClass(GetWorld(), AProjectMWorldInfo::StaticClass()));
   USceneCaptureComponent2D* const SceneCapture = WorldInfo ? WorldInfo->GetWorldMapSceneCapture() : nullptr;
@@ -219,4 +240,16 @@ void UProjectMMapWidget::InitializeMapViewProjectionMatrix(USceneCaptureComponen
 void UProjectMMapWidget::SetSelectedUnit(UMilitaryUnit* Unit)
 {
   SelectedUnit = Unit;
+}
+
+//----------------------------------------------------------------------//
+//  UProjectMMapWidgetLibrary
+//----------------------------------------------------------------------//
+void UProjectMMapWidgetLibrary::RecursivelyExpandTreeViewUnitParents(UTreeView* TreeView, UMilitaryUnit* Unit)
+{
+  while (Unit)
+  {
+    TreeView->SetItemExpansion(Unit, true);
+    Unit = Unit->Parent;
+  }
 }

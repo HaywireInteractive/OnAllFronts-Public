@@ -28,6 +28,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetSelectedUnit(UMilitaryUnit* Unit);
 
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnSoldierButtonClicked(UMilitaryUnit* Unit);
+
 	virtual void NativeOnInitialized() override;
 
 protected:
@@ -37,9 +40,9 @@ private:
 	FVector2D WorldPositionToMapPosition(const FVector& WorldLocation);
 	void InitializeMapViewProjectionMatrix(USceneCaptureComponent2D* const SceneCapture2D);
 	void UpdateSoldierButtons();
-	bool IsEntityChildOfSelectedUnit(const FMassEntityHandle& Entity);
+	bool IsUnitChildOfSelectedUnit(UMilitaryUnit* Unit);
 	void CreateSoldierButtons();
-	void CreateButton(const FVector2D& Position, const FLinearColor& Color);
+	class UButton* CreateButton(const FVector2D& Position, const FLinearColor& Color);
 	void ForEachMapDisplayableEntity(const FMapDisplayableEntityFunction& EntityExecuteFunction);
 
 	/** Rect representing render target (map) space. */
@@ -51,4 +54,17 @@ private:
 
 	bool bCreatedButtons = false;
 	UMilitaryUnit* SelectedUnit = nullptr;
+	TMap<UButton*, UMilitaryUnit*> ButtonToMilitaryUnitMap;
+	UMilitaryStructureSubsystem* MilitaryStructureSubsystem;
+};
+
+// Static helper methods for Blueprints.
+UCLASS()
+class PROJECTM_API UProjectMMapWidgetLibrary : public UBlueprintFunctionLibrary
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION(BlueprintCallable)
+	static void RecursivelyExpandTreeViewUnitParents(class UTreeView* TreeView, UMilitaryUnit* Unit);
 };
