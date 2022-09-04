@@ -101,7 +101,8 @@ void AProjectMWorldInfo::InitializeMapSceneCapture()
 	}
 
 	const FVector CaptureActorLocation(MapBounds.GetCenter().X, MapBounds.GetCenter().Y, CaptureActorZ);
-	const FRotator CaptureActorRotation(-90.f, 0.f, 0.f);
+	// TODO: figure out why CaptureActorRotation had to be changed from ACitySampleWorldInfo. Without the Yaw change, the map is rotated.
+	const FRotator CaptureActorRotation(-90.f, -90.f, 0.f);
 	WorldMapSceneCaptureComponent2D->SetWorldLocationAndRotation(CaptureActorLocation, CaptureActorRotation);
 	WorldMapSceneCaptureComponent2D->CaptureScene();
 }
