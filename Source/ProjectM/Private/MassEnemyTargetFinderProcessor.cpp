@@ -8,6 +8,7 @@
 #include "MassLODTypes.h"
 #include "MassCommonFragments.h"
 #include "MassTrackTargetProcessor.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
@@ -175,11 +176,29 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 	return false;
 }
 
+bool IsTargetEntityVisibleViaLineTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation)
+{
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaLineTrace);
+	FHitResult Result;
+	bool bFoundBlockingHit = UKismetSystemLibrary::LineTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
+	return !bFoundBlockingHit;
+}
+
 void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase)
 {
+	const FVector& EntityLocation = Location.GetTransform().GetLocation();
 	FMassEntityHandle TargetEntity;
-	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase);
+	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityLocation, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase);
 	if (!bFoundTarget) {
+		return;
+	}
+
+	FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
+	FTransformFragment& TargetTransformFragment = TargetEntityView.GetFragmentData<FTransformFragment>();
+
+	bool bTargetEntityVisibleViaLineTrace = IsTargetEntityVisibleViaLineTrace(*EntitySubsystem.GetWorld(), EntityLocation, TargetTransformFragment.GetTransform().GetLocation());
+	if (!bTargetEntityVisibleViaLineTrace)
+	{
 		return;
 	}
 
