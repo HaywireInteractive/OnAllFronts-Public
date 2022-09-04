@@ -50,6 +50,13 @@ void ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 	}
 
 	const ANavigationData* NavData = NavSys->GetNavDataForProps(FNavAgentProperties::DefaultProperties, EntityLocation);
+
+	if (!NavData)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not get navigation data. Likely there is no NavMesh in level."));
+		return;
+	}
+
 	FPathFindingQuery Query(Processor, *NavData, EntityLocation, LastMoveToCommandTarget);
 	FPathFindingResult Result = NavSys->FindPathSync(Query);
 
