@@ -19,6 +19,7 @@
 #include "MassCommonFragments.h"
 #include "MassEnemyTargetFinderProcessor.h"
 
+#define LOCTEXT_NAMESPACE "MyNamespace" // TODO
 
 static const float GButtonSize = 10.f;
 
@@ -49,6 +50,20 @@ void UProjectMMapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
   {
     UpdateSoldierButtons();
   }
+
+  UpdateSoldierCountLabels();
+}
+
+void UProjectMMapWidget::UpdateSoldierCountLabels()
+{
+  if (TextBlock_Team1Count)
+  {
+    TextBlock_Team1Count->SetText(FText::Format(LOCTEXT("TODO", "Team 1: {0}"), CachedTeam1AliveSoldierCount));
+  }
+  if (TextBlock_Team2Count)
+  {
+    TextBlock_Team2Count->SetText(FText::Format(LOCTEXT("TODO", "Team 2: {0}"), CachedTeam2AliveSoldierCount));
+  }
 }
 
 void UProjectMMapWidget::CreateSoldierButtons()
@@ -56,6 +71,7 @@ void UProjectMMapWidget::CreateSoldierButtons()
   ForEachMapDisplayableEntity([this](const FVector& EntityLocation, const bool& bIsOnTeam1, const FMassEntityHandle& Entity)
   {
     FLinearColor Color = GTeamColors[bIsOnTeam1];
+    (bIsOnTeam1 ? CachedTeam1AliveSoldierCount : CachedTeam2AliveSoldierCount)++;
     UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
     UButton* Button = CreateButton(WorldPositionToMapPosition(EntityLocation), Color);
     ButtonToMilitaryUnitMap.Add(Button, Unit);
@@ -115,6 +131,7 @@ UButton* UProjectMMapWidget::CreateButton(const FVector2D& Position, const FLine
 
 void UProjectMMapWidget::UpdateSoldierButtons()
 {
+  CachedTeam1AliveSoldierCount = CachedTeam2AliveSoldierCount = 0;
   int32 ButtonIndex = 0;
 
   // Find first button index.
@@ -130,6 +147,7 @@ void UProjectMMapWidget::UpdateSoldierButtons()
 
   ForEachMapDisplayableEntity([&ButtonIndex, this](const FVector& EntityLocation, const bool& bIsOnTeam1, const FMassEntityHandle& Entity)
   {
+    (bIsOnTeam1 ? CachedTeam1AliveSoldierCount : CachedTeam2AliveSoldierCount)++;
     UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
     UButton* Button = CastChecked<UButton>(CanvasPanel->GetChildAt(ButtonIndex++));
     Button->WidgetStyle.Normal.TintColor = IsUnitChildOfSelectedUnit(Unit) ? GSelectedUnitColor : GTeamColors[bIsOnTeam1];

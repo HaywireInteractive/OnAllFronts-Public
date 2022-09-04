@@ -25,6 +25,12 @@ public:
 	UPROPERTY(EditAnywhere, meta = (BindWidget))
 	class UBorder* Border;
 
+	UPROPERTY(EditAnywhere, meta = (BindWidget))
+	class UTextBlock* TextBlock_Team1Count;
+
+	UPROPERTY(EditAnywhere, meta = (BindWidget))
+	class UTextBlock* TextBlock_Team2Count;
+
 	UFUNCTION(BlueprintCallable)
 	void SetSelectedUnit(UMilitaryUnit* Unit);
 
@@ -32,6 +38,12 @@ public:
 	void BP_OnSoldierButtonClicked(UMilitaryUnit* Unit);
 
 	virtual void NativeOnInitialized() override;
+
+	UPROPERTY(Transient, VisibleAnywhere)
+	int32 CachedTeam1AliveSoldierCount;
+	
+	UPROPERTY(Transient, VisibleAnywhere)
+	int32 CachedTeam2AliveSoldierCount;
 
 protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
@@ -44,6 +56,7 @@ private:
 	void CreateSoldierButtons();
 	class UButton* CreateButton(const FVector2D& Position, const FLinearColor& Color);
 	void ForEachMapDisplayableEntity(const FMapDisplayableEntityFunction& EntityExecuteFunction);
+	void UpdateSoldierCountLabels();
 
 	/** Rect representing render target (map) space. */
 	FIntRect MapRect;
