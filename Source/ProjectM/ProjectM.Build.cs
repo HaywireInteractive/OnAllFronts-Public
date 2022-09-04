@@ -40,6 +40,8 @@ public class ProjectM : ModuleRules
 
             "Slate",
             "SlateCore",
+
+            "NavigationSystem",
         });
 	}
 }

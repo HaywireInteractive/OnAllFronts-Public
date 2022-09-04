@@ -31,6 +31,15 @@ struct PROJECTM_API FMassStashedMoveTargetFragment : public FMassMoveTargetFragm
 	GENERATED_BODY()
 };
 
+USTRUCT()
+struct PROJECTM_API FMassNavMeshMoveFragment : public FMassMoveTargetFragment
+{
+	GENERATED_BODY()
+
+	FNavPathSharedPtr Path;
+	int32 CurrentPathPointIndex = 0;
+};
+
 UCLASS()
 class PROJECTM_API UMassMoveToCommandProcessor : public UMassProcessor
 {

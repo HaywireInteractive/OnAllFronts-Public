@@ -2,10 +2,13 @@
 
 
 #include "MassMoveToCommandProcessor.h"
+
 #include "MassEnemyTargetFinderProcessor.h"
 #include "MassTrackTargetProcessor.h"
 #include "MassMoveToCommandSubsystem.h"
 #include "MassCommonFragments.h"
+#include "NavigationSystem.h"
+#include <MassNavMeshMoveProcessor.h>
 
 //----------------------------------------------------------------------//
 //  UMassCommandableTrait
@@ -13,6 +16,7 @@
 void UMassCommandableTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
 	BuildContext.AddFragment<FMassStashedMoveTargetFragment>();
+	BuildContext.AddFragment<FMassNavMeshMoveFragment>();
 }
 
 //----------------------------------------------------------------------//
@@ -28,8 +32,7 @@ void UMassMoveToCommandProcessor::ConfigureQueries()
 {
 	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadWrite);
 }
 
 void UMassMoveToCommandProcessor::Initialize(UObject& Owner)
@@ -39,30 +42,27 @@ void UMassMoveToCommandProcessor::Initialize(UObject& Owner)
 	MoveToCommandSubsystem = UWorld::GetSubsystem<UMassMoveToCommandSubsystem>(Owner.GetWorld());
 }
 
-void ProcessEntity(const FTeamMemberFragment& TeamMemberFragment, FMassMoveTargetFragment& MoveTargetFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const UMassEntitySubsystem& EntitySubsystem, const FVector& EntityLocation, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle &Entity)
+void ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, FMassExecutionContext& Context)
 {
 	if (TeamMemberFragment.IsOnTeam1 != IsLastMoveToCommandForTeam1)
 	{
 		return;
 	}
 
-	// TODO: would it be faster to have two separate entity queries instead of checking tag here?
-	const bool& bUseStashedMoveTarget = Context.DoesArchetypeHaveTag<FMassTrackTargetTag>();
-	FMassMoveTargetFragment& MoveTargetFragmentToModify = bUseStashedMoveTarget ? StashedMoveTargetFragment : MoveTargetFragment;
+	const ANavigationData* NavData = NavSys->GetNavDataForProps(FNavAgentProperties::DefaultProperties, EntityLocation);
+	FPathFindingQuery Query(Processor, *NavData, EntityLocation, LastMoveToCommandTarget);
+	FPathFindingResult Result = NavSys->FindPathSync(Query);
 
-	UWorld* World = EntitySubsystem.GetWorld();
-	MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Move, *World);
-	MoveTargetFragmentToModify.Center = LastMoveToCommandTarget;
-	MoveTargetFragmentToModify.Forward = (LastMoveToCommandTarget - EntityLocation).GetSafeNormal();
-	float Distance = (EntityLocation - LastMoveToCommandTarget).Size();
-	MoveTargetFragmentToModify.DistanceToGoal = Distance;
-	MoveTargetFragmentToModify.bOffBoundaries = true;
-	MoveTargetFragmentToModify.DesiredSpeed.Set(200.f); // TODO
-	MoveTargetFragmentToModify.IntentAtGoal = EMassMovementAction::Stand;
-
-	if (bUseStashedMoveTarget) {
-		Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
+	if (!Result.IsSuccessful())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find path to target."));
+		return;
 	}
+
+	NavMeshMoveFragment.Path = Result.Path;
+	NavMeshMoveFragment.CurrentPathPointIndex = 0;
+
+	Context.Defer().AddTag<FMassNeedsNavMeshMoveTag>(Entity);
 }
 
 void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
@@ -82,13 +82,14 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 
 	const bool& IsLastMoveToCommandForTeam1 = MoveToCommandSubsystem->IsLastMoveToCommandForTeam1();
 
-	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &EntitySubsystem, &IsLastMoveToCommandForTeam1, LastMoveToCommandTarget = *LastMoveToCommandTarget](FMassExecutionContext& Context)
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+
+	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &IsLastMoveToCommandForTeam1, LastMoveToCommandTarget = *LastMoveToCommandTarget, NavSys](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 		const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
-		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
-		const TArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetMutableFragmentView<FMassStashedMoveTargetFragment>();
+		const TArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetMutableFragmentView<FMassNavMeshMoveFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
@@ -97,7 +98,7 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 			FVector MoveToCommandTarget = LastMoveToCommandTarget;
 			MoveToCommandTarget.Z = EntityLocation.Z;
 
-			ProcessEntity(TeamMemberList[i], MoveTargetList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntitySubsystem, EntityLocation, Context, StashedMoveTargetList[i], Context.GetEntity(i));
+			ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntityLocation, Context.GetEntity(i), NavSys, NavMeshMoveList[i], Context);
 		}
 	});
 
