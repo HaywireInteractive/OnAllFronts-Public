@@ -16,6 +16,12 @@ struct FMassHasStashedMoveTargetTag : public FMassTag
 	GENERATED_BODY()
 };
 
+USTRUCT()
+struct FMassCommandableTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
 UCLASS(meta = (DisplayName = "Commandable"))
 class PROJECTM_API UMassCommandableTrait : public UMassEntityTraitBase
 {

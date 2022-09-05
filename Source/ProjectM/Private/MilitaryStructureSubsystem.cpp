@@ -39,9 +39,11 @@ int32 RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 D
 
 	UMilitaryUnit* Commander = NewObject<UMilitaryUnit>();
 	Commander->bIsSoldier = true;
+	Commander->bIsCommander = true;
 	Commander->Depth = Depth + 1;
 	Commander->Name = FText::Format(LOCTEXT("TODO", "{0} Commander"), Unit->Name);
 	Commander->Parent = Unit;
+	Unit->Commander = Commander;
 	Unit->SubUnits.Add(Commander);
 	int32 Result = 1;
 
@@ -90,6 +92,10 @@ void UMilitaryStructureSubsystem::Initialize(FSubsystemCollectionBase& Collectio
 
 void UMilitaryStructureSubsystem::BindUnitToMassEntity(UMilitaryUnit* MilitaryUnit, FMassEntityHandle Entity)
 {
+	if (EntityToUnitMap.Contains(Entity))
+	{
+		EntityToUnitMap.Remove(Entity);
+	}
 	MilitaryUnit->MassEntityIndex = Entity.Index;
 	MilitaryUnit->MassEntitySerialNumber = Entity.SerialNumber;
 	EntityToUnitMap.Add(Entity, MilitaryUnit);
@@ -105,12 +111,12 @@ void UMilitaryStructureSubsystem::DestroyEntity(FMassEntityHandle Entity)
 	}
 }
 
-UMilitaryUnit* UMilitaryStructureSubsystem::GetRootUnitForTeam(bool bIsTeam1)
+UMilitaryUnit* UMilitaryStructureSubsystem::GetRootUnitForTeam(const bool bIsTeam1)
 {
 	return bIsTeam1 ? Team1RootUnit : Team2RootUnit;
 }
 
-UMilitaryUnit* UMilitaryStructureSubsystem::GetUnitForEntity(FMassEntityHandle Entity)
+UMilitaryUnit* UMilitaryStructureSubsystem::GetUnitForEntity(const FMassEntityHandle Entity)
 {
 	UMilitaryUnit** MilitaryUnit = EntityToUnitMap.Find(Entity);
 	if (!MilitaryUnit)
@@ -126,10 +132,49 @@ UMilitaryUnit* UMilitaryStructureSubsystem::GetUnitForEntity(FMassEntityHandle E
 //----------------------------------------------------------------------//
 void UMilitaryUnit::RemoveFromParent()
 {
+	if (Parent->Commander == this)
+	{
+		Parent->Commander = nullptr;
+	}
 	Parent->SubUnits.Remove(this);
 }
 
 FMassEntityHandle UMilitaryUnit::GetMassEntityHandle()
 {
 	return FMassEntityHandle(MassEntityIndex, MassEntitySerialNumber);
+}
+
+bool UMilitaryUnit::IsChildOfUnit(const UMilitaryUnit* ParentUnit)
+{
+	if (!ParentUnit) {
+		return false;
+	}
+
+	UMilitaryUnit* ChildUnit = this;
+	if (ParentUnit->bIsSoldier)
+	{
+		return ChildUnit == ParentUnit;
+	}
+
+	// If we got here, ParentUnit is set to a non-soldier.
+
+	while (ChildUnit)
+	{
+		if (ChildUnit == ParentUnit) {
+			return true;
+		}
+		ChildUnit = ChildUnit->Parent;
+	}
+
+	return false;
+}
+
+void UMilitaryStructureSubsystem::DidCompleteAssigningEntitiesToMilitaryUnits(const bool bIsTeam1)
+{
+	(bIsTeam1 ? bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1 : bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2) = true;
+
+	if (bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1 && bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2)
+	{
+		OnCompletedAssigningEntitiesToMilitaryUnitsEvent.Broadcast();
+	}
 }

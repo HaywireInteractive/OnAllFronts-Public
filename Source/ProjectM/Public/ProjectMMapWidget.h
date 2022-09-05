@@ -52,7 +52,6 @@ private:
 	FVector2D WorldPositionToMapPosition(const FVector& WorldLocation);
 	void InitializeMapViewProjectionMatrix(USceneCaptureComponent2D* const SceneCapture2D);
 	void UpdateSoldierButtons();
-	bool IsUnitChildOfSelectedUnit(UMilitaryUnit* Unit);
 	void CreateSoldierButtons();
 	class UButton* CreateButton(const FVector2D& Position, const FLinearColor& Color);
 	void ForEachMapDisplayableEntity(const FMapDisplayableEntityFunction& EntityExecuteFunction);

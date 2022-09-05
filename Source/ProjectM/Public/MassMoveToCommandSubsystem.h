@@ -8,6 +8,7 @@
 
 class UMassAgentSubsystem;
 class UMassSignalSubsystem;
+class UMilitaryUnit;
 
 /**
  *
@@ -20,7 +21,8 @@ class PROJECTM_API UMassMoveToCommandSubsystem : public UWorldSubsystem
 public:
 	const FVector* GetLastMoveToCommandTarget() const;
 	const bool IsLastMoveToCommandForTeam1() const;
-	void SetMoveToCommandTarget(const FVector target, const bool bIsOnTeam1);
+	const UMilitaryUnit* GetLastMoveToCommandMilitaryUnit() const;
+	void SetMoveToCommandTarget(UMilitaryUnit* MilitaryUnit, const FVector target, const bool bIsOnTeam1);
 	void ResetLastMoveToCommand();
 
 protected:
@@ -32,4 +34,7 @@ protected:
 
 	UPROPERTY()
 	bool bHasMoveToCommand = false;
+
+	UPROPERTY()
+	UMilitaryUnit* MoveToCommandMilitaryUnit = nullptr;
 };

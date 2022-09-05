@@ -52,6 +52,7 @@ void AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits()
 	int32 Index = 0;
 	int32 SubIndex = 0;
 	AssignEntitiesToMilitaryUnits(MilitaryStructureSubsystem->GetRootUnitForTeam(bIsTeam1), Index, SubIndex);
+	MilitaryStructureSubsystem->DidCompleteAssigningEntitiesToMilitaryUnits(bIsTeam1);
 }
 
 void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(UMilitaryUnit* MilitaryUnit, int32& Index, int32& SubIndex)

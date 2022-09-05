@@ -150,7 +150,7 @@ void UProjectMMapWidget::UpdateSoldierButtons()
     (bIsOnTeam1 ? CachedTeam1AliveSoldierCount : CachedTeam2AliveSoldierCount)++;
     UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
     UButton* Button = CastChecked<UButton>(CanvasPanel->GetChildAt(ButtonIndex++));
-    Button->WidgetStyle.Normal.TintColor = IsUnitChildOfSelectedUnit(Unit) ? GSelectedUnitColor : GTeamColors[bIsOnTeam1];
+    Button->WidgetStyle.Normal.TintColor = Unit->IsChildOfUnit(SelectedUnit) ? GSelectedUnitColor : GTeamColors[bIsOnTeam1];
     UCanvasPanelSlot* ButtonSlot = CastChecked<UCanvasPanelSlot>(Button->Slot.Get());
     const FVector2D& MapPosition = WorldPositionToMapPosition(EntityLocation);
     ButtonSlot->SetPosition(MapPosition);
@@ -164,30 +164,6 @@ void UProjectMMapWidget::UpdateSoldierButtons()
     UButton* Button = CastChecked<UButton>(CanvasPanel->GetChildAt(ButtonIndex));
     Button->SetVisibility(ESlateVisibility::Collapsed);
   }
-}
-
-bool UProjectMMapWidget::IsUnitChildOfSelectedUnit(UMilitaryUnit* Unit)
-{
-  if (!SelectedUnit) {
-    return false;
-  }
-
-  if (SelectedUnit->bIsSoldier)
-  {
-    return Unit == SelectedUnit;
-  }
-
-  // If we got here, SelectedUnit is set to a non-soldier.
-
-  while (Unit)
-  {
-    if (Unit == SelectedUnit) {
-      return true;
-    }
-    Unit = Unit->Parent;
-  }
-
-  return false;
 }
 
 FVector2D UProjectMMapWidget::WorldPositionToMapPosition(const FVector& WorldLocation)

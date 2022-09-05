@@ -31,9 +31,11 @@ class PROJECTM_API ACommanderCharacter : public ACharacter
 	GENERATED_BODY()
 
 private:
-	void InitializeFromMassSoldierInternal(FMassEntityHandle MassSoldierEntityToInitializeWith);
+	void InitializeFromMassSoldierInternal();
+	FMassEntityHandle GetMassEntityHandle() const;
 
 	FDelegateHandle OnMassAgentComponentEntityAssociatedHandle;
+	FMassEntityHandle MassSoldierEntityToInitializeWith;
 
 protected:
 	UPROPERTY()
@@ -67,5 +69,5 @@ public:
 	bool InitializeFromMassSoldier(const int32 MassEntityIndex, const int32 MassEntitySerialNumber);
 
 	UFUNCTION(BlueprintCallable)
-	bool IsPlayerOnTeam1();
+	bool IsPlayerOnTeam1() const;
 };

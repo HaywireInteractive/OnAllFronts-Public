@@ -9,6 +9,7 @@
 #include "MassCommonFragments.h"
 #include "NavigationSystem.h"
 #include <MassNavMeshMoveProcessor.h>
+#include <MilitaryStructureSubsystem.h>
 
 //----------------------------------------------------------------------//
 //  UMassCommandableTrait
@@ -17,6 +18,7 @@ void UMassCommandableTrait::BuildTemplate(FMassEntityTemplateBuildContext& Build
 {
 	BuildContext.AddFragment<FMassStashedMoveTargetFragment>();
 	BuildContext.AddFragment<FMassNavMeshMoveFragment>();
+	BuildContext.AddTag<FMassCommandableTag>();
 }
 
 //----------------------------------------------------------------------//
@@ -33,6 +35,7 @@ void UMassMoveToCommandProcessor::ConfigureQueries()
 	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddTagRequirement<FMassCommandableTag>(EMassFragmentPresence::All);
 }
 
 void UMassMoveToCommandProcessor::Initialize(UObject& Owner)
@@ -42,9 +45,22 @@ void UMassMoveToCommandProcessor::Initialize(UObject& Owner)
 	MoveToCommandSubsystem = UWorld::GetSubsystem<UMassMoveToCommandSubsystem>(Owner.GetWorld());
 }
 
-void ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, FMassExecutionContext& Context)
+bool IsEntityCommandableByUnit(const FMassEntityHandle& Entity, const UMilitaryUnit* ParentUnit, const UWorld* World)
+{
+	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
+	check(MilitaryStructureSubsystem);
+	UMilitaryUnit* EntityUnit =	MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+	return EntityUnit->IsChildOfUnit(ParentUnit);
+}
+
+void ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World)
 {
 	if (TeamMemberFragment.IsOnTeam1 != IsLastMoveToCommandForTeam1)
+	{
+		return;
+	}
+
+	if (!IsEntityCommandableByUnit(Entity, LastMoveToCommandMilitaryUnit, World))
 	{
 		return;
 	}
@@ -88,10 +104,12 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 	}
 
 	const bool& IsLastMoveToCommandForTeam1 = MoveToCommandSubsystem->IsLastMoveToCommandForTeam1();
+	const UMilitaryUnit* LastMoveToCommandMilitaryUnit = MoveToCommandSubsystem->GetLastMoveToCommandMilitaryUnit();
+	check(LastMoveToCommandMilitaryUnit);
 
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 
-	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &IsLastMoveToCommandForTeam1, LastMoveToCommandTarget = *LastMoveToCommandTarget, NavSys](FMassExecutionContext& Context)
+	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &IsLastMoveToCommandForTeam1, LastMoveToCommandTarget, NavSys, LastMoveToCommandMilitaryUnit](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
@@ -102,10 +120,10 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 		{
 			// Change move to command target Z to make current entity's Z value since we don't know ground height.
 			const FVector& EntityLocation = TransformList[i].GetTransform().GetLocation();
-			FVector MoveToCommandTarget = LastMoveToCommandTarget;
+			FVector MoveToCommandTarget = *LastMoveToCommandTarget;
 			MoveToCommandTarget.Z = EntityLocation.Z;
 
-			ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntityLocation, Context.GetEntity(i), NavSys, NavMeshMoveList[i], Context);
+			ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntityLocation, Context.GetEntity(i), NavSys, NavMeshMoveList[i], Context, LastMoveToCommandMilitaryUnit, GetWorld());
 		}
 	});
 

@@ -51,16 +51,31 @@ public:
 	UMilitaryUnit* Parent;
 
 	UPROPERTY(BlueprintReadOnly)
+	UMilitaryUnit* Commander;
+
+	// TODO: make private and expose getter
+	UPROPERTY(BlueprintReadOnly)
 	bool bIsSoldier = false;
+
+	// TODO: make private and expose getter
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsCommander = false;
 
 	void RemoveFromParent();
 	FMassEntityHandle GetMassEntityHandle();
+	bool IsChildOfUnit(const UMilitaryUnit* ParentUnit);
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FCompletedAssigningEntitiesToMilitaryUnitsEvent);
 
 UCLASS(BlueprintType)
 class PROJECTM_API UMilitaryStructureSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
+
+private:
+	bool bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1;
+	bool bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2;
 
 protected:
 	UPROPERTY()
@@ -83,6 +98,10 @@ public:
 	void BindUnitToMassEntity(UMilitaryUnit* MilitaryUnit, FMassEntityHandle Entity);
 	void DestroyEntity(FMassEntityHandle Entity);
 	
-	UMilitaryUnit* GetUnitForEntity(FMassEntityHandle Entity);
-	UMilitaryUnit* GetRootUnitForTeam(bool bIsTeam1);
+	UMilitaryUnit* GetUnitForEntity(const FMassEntityHandle Entity);
+	UMilitaryUnit* GetRootUnitForTeam(const bool bIsTeam1);
+
+	void DidCompleteAssigningEntitiesToMilitaryUnits(const bool bIsTeam1);
+
+	FCompletedAssigningEntitiesToMilitaryUnitsEvent OnCompletedAssigningEntitiesToMilitaryUnitsEvent;
 };

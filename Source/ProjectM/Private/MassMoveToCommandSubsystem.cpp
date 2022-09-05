@@ -7,6 +7,7 @@
 #include "MassAgentSubsystem.h"
 #include "MassSignalSubsystem.h"
 #include "MassComponentHitTypes.h"
+#include <MilitaryStructureSubsystem.h>
 
 const FVector* UMassMoveToCommandSubsystem::GetLastMoveToCommandTarget() const
 {
@@ -18,10 +19,16 @@ const bool UMassMoveToCommandSubsystem::IsLastMoveToCommandForTeam1() const
 	return bIsLastMoveToCommandForTeam1;
 }
 
-void UMassMoveToCommandSubsystem::SetMoveToCommandTarget(const FVector target, const bool bIsOnTeam1)
+const UMilitaryUnit* UMassMoveToCommandSubsystem::GetLastMoveToCommandMilitaryUnit() const
+{
+	return MoveToCommandMilitaryUnit;
+}
+
+void UMassMoveToCommandSubsystem::SetMoveToCommandTarget(UMilitaryUnit* MilitaryUnit, const FVector target, const bool bIsOnTeam1)
 {
 	bHasMoveToCommand = true;
 	MoveToCommandTarget = target;
+	MoveToCommandMilitaryUnit = MilitaryUnit;
 	bIsLastMoveToCommandForTeam1 = bIsOnTeam1;
 }
 
