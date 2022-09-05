@@ -271,3 +271,18 @@ void UProjectMMapWidgetLibrary::RecursivelyExpandTreeViewUnitParents(UTreeView* 
     Unit = Unit->Parent;
   }
 }
+
+void UProjectMMapWidgetLibrary::SetListItemSelectedWithOnItemSelectedChangedEvent(UListView* ListView, TScriptInterface<IUserListEntry> UserListEntry)
+{
+  UUserWidget* ListEntryWidget = Cast<UUserWidget>(UserListEntry.GetObject());
+  if (!ListEntryWidget || !ListView)
+  {
+    return;
+  }
+  auto PreviousSelectedItemEntryWidget = ListView->GetEntryWidgetFromItem(ListView->GetSelectedItem());
+  if (PreviousSelectedItemEntryWidget)
+  {
+    IUserListEntry::UpdateItemSelection(*PreviousSelectedItemEntryWidget, false);
+  }
+  IUserListEntry::UpdateItemSelection(*ListEntryWidget, true);
+}

@@ -80,4 +80,7 @@ class PROJECTM_API UProjectMMapWidgetLibrary : public UBlueprintFunctionLibrary
 public:
 	UFUNCTION(BlueprintCallable)
 	static void RecursivelyExpandTreeViewUnitParents(class UTreeView* TreeView, UMilitaryUnit* Unit);
+
+	UFUNCTION(BlueprintCallable)
+	static void SetListItemSelectedWithOnItemSelectedChangedEvent(UListView* ListView, TScriptInterface<IUserListEntry> UserListEntry);
 };
