@@ -48,6 +48,9 @@ public:
 protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
+	UFUNCTION(BlueprintCallable)
+	class UCanvasPanel* GetCanvasPanel() const;
+
 private:
 	FVector2D WorldPositionToMapPosition(const FVector& WorldLocation);
 	void InitializeMapViewProjectionMatrix(USceneCaptureComponent2D* const SceneCapture2D);

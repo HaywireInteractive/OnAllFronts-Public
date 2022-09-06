@@ -129,27 +129,37 @@ UButton* UProjectMMapWidget::CreateButton(const FVector2D& Position, const FLine
   return Button;
 }
 
+UButton* GetNextButton(UCanvasPanel* CanvasPanel, int32 &ButtonIndex)
+{
+  while (ButtonIndex < CanvasPanel->GetChildrenCount() && !(Cast<UButton>(CanvasPanel->GetChildAt(ButtonIndex))))
+  {
+    ButtonIndex++;
+  }
+
+  if (ButtonIndex >= CanvasPanel->GetChildrenCount())
+  {
+    return nullptr;
+  }
+
+  if (UButton* Button = Cast<UButton>(CanvasPanel->GetChildAt(ButtonIndex)))
+  {
+    ButtonIndex++;
+    return Button;
+  }
+
+  return nullptr;
+}
+
 void UProjectMMapWidget::UpdateSoldierButtons()
 {
   CachedTeam1AliveSoldierCount = CachedTeam2AliveSoldierCount = 0;
   int32 ButtonIndex = 0;
 
-  // Find first button index.
-  // TODO: this is brittle in case not all buttons are at end of CanvasPanel's children. Find safer way to do this.
-  for (; ButtonIndex < CanvasPanel->GetChildrenCount(); ButtonIndex++)
-  {
-    UButton* Button = Cast<UButton>(CanvasPanel->GetChildAt(ButtonIndex));
-    if (Button)
-    {
-      break;
-    }
-  }
-
   ForEachMapDisplayableEntity([&ButtonIndex, this](const FVector& EntityLocation, const bool& bIsOnTeam1, const FMassEntityHandle& Entity)
   {
     (bIsOnTeam1 ? CachedTeam1AliveSoldierCount : CachedTeam2AliveSoldierCount)++;
     UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
-    UButton* Button = CastChecked<UButton>(CanvasPanel->GetChildAt(ButtonIndex++));
+    UButton* Button = GetNextButton(CanvasPanel, ButtonIndex);
     Button->WidgetStyle.Normal.TintColor = Unit->IsChildOfUnit(SelectedUnit) ? GSelectedUnitColor : GTeamColors[bIsOnTeam1];
     UCanvasPanelSlot* ButtonSlot = CastChecked<UCanvasPanelSlot>(Button->Slot.Get());
     const FVector2D& MapPosition = WorldPositionToMapPosition(EntityLocation);
@@ -159,9 +169,8 @@ void UProjectMMapWidget::UpdateSoldierButtons()
   });
 
   // Hide remaining buttons.
-  for (; ButtonIndex < CanvasPanel->GetChildrenCount(); ButtonIndex++)
+  while (UButton* Button = GetNextButton(CanvasPanel, ButtonIndex))
   {
-    UButton* Button = CastChecked<UButton>(CanvasPanel->GetChildAt(ButtonIndex));
     Button->SetVisibility(ESlateVisibility::Collapsed);
   }
 }
@@ -234,6 +243,11 @@ void UProjectMMapWidget::InitializeMapViewProjectionMatrix(USceneCaptureComponen
 void UProjectMMapWidget::SetSelectedUnit(UMilitaryUnit* Unit)
 {
   SelectedUnit = Unit;
+}
+
+UCanvasPanel* UProjectMMapWidget::GetCanvasPanel() const
+{
+  return CanvasPanel;
 }
 
 //----------------------------------------------------------------------//

@@ -33,6 +33,7 @@ class PROJECTM_API ACommanderCharacter : public ACharacter
 private:
 	void InitializeFromMassSoldierInternal();
 	FMassEntityHandle GetMassEntityHandle() const;
+	class UMilitaryUnit* GetMyMilitaryUnit() const;
 
 	FDelegateHandle OnMassAgentComponentEntityAssociatedHandle;
 	FMassEntityHandle MassSoldierEntityToInitializeWith;
@@ -70,4 +71,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	bool IsPlayerOnTeam1() const;
+
+	UFUNCTION(BlueprintCallable)
+	bool IsCommander() const;
 };

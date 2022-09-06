@@ -67,12 +67,17 @@ void ACommanderCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void ACommanderCharacter::SetMoveToCommand() const
+UMilitaryUnit* ACommanderCharacter::GetMyMilitaryUnit() const
 {
 	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(GetWorld());
 	check(MilitaryStructureSubsystem);
 
-	UMilitaryUnit* MyMilitaryUnit = MilitaryStructureSubsystem->GetUnitForEntity(GetMassEntityHandle());
+	return MilitaryStructureSubsystem->GetUnitForEntity(GetMassEntityHandle());
+}
+
+void ACommanderCharacter::SetMoveToCommand() const
+{
+	UMilitaryUnit* MyMilitaryUnit = GetMyMilitaryUnit();
 
 	if (!MyMilitaryUnit)
 	{
@@ -137,10 +142,7 @@ void ACommanderCharacter::ChangePlayerToAISoldier()
 	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(GetWorld());
 	check(EntitySubsystem);
 
-	UMassAgentComponent* AgentComponent = Cast<UMassAgentComponent>(GetComponentByClass(UMassAgentComponent::StaticClass()));
-	check(AgentComponent);
-
-	const FMassEntityHandle& PlayerEntityHandle = AgentComponent->GetEntityHandle();
+	const FMassEntityHandle& PlayerEntityHandle = GetMassEntityHandle();
 	FMassEntityView PlayerEntityView(*EntitySubsystem, PlayerEntityHandle);
 	FTransformFragment* PlayerEntityTransformFragment = PlayerEntityView.GetFragmentDataPtr<FTransformFragment>();
 	FMassHealthFragment* PlayerEntityHealthFragment = PlayerEntityView.GetFragmentDataPtr<FMassHealthFragment>();
@@ -233,4 +235,17 @@ FMassEntityHandle ACommanderCharacter::GetMassEntityHandle() const
 	check(AgentEntityHandle.IsValid());
 
 	return AgentEntityHandle;
+}
+
+bool ACommanderCharacter::IsCommander() const
+{
+	UMilitaryUnit* MyMilitaryUnit = GetMyMilitaryUnit();
+
+	if (!MyMilitaryUnit)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot find military unit for player when attempting to check if commander."));
+		return false;
+	}
+
+	return MyMilitaryUnit->bIsCommander;
 }
