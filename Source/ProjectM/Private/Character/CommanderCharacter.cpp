@@ -75,7 +75,7 @@ UMilitaryUnit* ACommanderCharacter::GetMyMilitaryUnit() const
 	return MilitaryStructureSubsystem->GetUnitForEntity(GetMassEntityHandle());
 }
 
-void ACommanderCharacter::SetMoveToCommand() const
+void ACommanderCharacter::SetMoveToCommand(FVector2D CommandLocation) const
 {
 	UMilitaryUnit* MyMilitaryUnit = GetMyMilitaryUnit();
 
@@ -92,7 +92,8 @@ void ACommanderCharacter::SetMoveToCommand() const
 	}
 
 	check(MyMilitaryUnit->Parent);
-	MoveToCommandSystem->SetMoveToCommandTarget(MyMilitaryUnit->Parent, FVector(0.f, 0.f, 20.f), IsPlayerOnTeam1()); // TODO
+	// TODO: don't hard-code 20.f below
+	MoveToCommandSystem->SetMoveToCommandTarget(MyMilitaryUnit->Parent, FVector(CommandLocation.X, CommandLocation.Y, 20.f), IsPlayerOnTeam1()); 
 }
 
 void ACommanderCharacter::SpawnProjectile() const
@@ -181,7 +182,14 @@ void ACommanderCharacter::InitializeFromMassSoldierInternal()
 	// If we don't have a soldier entity to initialize with, set it to team's highest commander.
 	if (!MassSoldierEntityToInitializeWith.IsSet())
 	{
-		MassSoldierEntityToInitializeWith = MilitaryStructureSubsystem->GetRootUnitForTeam(IsPlayerOnTeam1())->Commander->GetMassEntityHandle();
+		UMilitaryUnit* TeamCommander = MilitaryStructureSubsystem->GetRootUnitForTeam(IsPlayerOnTeam1())->Commander;
+
+		if (!TeamCommander)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Cannot find military unit for team commander on character initialization."));
+			return;
+		}
+		MassSoldierEntityToInitializeWith = TeamCommander->GetMassEntityHandle();
 	}
 
 	if (!MassSoldierEntityToInitializeWith.IsSet())

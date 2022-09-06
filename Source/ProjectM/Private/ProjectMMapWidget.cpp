@@ -182,6 +182,13 @@ FVector2D UProjectMMapWidget::WorldPositionToMapPosition(const FVector& WorldLoc
   return MapPosition;
 }
 
+FVector UProjectMMapWidget::MapPositionToWorldPosition(const FVector2D& MapPosition) const
+{
+  FVector WorldPosition, WorldDirection;
+  FSceneView::DeprojectScreenToWorld(MapPosition, MapRect, MapViewProjectionMatrix.Inverse(), WorldPosition, WorldDirection);
+  return WorldPosition;
+}
+
 void UProjectMMapWidget::NativeOnInitialized()
 {
   Super::NativeOnInitialized();
@@ -248,6 +255,11 @@ void UProjectMMapWidget::SetSelectedUnit(UMilitaryUnit* Unit)
 UCanvasPanel* UProjectMMapWidget::GetCanvasPanel() const
 {
   return CanvasPanel;
+}
+
+UBorder* UProjectMMapWidget::GetBorder() const
+{
+  return Border;
 }
 
 //----------------------------------------------------------------------//

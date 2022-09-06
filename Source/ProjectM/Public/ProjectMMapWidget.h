@@ -51,6 +51,12 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	class UCanvasPanel* GetCanvasPanel() const;
 
+	UFUNCTION(BlueprintCallable)
+	class UBorder* GetBorder() const;
+
+	UFUNCTION(BlueprintCallable)
+	FVector MapPositionToWorldPosition(const FVector2D& MapPosition) const;
+
 private:
 	FVector2D WorldPositionToMapPosition(const FVector& WorldLocation);
 	void InitializeMapViewProjectionMatrix(USceneCaptureComponent2D* const SceneCapture2D);

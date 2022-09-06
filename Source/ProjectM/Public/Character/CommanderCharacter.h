@@ -33,7 +33,6 @@ class PROJECTM_API ACommanderCharacter : public ACharacter
 private:
 	void InitializeFromMassSoldierInternal();
 	FMassEntityHandle GetMassEntityHandle() const;
-	class UMilitaryUnit* GetMyMilitaryUnit() const;
 
 	FDelegateHandle OnMassAgentComponentEntityAssociatedHandle;
 	FMassEntityHandle MassSoldierEntityToInitializeWith;
@@ -52,10 +51,13 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UFUNCTION(BlueprintCallable)
-	void SetMoveToCommand() const;
+	void SetMoveToCommand(FVector2D CommandLocation) const;
 
 	UFUNCTION(BlueprintCallable)
 	void SpawnProjectile() const;
+
+	UFUNCTION(BlueprintCallable)
+	class UMilitaryUnit* GetMyMilitaryUnit() const;
 
 public:
 	ACommanderCharacter();

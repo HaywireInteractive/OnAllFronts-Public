@@ -28,7 +28,7 @@ int32 RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 D
 	Unit->Parent = Parent;
 	Unit->Depth = Depth;
 	Unit->Name = FText::Format(LOCTEXT("TODO", "{0} {1}"), FText::FromName(MilitaryUnits[Depth].Value), Index);
-
+	
 	uint8 SubUnitCount = MilitaryUnits[Depth].Key;
 
 	if (SubUnitCount == 0)

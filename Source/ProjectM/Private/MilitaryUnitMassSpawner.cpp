@@ -21,7 +21,7 @@ void AMilitaryUnitMassSpawner::BeginPlay()
 
 	bool bFoundTeamMemberTrait = false;
 
-	// TODO: Get team from EntityTypes (UMassEntityConfigAsset) once figure out linker issue with using FMassSpawnedEntityType::GetEntityConfig():
+	// TODO: Get team from EntityTypes (UMassEntityConfigAsset) once figure out linker issue with using FMassSpawnedEntityType::GetEntityConfig(). Then replace bIsTeam1 below.
 	// https://forums.unrealengine.com/t/how-to-resolve-unresolved-external-symbol-fmassspawnedentitytype-getentityconfig-error/636923
 	// Error	LNK2019	unresolved external symbol "public: class UMassEntityConfigAsset * __cdecl FMassSpawnedEntityType::GetEntityConfig(void)" (? GetEntityConfig@FMassSpawnedEntityType@@QEAAPEAVUMassEntityConfigAsset@@XZ) referenced in function "protected: virtual void __cdecl AMilitaryUnitMassSpawner::BeginPlay(void)" (? BeginPlay@AMilitaryUnitMassSpawner@@MEAAXXZ)
 	
