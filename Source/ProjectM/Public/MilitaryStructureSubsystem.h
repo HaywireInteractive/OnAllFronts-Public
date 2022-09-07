@@ -61,6 +61,10 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	bool bIsCommander = false;
 
+	// TODO: make private and expose getter
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsPlayer = false;
+
 	void RemoveFromParent();
 	FMassEntityHandle GetMassEntityHandle();
 	bool IsChildOfUnit(const UMilitaryUnit* ParentUnit);

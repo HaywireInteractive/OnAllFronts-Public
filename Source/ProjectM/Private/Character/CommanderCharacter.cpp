@@ -111,36 +111,10 @@ void ACommanderCharacter::SpawnProjectile() const
 	::SpawnProjectile(World, SpawnLocation, GetActorQuat(), InitialVelocity, ProjectileEntityConfig);
 }
 
-void ChangePlayerEntityToSoliderEntity(const UWorld* World, const FMassEntityConfig& EntityConfig, const FTransform &Transform, UMassEntitySubsystem* EntitySubsystem, const int16 &PlayerHealth)
-{
-	UMassSpawnerSubsystem* SpawnerSystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
-	check(SpawnerSystem);
-
-	// TODO: A bit hacky to get first actor here.
-	const FMassEntityTemplate* EntityTemplate = EntityConfig.GetOrCreateEntityTemplate(*World->GetLevel(0)->Actors[0], *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
-	check(EntityTemplate->IsValid());
-
-	FMassEntitySpawnDataGeneratorResult Result;
-	Result.SpawnDataProcessor = UMassSpawnLocationProcessor::StaticClass();
-	Result.SpawnData.InitializeAs<FMassTransformsSpawnData>();
-	Result.NumEntities = 1;
-	FMassTransformsSpawnData& Transforms = Result.SpawnData.GetMutable<FMassTransformsSpawnData>();
-
-	Transforms.Transforms.Reserve(1);
-	FTransform& SpawnDataTransform = Transforms.Transforms.AddDefaulted_GetRef();
-	SpawnDataTransform = Transform;
-
-	TArray<FMassEntityHandle> SpawnedEntities;
-	SpawnerSystem->SpawnEntities(EntityTemplate->GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
-
-	FMassHealthFragment* SpawnedEntityHealthFragment = EntitySubsystem->GetFragmentDataPtr<FMassHealthFragment>(SpawnedEntities[0]);
-	check(SpawnedEntityHealthFragment);
-	SpawnedEntityHealthFragment->Value = PlayerHealth;
-}
-
 void ACommanderCharacter::ChangePlayerToAISoldier()
 {
-	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(GetWorld());
+	UWorld* World = GetWorld();
+	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(World);
 	check(EntitySubsystem);
 
 	const FMassEntityHandle& PlayerEntityHandle = GetMassEntityHandle();
@@ -151,7 +125,36 @@ void ACommanderCharacter::ChangePlayerToAISoldier()
 	check(PlayerEntityTransformFragment);
 	check(PlayerEntityHealthFragment);
 
-	ChangePlayerEntityToSoliderEntity(GetWorld(), SoldierEntityConfig, PlayerEntityTransformFragment->GetTransform(), EntitySubsystem, PlayerEntityHealthFragment->Value);
+	UMassSpawnerSubsystem* SpawnerSystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
+	check(SpawnerSystem);
+
+	// TODO: A bit hacky to get first actor here.
+	const FMassEntityTemplate* EntityTemplate = SoldierEntityConfig.GetOrCreateEntityTemplate(*World->GetLevel(0)->Actors[0], *SpawnerSystem); // TODO: passing SpawnerSystem is a hack
+	check(EntityTemplate->IsValid());
+
+	FMassEntitySpawnDataGeneratorResult Result;
+	Result.SpawnDataProcessor = UMassSpawnLocationProcessor::StaticClass();
+	Result.SpawnData.InitializeAs<FMassTransformsSpawnData>();
+	Result.NumEntities = 1;
+	FMassTransformsSpawnData& Transforms = Result.SpawnData.GetMutable<FMassTransformsSpawnData>();
+
+	Transforms.Transforms.Reserve(1);
+	FTransform& SpawnDataTransform = Transforms.Transforms.AddDefaulted_GetRef();
+	SpawnDataTransform = PlayerEntityTransformFragment->GetTransform();
+
+	TArray<FMassEntityHandle> SpawnedEntities;
+	SpawnerSystem->SpawnEntities(EntityTemplate->GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
+
+	FMassHealthFragment* SpawnedEntityHealthFragment = EntitySubsystem->GetFragmentDataPtr<FMassHealthFragment>(SpawnedEntities[0]);
+	check(SpawnedEntityHealthFragment);
+	SpawnedEntityHealthFragment->Value = PlayerEntityHealthFragment->Value;
+
+	UMilitaryUnit* MyMilitaryUnit = GetMyMilitaryUnit();
+	MyMilitaryUnit->bIsPlayer = false;
+
+	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(GetWorld());
+	check(MilitaryStructureSubsystem);
+	MilitaryStructureSubsystem->BindUnitToMassEntity(MyMilitaryUnit, SpawnedEntities[0]);
 }
 
 void ACommanderCharacter::DidDie_Implementation()
@@ -210,6 +213,7 @@ void ACommanderCharacter::InitializeFromMassSoldierInternal()
 	FMassEntityHandle PlayerEntityHandle = GetMassEntityHandle();
 
 	UMilitaryUnit* SoldierMilitaryUnit = MilitaryStructureSubsystem->GetUnitForEntity(MassSoldierEntityToInitializeWith);
+	SoldierMilitaryUnit->bIsPlayer = true;
 	MilitaryStructureSubsystem->BindUnitToMassEntity(SoldierMilitaryUnit, PlayerEntityHandle);
 	EntitySubsystem->DestroyEntity(MassSoldierEntityToInitializeWith);
 

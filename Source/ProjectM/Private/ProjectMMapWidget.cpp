@@ -12,12 +12,13 @@
 #include "Components/SceneCaptureComponent2D.h"
 #include "MassEntitySubsystem.h"
 #include "MassEntityQuery.h"
-#include "MassMapTranslatorProcessor.h"
 #include "ProjectMWorldInfo.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "MassCommonFragments.h"
 #include "MassEnemyTargetFinderProcessor.h"
+
+#include <Character/CommanderCharacter.h>
 
 #define LOCTEXT_NAMESPACE "MyNamespace" // TODO
 
@@ -25,6 +26,7 @@ static const float GButtonSize = 10.f;
 
 // TODO: don't hard-code
 static const FLinearColor GSelectedUnitColor = FLinearColor(0.f, 1.f, 0.f);
+static const FLinearColor GPlayerSoldierColor = FLinearColor(1.f, 1.f, 0.f);
 static const FLinearColor GTeamColors[] = {
   FLinearColor(0.f, 0.f, 1.f),
   FLinearColor(1.f, 0.f, 0.f),
@@ -68,12 +70,13 @@ void UProjectMMapWidget::UpdateSoldierCountLabels()
 
 void UProjectMMapWidget::CreateSoldierButtons()
 {
-  ForEachMapDisplayableEntity([this](const FVector& EntityLocation, const bool& bIsOnTeam1, const FMassEntityHandle& Entity)
+  ForEachMapDisplayableEntity([this](const FVector& EntityLocation, const bool& bIsOnTeam1, const bool& bIsPlayer, const FMassEntityHandle& Entity)
   {
     FLinearColor Color = GTeamColors[bIsOnTeam1];
     (bIsOnTeam1 ? CachedTeam1AliveSoldierCount : CachedTeam2AliveSoldierCount)++;
     UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
-    UButton* Button = CreateButton(WorldPositionToMapPosition(EntityLocation), Color);
+    UButton* Button = CreateButton();
+    UpdateButton(Button, WorldPositionToMapPosition(EntityLocation), Unit, bIsOnTeam1, bIsPlayer);
     ButtonToMilitaryUnitMap.Add(Button, Unit);
   });
 
@@ -86,7 +89,6 @@ void UProjectMMapWidget::ForEachMapDisplayableEntity(const FMapDisplayableEntity
   FMassEntityQuery EntityQuery;
   EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
   EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
-  EntityQuery.AddTagRequirement<FMassMapDisplayableTag>(EMassFragmentPresence::All);
   FMassExecutionContext Context(0.0f);
 
   EntityQuery.ForEachEntityChunk(*EntitySubsystem, Context, [&EntityExecuteFunction](FMassExecutionContext& Context)
@@ -98,22 +100,21 @@ void UProjectMMapWidget::ForEachMapDisplayableEntity(const FMapDisplayableEntity
 
     for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
     {
-      EntityExecuteFunction(TransformList[EntityIndex].GetTransform().GetLocation(), TeamMemberList[EntityIndex].IsOnTeam1, Context.GetEntity(EntityIndex));
+      const bool& bIsPlayer = Context.DoesArchetypeHaveTag<FMassPlayerControllableCharacterTag>();
+      EntityExecuteFunction(TransformList[EntityIndex].GetTransform().GetLocation(), TeamMemberList[EntityIndex].IsOnTeam1, bIsPlayer, Context.GetEntity(EntityIndex));
     }
   });
 }
 
-UButton* UProjectMMapWidget::CreateButton(const FVector2D& Position, const FLinearColor& Color)
+UButton* UProjectMMapWidget::CreateButton()
 {
   UButton* Button = NewObject<UButton>();
   Button->WidgetStyle.Normal.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
   Button->WidgetStyle.Normal.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
-  Button->WidgetStyle.Normal.TintColor = Color;
 
   UCanvasPanelSlot* CanvasPanelSlot = CanvasPanel->AddChildToCanvas(Button);
   CanvasPanelSlot->SetAnchors(FAnchors(0.5f));
   CanvasPanelSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-  CanvasPanelSlot->SetPosition(Position);
   CanvasPanelSlot->SetSize(FVector2D(GButtonSize, GButtonSize));
 
   SButton* ButtonWidget = (SButton*)&(Button->TakeWidget().Get());
@@ -127,6 +128,14 @@ UButton* UProjectMMapWidget::CreateButton(const FVector2D& Position, const FLine
   }));
 
   return Button;
+}
+
+void UProjectMMapWidget::UpdateButton(UButton* Button, const FVector2D& Position, UMilitaryUnit* Unit, const bool& bIsOnTeam1, const bool& bIsPlayer)
+{
+  Button->WidgetStyle.Normal.TintColor = bIsPlayer ? GPlayerSoldierColor : (Unit->IsChildOfUnit(SelectedUnit) ? GSelectedUnitColor : GTeamColors[bIsOnTeam1]);
+
+  UCanvasPanelSlot* CanvasPanelSlot = CastChecked<UCanvasPanelSlot>(Button->Slot.Get());
+  CanvasPanelSlot->SetPosition(Position);
 }
 
 UButton* GetNextButton(UCanvasPanel* CanvasPanel, int32 &ButtonIndex)
@@ -155,12 +164,12 @@ void UProjectMMapWidget::UpdateSoldierButtons()
   CachedTeam1AliveSoldierCount = CachedTeam2AliveSoldierCount = 0;
   int32 ButtonIndex = 0;
 
-  ForEachMapDisplayableEntity([&ButtonIndex, this](const FVector& EntityLocation, const bool& bIsOnTeam1, const FMassEntityHandle& Entity)
+  ForEachMapDisplayableEntity([&ButtonIndex, this](const FVector& EntityLocation, const bool& bIsOnTeam1, const bool& bIsPlayer, const FMassEntityHandle& Entity)
   {
     (bIsOnTeam1 ? CachedTeam1AliveSoldierCount : CachedTeam2AliveSoldierCount)++;
     UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
     UButton* Button = GetNextButton(CanvasPanel, ButtonIndex);
-    Button->WidgetStyle.Normal.TintColor = Unit->IsChildOfUnit(SelectedUnit) ? GSelectedUnitColor : GTeamColors[bIsOnTeam1];
+    UpdateButton(Button, WorldPositionToMapPosition(EntityLocation), Unit, bIsOnTeam1, bIsPlayer);
     UCanvasPanelSlot* ButtonSlot = CastChecked<UCanvasPanelSlot>(Button->Slot.Get());
     const FVector2D& MapPosition = WorldPositionToMapPosition(EntityLocation);
     ButtonSlot->SetPosition(MapPosition);

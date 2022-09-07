@@ -10,7 +10,7 @@
 
 class USceneCaptureComponent2D;
 
-typedef TFunction< void(const FVector& /*EntityLocation*/, const bool& /*bIsOnTeam1*/, const FMassEntityHandle& /*Entity*/) > FMapDisplayableEntityFunction;
+typedef TFunction< void(const FVector& /*EntityLocation*/, const bool& /*bIsOnTeam1*/, const bool& /*bIsPlayer*/, const FMassEntityHandle& /*Entity*/) > FMapDisplayableEntityFunction;
 
 // Adapted from UCitySampleMapWidget.
 UCLASS()
@@ -62,7 +62,8 @@ private:
 	void InitializeMapViewProjectionMatrix(USceneCaptureComponent2D* const SceneCapture2D);
 	void UpdateSoldierButtons();
 	void CreateSoldierButtons();
-	class UButton* CreateButton(const FVector2D& Position, const FLinearColor& Color);
+	class UButton* CreateButton();
+	void UpdateButton(class UButton* Button, const FVector2D& Position, UMilitaryUnit* Unit, const bool& bIsOnTeam1, const bool& bIsPlayer);
 	void ForEachMapDisplayableEntity(const FMapDisplayableEntityFunction& EntityExecuteFunction);
 	void UpdateSoldierCountLabels();
 
