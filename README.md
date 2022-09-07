@@ -100,13 +100,19 @@ These ideas below would be explored in one of the phases above.
     1. Mass Spawners: BP_MassTraffic* and BP_MassCrowdSpawner
     1. BP_CitySampleWorldInfo
     1. BP_Nightmode
+    1. SmartObjectCollection
 1. Open L_Template
 1. Copy MilitaryUnitMassSpawner*, BP_MassRifle, NavMeshBoundsVolume, and ProjectMWorldInfo actors
 1. Paste in Small_City_ProjectM_LVL
 1. Ensure NavMeshBoundsVolume is at location (0,0,90).
-1. Build NavMesh from menu: Build > Build Paths
 1. Select each MilitaryUnitMassSpawner* actor > Details > World Partition > Is Spatially Loaded > uncheck
 1. In ProjectMWorldInfo actor, select WorldMapBoundingBox component and under Shape > Box Extent set the X and Y values so the box surrounds the map. If actor is at (0,0,0), a good extent is (100000.0, 100000.0).
-1. Move PlayerStart to (X=-2190.125000,Y=18358.185547,Z=68.000000)
 1. Move BP_MassRifle to (X=-2190.125000,Y=18088.185547,Z=68.000000)
 1. World Settings > GameMode Override > BP_FirstPersonGameModeCommander
+1. We need to make collisions loaded all the time because AI soldiers rely on them to determine if they have line of sight to enemies:
+    1. Load all cells in World Partition
+    1. While we've got all cells loaded, build NavMesh from menu: Build > Build Paths
+    1. In Outliner search for "coll"
+    1. Click on any actor in the Outliner and select all (Ctrl+A)
+    1. Details > World Partition > Is Spatially Loaded > uncheck
+    1. World Partition: Unload all cells and load any if desired

@@ -25,9 +25,6 @@ struct PROJECTM_API FMassFireProjectileTaskInstanceData
 
 	UPROPERTY(EditAnywhere, Category = Parameter)
 	float ForwardVectorMagnitude = 100.f;
-
-	UPROPERTY(EditAnywhere, Category = Parameter)
-	FVector ProjectileLocationOffset = FVector::ZeroVector;
 };
 
 USTRUCT(meta = (DisplayName = "Fire Projectile"))
@@ -47,5 +44,4 @@ protected:
 	TStateTreeInstanceDataPropertyHandle<FMassEntityConfig> EntityConfigHandle;
 	TStateTreeInstanceDataPropertyHandle<float> InitialVelocityHandle;
 	TStateTreeInstanceDataPropertyHandle<float> ForwardVectorMagnitudeHandle;
-	TStateTreeInstanceDataPropertyHandle<FVector> ProjectileLocationOffsetHandle;
 };

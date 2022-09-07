@@ -14,6 +14,7 @@
 #include "MassSignalSubsystem.h"
 #include "Async/Async.h"
 #include "MassProjectileDamageProcessor.h"
+#include "MassEnemyTargetFinderProcessor.h"
 
 void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQuat& SpawnRotation, const FVector& InitialVelocity, const FMassEntityConfig& EntityConfig)
 {
@@ -71,7 +72,6 @@ bool FMassFireProjectileTask::Link(FStateTreeLinker& Linker)
 	Linker.LinkInstanceDataProperty(EntityConfigHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, EntityConfig));
 	Linker.LinkInstanceDataProperty(InitialVelocityHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, InitialVelocity));
 	Linker.LinkInstanceDataProperty(ForwardVectorMagnitudeHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, ForwardVectorMagnitude));
-	Linker.LinkInstanceDataProperty(ProjectileLocationOffsetHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, ProjectileLocationOffset));
 
 	return true;
 }
@@ -90,7 +90,7 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 	const float InitialVelocityMagnitude = Context.GetInstanceData(InitialVelocityHandle);
 	const FVector InitialVelocity = StateTreeEntityCurrentForward * InitialVelocityMagnitude;
 	const float ForwardVectorMagnitude = Context.GetInstanceData(ForwardVectorMagnitudeHandle);
-	const FVector& ProjectileLocationOffset = Context.GetInstanceData(ProjectileLocationOffsetHandle);
+	const FVector& ProjectileLocationOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset());
 
 	const FVector SpawnLocation = StateTreeEntityLocation + StateTreeEntityCurrentForward * ForwardVectorMagnitude + ProjectileLocationOffset;
 	const FQuat SpawnRotation = StateTreeEntityTransform.GetRotation();

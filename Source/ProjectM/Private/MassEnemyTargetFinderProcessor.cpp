@@ -176,11 +176,12 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 	return false;
 }
 
-bool IsTargetEntityVisibleViaLineTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation)
+bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaLineTrace);
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace);
 	FHitResult Result;
-	bool bFoundBlockingHit = UKismetSystemLibrary::LineTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
+	static const float Radius = 20.f; // TODO: don't hard-code
+	bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
 	return !bFoundBlockingHit;
 }
 
@@ -196,8 +197,9 @@ void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEnti
 	FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
 	FTransformFragment& TargetTransformFragment = TargetEntityView.GetFragmentData<FTransformFragment>();
 
-	bool bTargetEntityVisibleViaLineTrace = IsTargetEntityVisibleViaLineTrace(*EntitySubsystem.GetWorld(), EntityLocation, TargetTransformFragment.GetTransform().GetLocation());
-	if (!bTargetEntityVisibleViaLineTrace)
+	static const FVector ProjectileOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset());
+	bool bTargetEntityVisibleViaSphereTrace = IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), EntityLocation + ProjectileOffset, TargetTransformFragment.GetTransform().GetLocation() + ProjectileOffset);
+	if (!bTargetEntityVisibleViaSphereTrace)
 	{
 		return;
 	}
@@ -280,4 +282,9 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	}
 
 	FinderPhase = (FinderPhase + 1) % UMassEnemyTargetFinderProcessor_FinderPhaseCount;
+}
+
+/*static*/ const float UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset()
+{
+	return 150.f; // TODO: don't hard-code
 }

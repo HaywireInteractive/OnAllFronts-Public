@@ -78,6 +78,7 @@ class PROJECTM_API UMassEnemyTargetFinderProcessor : public UMassProcessor
 	GENERATED_BODY()
 public:
 	UMassEnemyTargetFinderProcessor();
+	static const float GetProjectileSpawnLocationZOffset();
 
 protected:
 	virtual void ConfigureQueries() override;
