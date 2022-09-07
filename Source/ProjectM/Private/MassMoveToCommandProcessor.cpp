@@ -53,16 +53,16 @@ bool IsEntityCommandableByUnit(const FMassEntityHandle& Entity, const UMilitaryU
 	return EntityUnit->IsChildOfUnit(ParentUnit);
 }
 
-void ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World)
+bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World)
 {
 	if (TeamMemberFragment.IsOnTeam1 != IsLastMoveToCommandForTeam1)
 	{
-		return;
+		return false;
 	}
 
 	if (!IsEntityCommandableByUnit(Entity, LastMoveToCommandMilitaryUnit, World))
 	{
-		return;
+		return false;
 	}
 
 	const ANavigationData* NavData = NavSys->GetNavDataForProps(FNavAgentProperties::DefaultProperties, EntityLocation);
@@ -70,22 +70,34 @@ void ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 	if (!NavData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not get navigation data. Likely there is no NavMesh in level."));
-		return;
+		return false;
 	}
 
-	FPathFindingQuery Query(Processor, *NavData, EntityLocation, LastMoveToCommandTarget);
+	FNavLocation ClosestValidLocation;
+	const FVector Extent(8000.f, 8000.f, 1000.f); // TODO: don't hard-code
+	const bool bProjectResult = NavSys->ProjectPointToNavigation(LastMoveToCommandTarget, ClosestValidLocation, Extent, NavData);
+
+	if (!bProjectResult)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find closest valid location to move to command location to %s"), *LastMoveToCommandTarget.ToString());
+		return false;
+	}
+
+	FPathFindingQuery Query(Processor, *NavData, EntityLocation, ClosestValidLocation.Location);
 	FPathFindingResult Result = NavSys->FindPathSync(Query);
 
 	if (!Result.IsSuccessful())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find path to target."));
-		return;
+		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find path to target. Start = %s, End = %s"), *EntityLocation.ToString(), *ClosestValidLocation.Location.ToString());
+		return false;
 	}
 
 	NavMeshMoveFragment.Path = Result.Path;
 	NavMeshMoveFragment.CurrentPathPointIndex = 0;
 
 	Context.Defer().AddTag<FMassNeedsNavMeshMoveTag>(Entity);
+
+	return true;
 }
 
 void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
@@ -103,13 +115,15 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 		return;
 	}
 
+	int32 NumEntitiesSetMoveTarget = 0;
+
 	const bool& IsLastMoveToCommandForTeam1 = MoveToCommandSubsystem->IsLastMoveToCommandForTeam1();
 	const UMilitaryUnit* LastMoveToCommandMilitaryUnit = MoveToCommandSubsystem->GetLastMoveToCommandMilitaryUnit();
 	check(LastMoveToCommandMilitaryUnit);
 
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 
-	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &IsLastMoveToCommandForTeam1, LastMoveToCommandTarget, NavSys, LastMoveToCommandMilitaryUnit](FMassExecutionContext& Context)
+	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &IsLastMoveToCommandForTeam1, LastMoveToCommandTarget, NavSys, LastMoveToCommandMilitaryUnit, &NumEntitiesSetMoveTarget](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
@@ -123,9 +137,16 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 			FVector MoveToCommandTarget = *LastMoveToCommandTarget;
 			MoveToCommandTarget.Z = EntityLocation.Z;
 
-			ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntityLocation, Context.GetEntity(i), NavSys, NavMeshMoveList[i], Context, LastMoveToCommandMilitaryUnit, GetWorld());
+			const bool& bDidSetMoveTarget = ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntityLocation, Context.GetEntity(i), NavSys, NavMeshMoveList[i], Context, LastMoveToCommandMilitaryUnit, GetWorld());
+
+			if (bDidSetMoveTarget)
+			{
+				NumEntitiesSetMoveTarget++;
+			}
 		}
 	});
+
+	UE_LOG(LogTemp, Log, TEXT("UMassMoveToCommandProcessor: Set move target to %d entities."), NumEntitiesSetMoveTarget);
 
 	MoveToCommandSubsystem->ResetLastMoveToCommand();
 }

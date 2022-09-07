@@ -104,7 +104,7 @@ These ideas below would be explored in one of the phases above.
 1. Copy MilitaryUnitMassSpawner*, BP_MassRifle, NavMeshBoundsVolume, and ProjectMWorldInfo actors
 1. Paste in Small_City_ProjectM_LVL
 1. Ensure NavMeshBoundsVolume is at location (0,0,90).
-1. Build NavMesh from Build > Build Paths menu
+1. Build NavMesh from menu: Build > Build Paths
 1. Select each MilitaryUnitMassSpawner* actor > Details > World Partition > Is Spatially Loaded > uncheck
 1. In ProjectMWorldInfo actor, select WorldMapBoundingBox component and under Shape > Box Extent set the X and Y values so the box surrounds the map. If actor is at (0,0,0), a good extent is (100000.0, 100000.0).
 1. Move PlayerStart to (X=-2190.125000,Y=18358.185547,Z=68.000000)
