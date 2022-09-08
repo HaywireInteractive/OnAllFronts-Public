@@ -185,7 +185,14 @@ void ACommanderCharacter::InitializeFromMassSoldierInternal()
 	// If we don't have a soldier entity to initialize with, set it to team's highest commander.
 	if (!MassSoldierEntityToInitializeWith.IsSet())
 	{
-		UMilitaryUnit* TeamCommander = MilitaryStructureSubsystem->GetRootUnitForTeam(IsPlayerOnTeam1())->Commander;
+		UMilitaryUnit* RootUnit = MilitaryStructureSubsystem->GetRootUnitForTeam(IsPlayerOnTeam1());
+		if (!RootUnit)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Cannot find root military unit for player's team on character initialization."));
+			return;
+		}
+
+		UMilitaryUnit* TeamCommander = RootUnit->Commander;
 
 		if (!TeamCommander)
 		{
