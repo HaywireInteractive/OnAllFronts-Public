@@ -34,6 +34,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetSelectedUnit(UMilitaryUnit* Unit);
 
+	UFUNCTION(BlueprintCallable)
+	void OnHide();
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnSoldierButtonClicked(UMilitaryUnit* Unit);
 
@@ -77,6 +80,7 @@ private:
 	bool bCreatedButtons = false;
 	UMilitaryUnit* SelectedUnit = nullptr;
 	TMap<UButton*, UMilitaryUnit*> ButtonToMilitaryUnitMap;
+	TMap<UMilitaryUnit*, UButton*> MilitaryUnitToButtonMap;
 	UMilitaryStructureSubsystem* MilitaryStructureSubsystem;
 };
 

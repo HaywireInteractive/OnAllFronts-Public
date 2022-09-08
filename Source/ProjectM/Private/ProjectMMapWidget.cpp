@@ -78,6 +78,7 @@ void UProjectMMapWidget::CreateSoldierButtons()
     UButton* Button = CreateButton();
     UpdateButton(Button, WorldPositionToMapPosition(EntityLocation), Unit, bIsOnTeam1, bIsPlayer);
     ButtonToMilitaryUnitMap.Add(Button, Unit);
+    MilitaryUnitToButtonMap.Add(Unit, Button);
   });
 
   bCreatedButtons = true;
@@ -138,49 +139,31 @@ void UProjectMMapWidget::UpdateButton(UButton* Button, const FVector2D& Position
   CanvasPanelSlot->SetPosition(Position);
 }
 
-UButton* GetNextButton(UCanvasPanel* CanvasPanel, int32 &ButtonIndex)
-{
-  while (ButtonIndex < CanvasPanel->GetChildrenCount() && !(Cast<UButton>(CanvasPanel->GetChildAt(ButtonIndex))))
-  {
-    ButtonIndex++;
-  }
-
-  if (ButtonIndex >= CanvasPanel->GetChildrenCount())
-  {
-    return nullptr;
-  }
-
-  if (UButton* Button = Cast<UButton>(CanvasPanel->GetChildAt(ButtonIndex)))
-  {
-    ButtonIndex++;
-    return Button;
-  }
-
-  return nullptr;
-}
-
 void UProjectMMapWidget::UpdateSoldierButtons()
 {
   CachedTeam1AliveSoldierCount = CachedTeam2AliveSoldierCount = 0;
-  int32 ButtonIndex = 0;
 
-  ForEachMapDisplayableEntity([&ButtonIndex, this](const FVector& EntityLocation, const bool& bIsOnTeam1, const bool& bIsPlayer, const FMassEntityHandle& Entity)
+  TSet<UButton*> UpdatedButtons;
+  ForEachMapDisplayableEntity([this, &UpdatedButtons](const FVector& EntityLocation, const bool& bIsOnTeam1, const bool& bIsPlayer, const FMassEntityHandle& Entity)
   {
     (bIsOnTeam1 ? CachedTeam1AliveSoldierCount : CachedTeam2AliveSoldierCount)++;
     UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
-    UButton* Button = GetNextButton(CanvasPanel, ButtonIndex);
+    UButton* Button = MilitaryUnitToButtonMap[Unit];
     UpdateButton(Button, WorldPositionToMapPosition(EntityLocation), Unit, bIsOnTeam1, bIsPlayer);
+    UpdatedButtons.Add(Button);
     UCanvasPanelSlot* ButtonSlot = CastChecked<UCanvasPanelSlot>(Button->Slot.Get());
     const FVector2D& MapPosition = WorldPositionToMapPosition(EntityLocation);
     ButtonSlot->SetPosition(MapPosition);
-
-    ButtonToMilitaryUnitMap[Button] = Unit;
   });
 
-  // Hide remaining buttons.
-  while (UButton* Button = GetNextButton(CanvasPanel, ButtonIndex))
+  // Hide buttons for destroyed units.
+  for (int32 CanvasPanelChildIndex = 0; CanvasPanelChildIndex < CanvasPanel->GetChildrenCount(); CanvasPanelChildIndex++)
   {
-    Button->SetVisibility(ESlateVisibility::Collapsed);
+    UButton* Button = Cast<UButton>(CanvasPanel->GetChildAt(CanvasPanelChildIndex));
+    if (Button && !UpdatedButtons.Contains(Button))
+    {
+      Button->SetVisibility(ESlateVisibility::Collapsed);
+    }
   }
 }
 
@@ -226,6 +209,19 @@ void UProjectMMapWidget::NativeOnInitialized()
       BorderSlot->SetSize(MapRect.Size());
     }
   }
+}
+
+void UProjectMMapWidget::OnHide()
+{
+  for (auto& KeyValuePair : ButtonToMilitaryUnitMap)
+  {
+    UButton* Button = KeyValuePair.Key;
+    Button->RemoveFromParent();
+  }
+
+  ButtonToMilitaryUnitMap.Reset();
+  MilitaryUnitToButtonMap.Reset();
+  bCreatedButtons = false;
 }
 
 void UProjectMMapWidget::InitializeMapViewProjectionMatrix(USceneCaptureComponent2D* const SceneCapture2D)
