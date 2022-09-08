@@ -40,17 +40,21 @@ Currently this is a hobby project, so it's unclear how far it'll go. Therefore, 
 
 Same as multiplayer below, except only one human-controller soldier.
 
-## Phase 2: Multiplayer MMO
+## Phase 2: Multiplayer Per-Server Battle
 
-All players in the game will be in a single battle at a time. Because of the scale being attempted, a single server will likely not be able to handle hosting this game. Instead it will require multiple servers communicating with each other.
+Maximum number of players in server will be limited by Unreal Engine's limits.
 
-The multiplayer phase of the game is split into two sub-phases below.
+## Phase 3: Multiplayer MMO
 
-### Phase 2A: Server switching between zones
+All players in the game will be in a single battle at a time, across multiple servers.
+
+This phase is split into two sub-phases below.
+
+### Phase 3A: Server switching between zones
 
 The map will be split up into zones. When a player reaches the border between zones, they load into a different server that manages that area of the map.
 
-### Phase 2B: Server meshing across zones
+### Phase 3B: Server meshing across zones
 
 Seamless switching between servers and players at the borders of servers will talk to all nearby servers to have a seamless experience across zones.
 
@@ -84,8 +88,11 @@ These ideas below would be explored in one of the phases above.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
 1. Run project from VS.
 1. Add First Person Content Pack from Content Drawer > Add > Add Feature or Content Pack > Blueprint > First Person > Add to project.
-1. Add Military Weapons Silver to project: https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver
-    1. Then open M_WeaponMaster_01 > Used with Instanced Static Meshes > Apply > Save
+1. Add Unreal Engine Marketplace free content to project:
+    1. Military Weapons Silver: https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver
+        1. Then open M_WeaponMaster_01 > Used with Instanced Static Meshes > Apply > Save
+    1. M1A1 Abrams Tank: https://www.unrealengine.com/marketplace/en-US/product/m1a1-abrams-tank
+        1. TODO: Any materials in ISMs?
 1. Edit > Project Settings
     1. Engine - Input > Bindings > Action Mappings
         1. Add "MoveToCommand", 1 key
