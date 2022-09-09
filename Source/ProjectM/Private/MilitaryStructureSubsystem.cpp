@@ -7,29 +7,46 @@
 
 #define LOCTEXT_NAMESPACE "MyNamespace" // TODO
 
-typedef TTuple<const uint8, FName> TUnitPair;
-
-static const TUnitPair MilitaryUnits[] = {
-	// pairs are in order of (SubUnitCount, UnitName)
-	TUnitPair(3, TEXT("Corps")),
-	TUnitPair(3, TEXT("Division")),
-	TUnitPair(4, TEXT("Brigade")),
-	TUnitPair(3, TEXT("Battalion")),
-	TUnitPair(3, TEXT("Company")),
-	TUnitPair(3, TEXT("Platoon")),
-	TUnitPair(2, TEXT("Squad")),
-	TUnitPair(3, TEXT("Fire team")),
-	TUnitPair(0, TEXT("Soldier")),
+struct FMilitaryUnitLevel
+{
+	FMilitaryUnitLevel(uint8 SubUnitCount, FName Name, uint8 ArmorSubUnitCount= 0)
+	{
+		this->SubUnitCount = SubUnitCount;
+		this->Name = Name;
+		this->ArmorSubUnitCount = ArmorSubUnitCount;
+	}
+	uint8 SubUnitCount;
+	FName Name;
+	uint8 ArmorSubUnitCount;
 };
-static const uint8 MilitaryUnits_Count = sizeof(MilitaryUnits) / sizeof(MilitaryUnits[0]);
+
+static const FMilitaryUnitLevel GMilitaryUnitLevels[] = {
+	FMilitaryUnitLevel(3, TEXT("Corps")),
+	FMilitaryUnitLevel(3, TEXT("Division")),
+	FMilitaryUnitLevel(4, TEXT("Brigade")),
+	FMilitaryUnitLevel(3, TEXT("Battalion"), 2),
+	FMilitaryUnitLevel(3, TEXT("Company")),
+	FMilitaryUnitLevel(3, TEXT("Platoon")),
+	FMilitaryUnitLevel(2, TEXT("Squad")),
+	FMilitaryUnitLevel(3, TEXT("Fire team")),
+	FMilitaryUnitLevel(0, TEXT("Soldier")),
+};
+
+static const FMilitaryUnitLevel GArmorUnitLevels[] = {
+	FMilitaryUnitLevel(3, TEXT("Company")),
+	FMilitaryUnitLevel(2, TEXT("Platoon")),
+	FMilitaryUnitLevel(2, TEXT("Section")),
+};
+
+static const uint8 GMilitaryUnitLevels_Count = sizeof(GMilitaryUnitLevels) / sizeof(GMilitaryUnitLevels[0]);
 
 int32 RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 Depth = 0, uint8 Index = 1)
 {
 	Unit->Parent = Parent;
 	Unit->Depth = Depth;
-	Unit->Name = FText::Format(LOCTEXT("TODO", "{0} {1}"), FText::FromName(MilitaryUnits[Depth].Value), Index);
+	Unit->Name = FText::Format(LOCTEXT("TODO", "{0} {1}"), FText::FromName(GMilitaryUnitLevels[Depth].Name), Index);
 	
-	uint8 SubUnitCount = MilitaryUnits[Depth].Key;
+	uint8 SubUnitCount = GMilitaryUnitLevels[Depth].SubUnitCount;
 
 	if (SubUnitCount == 0)
 	{
