@@ -92,7 +92,6 @@ These ideas below would be explored in one of the phases above.
     1. Military Weapons Silver: https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver
         1. Then open M_WeaponMaster_01 > Used with Instanced Static Meshes > Apply > Save
     1. M1A1 Abrams Tank: https://www.unrealengine.com/marketplace/en-US/product/m1a1-abrams-tank
-        1. TODO: Any materials in ISMs?
 1. Edit > Project Settings
     1. Engine - Input > Bindings > Action Mappings
         1. Add "MoveToCommand", 1 key
