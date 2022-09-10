@@ -62,13 +62,16 @@ Seamless switching between servers and players at the borders of servers will ta
 
 The ultimate goal is to recreate a war at a scale such as in this video (with the teams a bit more balanced): https://youtu.be/RSqKx3FG0Lw
 
-## Possible Additional Features
+## Possible Features
 
 These ideas below would be explored in one of the phases above.
 
 1. Railroad system for logistics. Railroads can be damaged and repaired.
 1. Pontoon bridges which can be built for river crossings. Bridges can be destroyed.
 1. Building destruction
+1. Naval warfare
+1. Helicopters
+1. Airplanes (not player controlled initially, only AI)
 
 # FAQ
 
