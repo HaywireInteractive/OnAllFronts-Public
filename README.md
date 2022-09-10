@@ -2,9 +2,9 @@
 
 ## Latest Demo
 
-1,000 vs 1,000 solider city battle:
+1,000 vs 1,000 soldier city battle:
 
-[![1,000 vs 1,000 solider city battle](https://img.youtube.com/vi/3JT4XytxOiQ/0.jpg)](https://www.youtube.com/watch?v=3JT4XytxOiQ)
+[![1,000 vs 1,000 soldier city battle](https://img.youtube.com/vi/3JT4XytxOiQ/0.jpg)](https://www.youtube.com/watch?v=3JT4XytxOiQ)
 
 https://youtu.be/3JT4XytxOiQ
 
@@ -21,7 +21,7 @@ In today's "MilSim" games players frequently end up doing things or seeing this 
 - Areas of interest are captured by standing near them
 - Areas that should be defended have little or no one defending them (because it's boring)
 - Soldiers being revived who should be dead
-- Soliders being healed much faster than they should be able to
+- Soldiers being healed much faster than they should be able to
 
 ProjectM aims to eliminate these unrealistic occurrences while keeping the game fun. It mainly does this by leveraging AI to do the not-so-fun stuff. Examples:
 - Moving soldiers to the frontlines
@@ -30,7 +30,7 @@ ProjectM aims to eliminate these unrealistic occurrences while keeping the game 
 - Vehicle repairs
 - Medical evacuation (medevac)
 
-Human players will never spawn soliders onto the battlefield. Instead they will take control of an AI-controller soldier already on the battlefield. Each match will last days/weeks, until all soldiers of one team are dead or main objectives have been accomplished.
+Human players will never spawn soldiers onto the battlefield. Instead they will take control of an AI-controller soldier already on the battlefield. Each match will last days/weeks, until all soldiers of one team are dead or main objectives have been accomplished.
 
 # Phases
 
