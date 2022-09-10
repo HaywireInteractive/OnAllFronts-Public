@@ -16,7 +16,7 @@ The project is open sourced to make it easy for others to contribute and to help
 
 ## Motivation
 
-In today's "MilSim" games players frequently end up doing things or seeing this that would not happen in an actual MilSim. Examples:
+In today's MilSim games players frequently end up doing things or seeing this that would not happen in an actual MilSim. Examples:
 - Soldiers magically spawn onto the battlefield
 - Areas of interest are captured by standing near them
 - Areas that should be defended have little or no one defending them (because it's boring)
@@ -57,6 +57,10 @@ The map will be split up into zones. When a player reaches the border between zo
 ### Phase 3B: Server meshing across zones
 
 Seamless switching between servers and players at the borders of servers will talk to all nearby servers to have a seamless experience across zones.
+
+## End Game
+
+The ultimate goal is to recreate a war at a scale such as in this video (with the teams a bit more balanced): https://youtu.be/RSqKx3FG0Lw
 
 ## Possible Additional Features
 
