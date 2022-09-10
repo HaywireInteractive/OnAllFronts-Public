@@ -6,7 +6,7 @@
 
 #include "MilitaryUnitMassSpawner.generated.h"
 
-// Note that setting Count property inherited from AMassSpawner gets ignored. Instead set MilitaryUnitIndex to determine Count.
+// Note that setting Count inherited from AMassSpawner gets ignored.
 UCLASS()
 class PROJECTM_API AMilitaryUnitMassSpawner : public AMassSpawner
 {
@@ -21,6 +21,8 @@ protected:
 	void AssignEntitiesToMilitaryUnits(UMilitaryUnit* MilitaryUnit, int32& Index, int32& SubIndex);
 
 	UMilitaryStructureSubsystem* MilitaryStructureSubsystem;
+
+	void DoMilitaryUnitSpawning();
 
 public:
 	AMilitaryUnitMassSpawner();

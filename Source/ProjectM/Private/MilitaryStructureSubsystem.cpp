@@ -4,12 +4,14 @@
 #include "MilitaryStructureSubsystem.h"
 
 #include "Internationalization/Internationalization.h"
+#include <Kismet/GameplayStatics.h>
+#include "MilitaryUnitMassSpawner.h"
 
 #define LOCTEXT_NAMESPACE "MyNamespace" // TODO
 
 struct FMilitaryUnitLevel
 {
-	FMilitaryUnitLevel(uint8 SubUnitCount, FName Name, uint8 ArmorSubUnitCount= 0)
+	FMilitaryUnitLevel(uint8 SubUnitCount, FName Name, uint8 ArmorSubUnitCount = 0)
 	{
 		this->SubUnitCount = SubUnitCount;
 		this->Name = Name;
@@ -36,22 +38,38 @@ static const FMilitaryUnitLevel GArmorUnitLevels[] = {
 	FMilitaryUnitLevel(3, TEXT("Company")),
 	FMilitaryUnitLevel(2, TEXT("Platoon")),
 	FMilitaryUnitLevel(2, TEXT("Section")),
+	FMilitaryUnitLevel(0, TEXT("Tank")),
 };
 
 static const uint8 GMilitaryUnitLevels_Count = sizeof(GMilitaryUnitLevels) / sizeof(GMilitaryUnitLevels[0]);
 
-int32 RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 Depth = 0, uint8 Index = 1)
+TPair<int32, int32> RecursivelyCreateArmorUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 GlobalDepth = 0, uint8 ArmorDepth = 0, uint8 Index = 1);
+
+TPair<int32, int32> RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 Depth = 0, uint8 Index = 1)
 {
 	Unit->Parent = Parent;
 	Unit->Depth = Depth;
 	Unit->Name = FText::Format(LOCTEXT("TODO", "{0} {1}"), FText::FromName(GMilitaryUnitLevels[Depth].Name), Index);
 	
 	uint8 SubUnitCount = GMilitaryUnitLevels[Depth].SubUnitCount;
+	uint8 ArmorSubUnitCount = GMilitaryUnitLevels[Depth].ArmorSubUnitCount;
+
+	TPair<int32, int32> Result = TPair<int32, int32>(0, 0);
+
+	if (ArmorSubUnitCount > 0)
+	{
+		UMilitaryUnit* RootArmorUnit = NewObject<UMilitaryUnit>();
+		TPair<int32, int32> UnitCounts = RecursivelyCreateArmorUnits(RootArmorUnit, Unit, Depth + 1);
+		Result.Key += UnitCounts.Key;
+		Result.Value += UnitCounts.Value;
+		Unit->SubUnits.Add(RootArmorUnit);
+	}
 
 	if (SubUnitCount == 0)
 	{
 		Unit->bIsSoldier = true;
-		return 1;
+		Result.Key += 1;
+		return Result;
 	}
 
 	UMilitaryUnit* Commander = NewObject<UMilitaryUnit>();
@@ -62,12 +80,53 @@ int32 RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 D
 	Commander->Parent = Unit;
 	Unit->Commander = Commander;
 	Unit->SubUnits.Add(Commander);
-	int32 Result = 1;
+	Result.Key += 1;
 
 	for (uint8 i = 0; i < SubUnitCount; i++)
 	{
 		UMilitaryUnit* SubUnit = NewObject<UMilitaryUnit>();
-		Result += RecursivelyCreateUnits(SubUnit, Unit, Depth + 1, i + 1);
+		TPair<int32, int32> UnitCounts = RecursivelyCreateUnits(SubUnit, Unit, Depth + 1, i + 1);
+		Result.Key += UnitCounts.Key;
+		Result.Value += UnitCounts.Value;
+		Unit->SubUnits.Add(SubUnit);
+	}
+
+	return Result;
+}
+
+TPair<int32, int32> RecursivelyCreateArmorUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 GlobalDepth, uint8 ArmorDepth, uint8 Index)
+{
+	Unit->Parent = Parent;
+	Unit->Depth = GlobalDepth;
+	Unit->Name = FText::Format(LOCTEXT("TODO", "{0} {1}"), FText::FromName(GArmorUnitLevels[ArmorDepth].Name), Index);
+
+	uint8 SubUnitCount = GArmorUnitLevels[ArmorDepth].SubUnitCount;
+
+	TPair<int32, int32> Result = TPair<int32, int32>(0, 0);
+
+	if (SubUnitCount == 0)
+	{
+		Unit->bIsVehicle = true;
+		Result.Value += 1;
+		return Result;
+	}
+
+	UMilitaryUnit* Commander = NewObject<UMilitaryUnit>();
+	Commander->bIsSoldier = true;
+	Commander->bIsCommander = true;
+	Commander->Depth = GlobalDepth + 1;
+	Commander->Name = FText::Format(LOCTEXT("TODO", "{0} Commander"), Unit->Name);
+	Commander->Parent = Unit;
+	Unit->Commander = Commander;
+	Unit->SubUnits.Add(Commander);
+	Result.Key += 1;
+
+	for (uint8 i = 0; i < SubUnitCount; i++)
+	{
+		UMilitaryUnit* SubUnit = NewObject<UMilitaryUnit>();
+		TPair<int32, int32> UnitCounts = RecursivelyCreateArmorUnits(SubUnit, Unit, GlobalDepth + 1, ArmorDepth + 1, i + 1);
+		Result.Key += UnitCounts.Key;
+		Result.Value += UnitCounts.Value;
 		Unit->SubUnits.Add(SubUnit);
 	}
 
@@ -77,10 +136,10 @@ int32 RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* Parent, uint8 D
 //----------------------------------------------------------------------//
 //  UMilitaryStructureSubsystem
 //----------------------------------------------------------------------//
-int32 UMilitaryStructureSubsystem::CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1)
+TPair<int32, int32> UMilitaryStructureSubsystem::CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1)
 {
 	UMilitaryUnit* RootUnit = NewObject<UMilitaryUnit>();
-	int32 Count = RecursivelyCreateUnits(RootUnit, nullptr, MilitaryUnitIndex);
+	TPair<int32, int32> Counts = RecursivelyCreateUnits(RootUnit, nullptr, MilitaryUnitIndex);
 	if (bIsTeam1)
 	{
 		Team1RootUnit = RootUnit;
@@ -89,7 +148,7 @@ int32 UMilitaryStructureSubsystem::CreateMilitaryUnit(uint8 MilitaryUnitIndex, b
 	{
 		Team2RootUnit = RootUnit;
 	}
-	return Count;
+	return Counts;
 }
 
 void PrintMilitaryStructure(UMilitaryUnit* Unit, FString Prefix = FString(""))
@@ -188,9 +247,17 @@ bool UMilitaryUnit::IsChildOfUnit(const UMilitaryUnit* ParentUnit)
 
 void UMilitaryStructureSubsystem::DidCompleteAssigningEntitiesToMilitaryUnits(const bool bIsTeam1)
 {
+	TArray<AActor*> MilitaryUnitMassSpawners;
+	UGameplayStatics::GetAllActorsOfClass(this, AMilitaryUnitMassSpawner::StaticClass(), MilitaryUnitMassSpawners);
+
+
 	(bIsTeam1 ? bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1 : bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2) = true;
 
-	if (bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1 && bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2)
+	if (MilitaryUnitMassSpawners.Num() == 1)
+	{
+		OnCompletedAssigningEntitiesToMilitaryUnitsEvent.Broadcast();
+	}
+	else if (bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1 && bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2)
 	{
 		OnCompletedAssigningEntitiesToMilitaryUnitsEvent.Broadcast();
 	}

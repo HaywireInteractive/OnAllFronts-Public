@@ -59,6 +59,10 @@ public:
 
 	// TODO: make private and expose getter
 	UPROPERTY(BlueprintReadOnly)
+	bool bIsVehicle = false;
+
+	// TODO: make private and expose getter
+	UPROPERTY(BlueprintReadOnly)
 	bool bIsCommander = false;
 
 	// TODO: make private and expose getter
@@ -96,8 +100,8 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	// USubsystem END
 
-	// returns number of soldiers
-	int32 CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1);
+	// returns pair of (soldier count, vehicle count)
+	TPair<int32, int32> CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1);
 
 	void BindUnitToMassEntity(UMilitaryUnit* MilitaryUnit, FMassEntityHandle Entity);
 	void DestroyEntity(FMassEntityHandle Entity);
