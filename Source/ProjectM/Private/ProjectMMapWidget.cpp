@@ -22,7 +22,8 @@
 
 #define LOCTEXT_NAMESPACE "MyNamespace" // TODO
 
-static const float GButtonSize = 10.f;
+static const float GSoldierButtonSize = 10.f;
+static const float GTankButtonSize = 20.f;
 
 // TODO: don't hard-code
 static const FLinearColor GSelectedUnitColor = FLinearColor(0.f, 1.f, 0.f);
@@ -46,11 +47,11 @@ void UProjectMMapWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 
   if (!bCreatedButtons)
   {
-    CreateSoldierButtons();
+    CreateMapButtons();
   }
   else
   {
-    UpdateSoldierButtons();
+    UpdateMapButtons();
   }
 
   UpdateSoldierCountLabels();
@@ -68,14 +69,21 @@ void UProjectMMapWidget::UpdateSoldierCountLabels()
   }
 }
 
-void UProjectMMapWidget::CreateSoldierButtons()
+void UProjectMMapWidget::CreateMapButtons()
 {
   ForEachMapDisplayableEntity([this](const FVector& EntityLocation, const bool& bIsOnTeam1, const bool& bIsPlayer, const FMassEntityHandle& Entity)
   {
+    UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+
+    if (!Unit)
+    {
+      UE_LOG(LogTemp, Warning, TEXT("UProjectMMapWidget: Could not find UMilitaryUnit for entity, not creating button"));
+      return;
+    }
+
     FLinearColor Color = GTeamColors[bIsOnTeam1];
     (bIsOnTeam1 ? CachedTeam1AliveSoldierCount : CachedTeam2AliveSoldierCount)++;
-    UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
-    UButton* Button = CreateButton();
+    UButton* Button = CreateButton(Unit->bIsSoldier);
     UpdateButton(Button, WorldPositionToMapPosition(EntityLocation), Unit, bIsOnTeam1, bIsPlayer);
     ButtonToMilitaryUnitMap.Add(Button, Unit);
     MilitaryUnitToButtonMap.Add(Unit, Button);
@@ -107,16 +115,21 @@ void UProjectMMapWidget::ForEachMapDisplayableEntity(const FMapDisplayableEntity
   });
 }
 
-UButton* UProjectMMapWidget::CreateButton()
+UButton* UProjectMMapWidget::CreateButton(const bool& bIsSolder)
 {
   UButton* Button = NewObject<UButton>();
-  Button->WidgetStyle.Normal.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
-  Button->WidgetStyle.Normal.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
+
+  if (bIsSolder)
+  {
+    Button->WidgetStyle.Normal.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
+    Button->WidgetStyle.Normal.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
+  }
 
   UCanvasPanelSlot* CanvasPanelSlot = CanvasPanel->AddChildToCanvas(Button);
   CanvasPanelSlot->SetAnchors(FAnchors(0.5f));
   CanvasPanelSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-  CanvasPanelSlot->SetSize(FVector2D(GButtonSize, GButtonSize));
+  const float& ButtonSize = bIsSolder ? GSoldierButtonSize : GTankButtonSize;
+  CanvasPanelSlot->SetSize(FVector2D(ButtonSize, ButtonSize));
 
   SButton* ButtonWidget = (SButton*)&(Button->TakeWidget().Get());
   ButtonWidget->SetOnClicked(FOnClicked::CreateLambda([this, Button]()
@@ -139,7 +152,7 @@ void UProjectMMapWidget::UpdateButton(UButton* Button, const FVector2D& Position
   CanvasPanelSlot->SetPosition(Position);
 }
 
-void UProjectMMapWidget::UpdateSoldierButtons()
+void UProjectMMapWidget::UpdateMapButtons()
 {
   CachedTeam1AliveSoldierCount = CachedTeam2AliveSoldierCount = 0;
 

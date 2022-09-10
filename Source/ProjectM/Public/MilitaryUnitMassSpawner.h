@@ -18,11 +18,14 @@ protected:
 	UFUNCTION()
 	void BeginAssignEntitiesToMilitaryUnits();
 
-	void AssignEntitiesToMilitaryUnits(UMilitaryUnit* MilitaryUnit, int32& Index, int32& SubIndex);
+	void AssignEntitiesToMilitaryUnits(UMilitaryUnit* MilitaryUnit, int32& SoldierIndex, int32& VehicleIndex);
+	void DoMilitaryUnitSpawning();
 
 	UMilitaryStructureSubsystem* MilitaryStructureSubsystem;
-
-	void DoMilitaryUnitSpawning();
+	
+	// Indices into AMassSpawner's AllSpawnedEntities.
+	int32 AllSpawnedEntitiesSoldierIndex;
+	int32 AllSpawnedEntitiesVehicleIndex;
 
 public:
 	AMilitaryUnitMassSpawner();

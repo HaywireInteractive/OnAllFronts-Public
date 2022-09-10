@@ -72,6 +72,9 @@ public:
 	void RemoveFromParent();
 	FMassEntityHandle GetMassEntityHandle();
 	bool IsChildOfUnit(const UMilitaryUnit* ParentUnit);
+
+	UFUNCTION(BlueprintCallable)
+	bool IsLeafUnit() const;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FCompletedAssigningEntitiesToMilitaryUnitsEvent);

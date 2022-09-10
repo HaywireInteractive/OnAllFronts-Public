@@ -203,6 +203,24 @@ UMilitaryUnit* UMilitaryStructureSubsystem::GetUnitForEntity(const FMassEntityHa
 	return *MilitaryUnit;
 }
 
+void UMilitaryStructureSubsystem::DidCompleteAssigningEntitiesToMilitaryUnits(const bool bIsTeam1)
+{
+	TArray<AActor*> MilitaryUnitMassSpawners;
+	UGameplayStatics::GetAllActorsOfClass(this, AMilitaryUnitMassSpawner::StaticClass(), MilitaryUnitMassSpawners);
+
+
+	(bIsTeam1 ? bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1 : bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2) = true;
+
+	if (MilitaryUnitMassSpawners.Num() == 1)
+	{
+		OnCompletedAssigningEntitiesToMilitaryUnitsEvent.Broadcast();
+	}
+	else if (bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1 && bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2)
+	{
+		OnCompletedAssigningEntitiesToMilitaryUnitsEvent.Broadcast();
+	}
+}
+
 //----------------------------------------------------------------------//
 //  UMilitaryUnit
 //----------------------------------------------------------------------//
@@ -245,20 +263,8 @@ bool UMilitaryUnit::IsChildOfUnit(const UMilitaryUnit* ParentUnit)
 	return false;
 }
 
-void UMilitaryStructureSubsystem::DidCompleteAssigningEntitiesToMilitaryUnits(const bool bIsTeam1)
+bool UMilitaryUnit::IsLeafUnit() const
 {
-	TArray<AActor*> MilitaryUnitMassSpawners;
-	UGameplayStatics::GetAllActorsOfClass(this, AMilitaryUnitMassSpawner::StaticClass(), MilitaryUnitMassSpawners);
-
-
-	(bIsTeam1 ? bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1 : bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2) = true;
-
-	if (MilitaryUnitMassSpawners.Num() == 1)
-	{
-		OnCompletedAssigningEntitiesToMilitaryUnitsEvent.Broadcast();
-	}
-	else if (bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam1 && bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2)
-	{
-		OnCompletedAssigningEntitiesToMilitaryUnitsEvent.Broadcast();
-	}
+	return bIsSoldier || bIsVehicle;
 }
+

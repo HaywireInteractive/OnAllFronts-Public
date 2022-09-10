@@ -142,34 +142,47 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 
 void AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits()
 {
-	int32 Index = 0;
-	int32 SubIndex = 0;
-	AssignEntitiesToMilitaryUnits(MilitaryStructureSubsystem->GetRootUnitForTeam(bIsTeam1), Index, SubIndex);
-	MilitaryStructureSubsystem->DidCompleteAssigningEntitiesToMilitaryUnits(bIsTeam1);
-}
+	// TODO: This is a bit hacky, refactor.
 
-void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(UMilitaryUnit* MilitaryUnit, int32& Index, int32& SubIndex)
-{
-	if (MilitaryUnit->bIsSoldier)
+	// If only soldiers were spawned.
+	if (AllSpawnedEntities.Num() < 2)
 	{
-		MilitaryStructureSubsystem->BindUnitToMassEntity(MilitaryUnit, AllSpawnedEntities[Index].Entities[SubIndex]);
-
-		// Increment indices.
-		if (SubIndex + 1 < AllSpawnedEntities[Index].Entities.Num())
+		AllSpawnedEntitiesSoldierIndex = 0;
+	}
+	else if (const UMassEntityConfigAsset* SoldierEntityConfig = EntityTypes[0].EntityConfig.LoadSynchronous())
+	{
+		const FMassEntityTemplate& SoldierEntityTemplate = SoldierEntityConfig->GetConfig().GetEntityTemplateChecked(*this, *SoldierEntityConfig);
+		if (AllSpawnedEntities[0].TemplateID == SoldierEntityTemplate.GetTemplateID())
 		{
-			SubIndex++;
+			AllSpawnedEntitiesSoldierIndex = 0;
+			AllSpawnedEntitiesVehicleIndex = 1;
 		}
 		else
 		{
-			Index++;
-			SubIndex = 0;
+			AllSpawnedEntitiesSoldierIndex = 1;
+			AllSpawnedEntitiesVehicleIndex = 0;
 		}
+	}
+
+	int32 SoldierIndex = 0;
+	int32 VehicleIndex = 0;
+	AssignEntitiesToMilitaryUnits(MilitaryStructureSubsystem->GetRootUnitForTeam(bIsTeam1), SoldierIndex, VehicleIndex);
+	MilitaryStructureSubsystem->DidCompleteAssigningEntitiesToMilitaryUnits(bIsTeam1);
+}
+
+void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(UMilitaryUnit* MilitaryUnit, int32& SoldierIndex, int32& VehicleIndex)
+{
+	if (MilitaryUnit->bIsSoldier || MilitaryUnit->bIsVehicle)
+	{
+		int32 AllSpawnedEntitiesIndex = MilitaryUnit->bIsSoldier ? AllSpawnedEntitiesSoldierIndex : AllSpawnedEntitiesVehicleIndex;
+		int32& EntitiesIndex = MilitaryUnit->bIsSoldier ? SoldierIndex : VehicleIndex;
+		MilitaryStructureSubsystem->BindUnitToMassEntity(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesIndex].Entities[EntitiesIndex++]);
 	}
 	else
 	{
 		for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
 		{
-			AssignEntitiesToMilitaryUnits(SubUnit, Index, SubIndex);
+			AssignEntitiesToMilitaryUnits(SubUnit, SoldierIndex, VehicleIndex);
 		}
 	}
 }

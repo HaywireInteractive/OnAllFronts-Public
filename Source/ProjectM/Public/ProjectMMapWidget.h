@@ -63,9 +63,9 @@ protected:
 private:
 	FVector2D WorldPositionToMapPosition(const FVector& WorldLocation);
 	void InitializeMapViewProjectionMatrix(USceneCaptureComponent2D* const SceneCapture2D);
-	void UpdateSoldierButtons();
-	void CreateSoldierButtons();
-	class UButton* CreateButton();
+	void CreateMapButtons();
+	void UpdateMapButtons();
+	class UButton* CreateButton(const bool& bIsSolder);
 	void UpdateButton(class UButton* Button, const FVector2D& Position, UMilitaryUnit* Unit, const bool& bIsOnTeam1, const bool& bIsPlayer);
 	void ForEachMapDisplayableEntity(const FMapDisplayableEntityFunction& EntityExecuteFunction);
 	void UpdateSoldierCountLabels();
