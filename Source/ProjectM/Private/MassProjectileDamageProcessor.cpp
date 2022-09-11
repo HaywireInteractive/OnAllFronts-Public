@@ -167,13 +167,17 @@ bool GetClosestEntity(const FMassEntityHandle& Entity, UMassEntitySubsystem& Ent
 	return false;
 }
 
-bool DidCollideViaLineTrace(const UWorld &World, const FVector& StartLocation, const FVector &EndLocation, const bool& DrawLineTraces)
+bool DidCollideViaLineTrace(const UWorld &World, const FVector& StartLocation, const FVector &EndLocation, const bool& DrawLineTraces, TQueue<FHitResult>& DebugLinesToDrawQueue)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_DidCollideViaLineTrace);
+
 	FHitResult Result;
-	const TArray<AActor*> ActorsToIgnore;
-	EDrawDebugTrace::Type DrawDebugTraceType = DrawLineTraces ? EDrawDebugTrace::Type::Persistent : EDrawDebugTrace::Type::None;
-	bool bSuccess = UKismetSystemLibrary::LineTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, TraceTypeQuery1, false, ActorsToIgnore, DrawDebugTraceType, Result, false);
+	bool const bSuccess = World.LineTraceSingleByChannel(Result, StartLocation, EndLocation, ECollisionChannel::ECC_Visibility);
+	if (DrawLineTraces)
+	{
+		DebugLinesToDrawQueue.Enqueue(Result);
+	}
+
 	return bSuccess;
 }
 
@@ -286,7 +290,7 @@ FCapsule MakeCapsule(const FVector& Location, const FVector& CenterOffset, const
 	return Capsule;
 }
 
-bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, FTransformFragment* OtherTransformFragment, const bool& DrawCapsules, const UWorld& World, const bool& bIsOtherEntitySoldier)
+bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, FTransformFragment* OtherTransformFragment, const bool& DrawCapsules, const UWorld& World, const bool& bIsOtherEntitySoldier, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_DidCollideWithEntity);
 	if (!OtherTransformFragment)
@@ -317,8 +321,8 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 
 	if (DrawCapsules)
 	{
-		DrawCapsule(ProjectileCapsule, World);
-		DrawCapsule(OtherEntityCapsule, World, FLinearColor::White);
+		DebugCapsulesToDrawQueue.Enqueue(ProjectileCapsule);
+		DebugCapsulesToDrawQueue.Enqueue(OtherEntityCapsule);
 	}
 
 	return TestCapsuleCapsule(ProjectileCapsule, OtherEntityCapsule);
@@ -329,11 +333,11 @@ bool CanProjectileDamageEntity(const FProjectileDamagableFragment* ProjectileDam
 	return ProjectileDamagableFragment && ProjectileCaliber >= ProjectileDamagableFragment->MinCaliberForDamage;
 }
 
-void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy)
+void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
 {
 	// If collide via line trace, we hit the environment, so destroy projectile.
 	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
-	if (DidCollideViaLineTrace(*EntitySubsystem.GetWorld(), PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces))
+	if (DidCollideViaLineTrace(*EntitySubsystem.GetWorld(), PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces, DebugLinesToDrawQueue))
 	{
 		ProjectilesToDestroy.Enqueue(Entity);
 		return;
@@ -349,7 +353,7 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 	FTransformFragment* OtherTransformFragment = OtherEntityView.GetFragmentDataPtr<FTransformFragment>();
 	const bool& bIsOtherEntitySoldier = OtherEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
 
-	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *EntitySubsystem.GetWorld(), bIsOtherEntitySoldier))
+	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *EntitySubsystem.GetWorld(), bIsOtherEntitySoldier, DebugCapsulesToDrawQueue))
 	{
 		return;
 	}
@@ -386,6 +390,83 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 bool UMassProjectileDamageProcessor_UseParallelForEachEntityChunk = true;
 FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_UseParallelForEachEntityChunk(TEXT("pm.UMassProjectileDamageProcessor_UseParallelForEachEntityChunk"), UMassProjectileDamageProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassProjectileDamageProcessor::Execute to improve performance"));
 
+void ProcessQueues(TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<FCapsule>& DebugCapsulesToDrawQueue, UWorld* World, FMassExecutionContext& Context)
+{
+	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_ProcessQueues);
+
+	// Destroy projectiles.
+	while (!ProjectilesToDestroy.IsEmpty())
+	{
+		FMassEntityHandle EntityToDestroy;
+		bool bSuccess = ProjectilesToDestroy.Dequeue(EntityToDestroy);
+		check(bSuccess);
+		Context.Defer().DestroyEntity(EntityToDestroy);
+	}
+
+	// Destroy AI soldiers.
+	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
+	check(MilitaryStructureSubsystem);
+	while (!SoldiersToDestroy.IsEmpty())
+	{
+		FMassEntityHandle EntityToDestroy;
+		bool bSuccess = SoldiersToDestroy.Dequeue(EntityToDestroy);
+		check(bSuccess);
+		Context.Defer().DestroyEntity(EntityToDestroy);
+		MilitaryStructureSubsystem->DestroyEntity(EntityToDestroy);
+	}
+
+	// Destroy player soldiers.
+	UMassPlayerSubsystem* PlayerSubsystem = UWorld::GetSubsystem<UMassPlayerSubsystem>(World);
+	check(PlayerSubsystem);
+	while (!PlayersToDestroy.IsEmpty())
+	{
+		FMassEntityHandle EntityToDestroy;
+		bool bSuccess = PlayersToDestroy.Dequeue(EntityToDestroy);
+		check(bSuccess);
+		AActor* OtherActor = PlayerSubsystem->GetActorForEntity(EntityToDestroy);
+		check(OtherActor);
+		ACommanderCharacter* Character = CastChecked<ACommanderCharacter>(OtherActor);
+		AsyncTask(ENamedThreads::GameThread, [Character]()
+			{
+				Character->DidDie();
+			});
+	}
+
+	// Draw debug lines.
+	while (!DebugLinesToDrawQueue.IsEmpty())
+	{
+		FHitResult HitResult;
+		bool bSuccess = DebugLinesToDrawQueue.Dequeue(HitResult);
+		check(bSuccess);
+
+		static const FLinearColor TraceColor = FLinearColor::Red;
+		static const FLinearColor TraceHitColor = FLinearColor::Green;
+
+		if (HitResult.bBlockingHit)
+		{
+			// Red up to the blocking hit, green thereafter
+			::DrawDebugLine(World, HitResult.TraceStart, HitResult.ImpactPoint, TraceColor.ToFColor(true), true);
+			::DrawDebugLine(World, HitResult.ImpactPoint, HitResult.TraceEnd, TraceHitColor.ToFColor(true), true);
+			::DrawDebugPoint(World, HitResult.ImpactPoint, 16.f, TraceColor.ToFColor(true), true);
+		}
+		else
+		{
+			// no hit means all red
+			::DrawDebugLine(World, HitResult.TraceStart, HitResult.TraceEnd, TraceColor.ToFColor(true), true);
+		}
+	}
+
+	// Draw debug capsules.
+	while (!DebugCapsulesToDrawQueue.IsEmpty())
+	{
+		FCapsule Capsule;
+		bool bSuccess = DebugCapsulesToDrawQueue.Dequeue(Capsule);
+		check(bSuccess);
+		DrawCapsule(Capsule, *World);
+	}
+		
+}
+
 void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor);
@@ -398,8 +479,10 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 	TQueue<FMassEntityHandle> ProjectilesToDestroy;
 	TQueue<FMassEntityHandle> SoldiersToDestroy;
 	TQueue<FMassEntityHandle> PlayersToDestroy;
+	TQueue<FHitResult> DebugLinesToDrawQueue;
+	TQueue<FCapsule> DebugCapsulesToDrawQueue;
 
-	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &ProjectilesToDestroy, &SoldiersToDestroy, &PlayersToDestroy](FMassExecutionContext& Context)
+	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &ProjectilesToDestroy, &SoldiersToDestroy, &PlayersToDestroy, &DebugLinesToDrawQueue, &DebugCapsulesToDrawQueue](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 
@@ -426,7 +509,7 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex], CloseEntities, PreviousLocationList[EntityIndex], DebugParameters.DrawLineTraces, ProjectilesToDestroy, SoldiersToDestroy, PlayersToDestroy);
+			ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex], CloseEntities, PreviousLocationList[EntityIndex], DebugParameters.DrawLineTraces, ProjectilesToDestroy, SoldiersToDestroy, PlayersToDestroy, DebugLinesToDrawQueue, DebugCapsulesToDrawQueue);
 			PreviousLocationList[EntityIndex].Location = LocationList[EntityIndex].GetTransform().GetLocation();
 		}
 	};
@@ -440,45 +523,5 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 		EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
 	}
 
-	{
-		QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_ProcessQueues);
-
-		// Destroy projectiles.
-		while (!ProjectilesToDestroy.IsEmpty())
-		{
-			FMassEntityHandle EntityToDestroy;
-			bool bSuccess = ProjectilesToDestroy.Dequeue(EntityToDestroy);
-			check(bSuccess);
-			Context.Defer().DestroyEntity(EntityToDestroy);
-		}
-
-		// Destroy AI soldiers.
-		UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(EntitySubsystem.GetWorld());
-		check(MilitaryStructureSubsystem);
-		while (!SoldiersToDestroy.IsEmpty())
-		{
-			FMassEntityHandle EntityToDestroy;
-			bool bSuccess = SoldiersToDestroy.Dequeue(EntityToDestroy);
-			check(bSuccess);
-			Context.Defer().DestroyEntity(EntityToDestroy);
-			MilitaryStructureSubsystem->DestroyEntity(EntityToDestroy);
-		}
-
-		// Destroy player soldiers.
-		UMassPlayerSubsystem* PlayerSubsystem = UWorld::GetSubsystem<UMassPlayerSubsystem>(EntitySubsystem.GetWorld());
-		check(PlayerSubsystem);
-		while (!PlayersToDestroy.IsEmpty())
-		{
-			FMassEntityHandle EntityToDestroy;
-			bool bSuccess = PlayersToDestroy.Dequeue(EntityToDestroy);
-			check(bSuccess);
-			AActor* OtherActor = PlayerSubsystem->GetActorForEntity(EntityToDestroy);
-			check(OtherActor);
-			ACommanderCharacter* Character = CastChecked<ACommanderCharacter>(OtherActor);
-			AsyncTask(ENamedThreads::GameThread, [Character]()
-			{
-				Character->DidDie();
-			});
-		}
-	}
+	ProcessQueues(ProjectilesToDestroy,  SoldiersToDestroy, PlayersToDestroy, DebugLinesToDrawQueue, DebugCapsulesToDrawQueue, EntitySubsystem.GetWorld(), Context);
 }

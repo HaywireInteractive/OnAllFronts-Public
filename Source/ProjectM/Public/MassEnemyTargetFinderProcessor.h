@@ -16,6 +16,9 @@ struct PROJECTM_API FTargetEntityFragment : public FMassFragment
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, Category = "")
 	FMassEntityHandle Entity;
+
+	UPROPERTY(EditAnywhere, Category = "")
+	float TargetMinCaliberForDamage;
 };
 
 USTRUCT()
@@ -70,6 +73,9 @@ protected:
 
 	UPROPERTY(Category = "", EditAnywhere)
 	FNeedsEnemyTargetSharedParameters SharedParameters;
+
+	UPROPERTY(Category = "", EditAnywhere)
+	float ProjectileCaliber = 5.f; // TODO: DRY this with the Caliber value in projectile data assets.
 };
 
 UCLASS()

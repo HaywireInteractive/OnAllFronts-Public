@@ -9,6 +9,7 @@
 #include "MassCommonFragments.h"
 #include "MassTrackTargetProcessor.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "MassProjectileDamageProcessor.h"
 
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
@@ -24,6 +25,9 @@ void UMassTeamMemberTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildC
 //----------------------------------------------------------------------//
 void UMassNeedsEnemyTargetTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
+	FTargetEntityFragment& TargetEntityTemplate = BuildContext.AddFragment_GetRef<FTargetEntityFragment>();
+	TargetEntityTemplate.TargetMinCaliberForDamage = ProjectileCaliber;
+
 	BuildContext.AddFragment<FTargetEntityFragment>();
 	BuildContext.AddTag<FMassNeedsEnemyTargetTag>();
 
@@ -176,6 +180,11 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 	return false;
 }
 
+bool CanEntityDamageTargetEntity(const float& TargetMinCaliberForDamage, const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment)
+{
+	return TargetEntityProjectileDamagableFragment && TargetMinCaliberForDamage >= TargetEntityProjectileDamagableFragment->MinCaliberForDamage;
+}
+
 bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace);
@@ -195,10 +204,17 @@ void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEnti
 	}
 
 	FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
+	
+	const bool& bCanEntityDamageTargetEntity = CanEntityDamageTargetEntity(TargetEntityFragment.TargetMinCaliberForDamage, TargetEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>());
+	if (!bCanEntityDamageTargetEntity)
+	{
+		return;
+	}
+
 	FTransformFragment& TargetTransformFragment = TargetEntityView.GetFragmentData<FTransformFragment>();
 
 	static const FVector ProjectileOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset());
-	bool bTargetEntityVisibleViaSphereTrace = IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), EntityLocation + ProjectileOffset, TargetTransformFragment.GetTransform().GetLocation() + ProjectileOffset);
+	const bool& bTargetEntityVisibleViaSphereTrace = IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), EntityLocation + ProjectileOffset, TargetTransformFragment.GetTransform().GetLocation() + ProjectileOffset);
 	if (!bTargetEntityVisibleViaSphereTrace)
 	{
 		return;
