@@ -22,6 +22,16 @@ struct FMassCommandableTag : public FMassTag
 	GENERATED_BODY()
 };
 
+// This fragment should not be shared across entities because movement speed may get affected by damage in the future.
+USTRUCT()
+struct PROJECTM_API FMassCommandableMovementSpeedFragment : public FMassFragment
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Category = "", EditAnywhere)
+	float MovementSpeed;
+};
+
 UCLASS(meta = (DisplayName = "Commandable"))
 class PROJECTM_API UMassCommandableTrait : public UMassEntityTraitBase
 {
@@ -29,6 +39,9 @@ class PROJECTM_API UMassCommandableTrait : public UMassEntityTraitBase
 
 protected:
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
+
+	UPROPERTY(Category = "", EditAnywhere)
+	float MovementSpeed = 500.f;
 };
 
 USTRUCT()

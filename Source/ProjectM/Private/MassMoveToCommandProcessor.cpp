@@ -19,6 +19,9 @@ void UMassCommandableTrait::BuildTemplate(FMassEntityTemplateBuildContext& Build
 	BuildContext.AddFragment<FMassStashedMoveTargetFragment>();
 	BuildContext.AddFragment<FMassNavMeshMoveFragment>();
 	BuildContext.AddTag<FMassCommandableTag>();
+
+	FMassCommandableMovementSpeedFragment& CommandableMovementSpeedTemplate = BuildContext.AddFragment_GetRef<FMassCommandableMovementSpeedFragment>();
+	CommandableMovementSpeedTemplate.MovementSpeed = MovementSpeed;
 }
 
 //----------------------------------------------------------------------//

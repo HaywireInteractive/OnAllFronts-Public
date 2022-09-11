@@ -21,10 +21,11 @@ void UMassNavMeshMoveProcessor::ConfigureQueries()
 	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FMassCommandableMovementSpeedFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FMassNeedsNavMeshMoveTag>(EMassFragmentPresence::All);
 }
 
-void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FVector& EntityLocation, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment)
+void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FVector& EntityLocation, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float& MovementSpeed)
 {
 	FVector& NextMovePoint = NavMeshMoveFragment.Path.Get()->GetPathPoints()[NavMeshMoveFragment.CurrentPathPointIndex].Location;
 
@@ -59,7 +60,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	float Distance = (EntityLocation - NextMovePoint).Size();
 	MoveTargetFragmentToModify.DistanceToGoal = Distance;
 	MoveTargetFragmentToModify.bOffBoundaries = true;
-	MoveTargetFragmentToModify.DesiredSpeed.Set(400.f); // TODO
+	MoveTargetFragmentToModify.DesiredSpeed.Set(MovementSpeed);
 	MoveTargetFragmentToModify.IntentAtGoal = EMassMovementAction::Stand;
 
 	if (bUseStashedMoveTarget) {
@@ -75,13 +76,14 @@ void UMassNavMeshMoveProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, F
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 		const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
+		const TConstArrayView<FMassCommandableMovementSpeedFragment> MovementSpeedList = Context.GetFragmentView<FMassCommandableMovementSpeedFragment>();
 		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
 		const TArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetMutableFragmentView<FMassStashedMoveTargetFragment>();
 		const TArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetMutableFragmentView<FMassNavMeshMoveFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
-			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform().GetLocation(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i]);
+			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform().GetLocation(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i], MovementSpeedList[i].MovementSpeed);
 		}
 	});
 }
