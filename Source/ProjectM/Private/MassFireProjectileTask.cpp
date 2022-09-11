@@ -72,6 +72,7 @@ bool FMassFireProjectileTask::Link(FStateTreeLinker& Linker)
 	Linker.LinkInstanceDataProperty(EntityConfigHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, EntityConfig));
 	Linker.LinkInstanceDataProperty(InitialVelocityHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, InitialVelocity));
 	Linker.LinkInstanceDataProperty(ForwardVectorMagnitudeHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, ForwardVectorMagnitude));
+	Linker.LinkInstanceDataProperty(IsFromSoldierHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, IsFromSoldier));
 
 	return true;
 }
@@ -90,7 +91,8 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 	const float InitialVelocityMagnitude = Context.GetInstanceData(InitialVelocityHandle);
 	const FVector InitialVelocity = StateTreeEntityCurrentForward * InitialVelocityMagnitude;
 	const float ForwardVectorMagnitude = Context.GetInstanceData(ForwardVectorMagnitudeHandle);
-	const FVector& ProjectileLocationOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset());
+	const bool IsFromSoldier = Context.GetInstanceData(IsFromSoldierHandle);
+	const FVector& ProjectileLocationOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(IsFromSoldier));
 
 	const FVector SpawnLocation = StateTreeEntityLocation + StateTreeEntityCurrentForward * ForwardVectorMagnitude + ProjectileLocationOffset;
 	const FQuat SpawnRotation = StateTreeEntityTransform.GetRotation();

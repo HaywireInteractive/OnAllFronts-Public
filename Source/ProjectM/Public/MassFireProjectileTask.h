@@ -25,6 +25,10 @@ struct PROJECTM_API FMassFireProjectileTaskInstanceData
 
 	UPROPERTY(EditAnywhere, Category = Parameter)
 	float ForwardVectorMagnitude = 100.f;
+
+	// TODO: DRY this somehow. Soldier/vehicle Entity's weapon should have info where it should spawn from instead of needing this.
+	UPROPERTY(EditAnywhere, Category = Parameter)
+	bool IsFromSoldier = true;
 };
 
 USTRUCT(meta = (DisplayName = "Fire Projectile"))
@@ -44,4 +48,5 @@ protected:
 	TStateTreeInstanceDataPropertyHandle<FMassEntityConfig> EntityConfigHandle;
 	TStateTreeInstanceDataPropertyHandle<float> InitialVelocityHandle;
 	TStateTreeInstanceDataPropertyHandle<float> ForwardVectorMagnitudeHandle;
+	TStateTreeInstanceDataPropertyHandle<bool> IsFromSoldierHandle;
 };
