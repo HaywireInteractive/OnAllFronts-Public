@@ -17,7 +17,7 @@ struct FMassProjectileWithDamageTag : public FMassTag
 };
 
 USTRUCT()
-struct FMassProjectileDamagableTag : public FMassTag
+struct FMassProjectileDamagableSoldierTag : public FMassTag
 {
 	GENERATED_BODY()
 };
@@ -95,6 +95,9 @@ class PROJECTM_API UMassProjectileDamagableTrait : public UMassEntityTraitBase
 
 protected:
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
+
+	UPROPERTY(Category = "", EditAnywhere)
+	bool bIsSoldier = true;
 };
 
 UCLASS()

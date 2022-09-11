@@ -43,7 +43,10 @@ void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildConte
 //----------------------------------------------------------------------//
 void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
-	BuildContext.AddTag<FMassProjectileDamagableTag>();
+	if (bIsSoldier)
+	{
+		BuildContext.AddTag<FMassProjectileDamagableSoldierTag>();
+	}
 }
 
 //----------------------------------------------------------------------//
@@ -266,7 +269,20 @@ void DrawCapsule(const FCapsule& Capsule, const UWorld& World, const FLinearColo
 	DrawDebugCapsule(&World, GetCapsuleCenter(Capsule), GetCapsuleHalfHeight(Capsule), Capsule.r, CapsuleRot, Color.ToFColor(true), true);
 }
 
-bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, FTransformFragment* OtherTransformFragment, const bool& DrawCapsules, const UWorld& World)
+FCapsule MakeCapsule(const FVector& Location, const FVector& CenterOffset, const FRotator& Rotator, const float& Radius, const float& Length)
+{
+	FCapsule Capsule;
+
+	FVector Center = Location + CenterOffset;
+
+	Capsule.a = Center + Rotator.RotateVector(FVector(0.f, 0.f, Length / 2.f));
+	Capsule.b = Center + Rotator.RotateVector(FVector(0.f, 0.f, -Length / 2.f));
+	Capsule.r = Radius;
+
+	return Capsule;
+}
+
+bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, FTransformFragment* OtherTransformFragment, const bool& DrawCapsules, const UWorld& World, const bool& bIsOtherEntitySoldier)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_DidCollideWithEntity);
 	if (!OtherTransformFragment)
@@ -282,11 +298,18 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 	ProjectileCapsule.r = Radius;
 
 	FCapsule OtherEntityCapsule;
-	OtherEntityCapsule.a = OtherEntityLocation;
-	static const float EntityHeight = 200.0f; // TODO: don't hard-code; add new fragment for this?
-	static const float EntityRadius = 40.0f; // TODO: don't hard-code; read from other entity's AgentRadius?
-	OtherEntityCapsule.b = OtherEntityLocation + FVector(0.f, 0.f, EntityHeight);
-	OtherEntityCapsule.r = EntityRadius;
+	if (bIsOtherEntitySoldier)
+	{
+		OtherEntityCapsule.a = OtherEntityLocation;
+		static const float EntityHeight = 200.0f; // TODO: don't hard-code; add new fragment for this?
+		static const float EntityRadius = 40.0f; // TODO: don't hard-code; read from other entity's AgentRadius?
+		OtherEntityCapsule.b = OtherEntityLocation + FVector(0.f, 0.f, EntityHeight);
+		OtherEntityCapsule.r = EntityRadius;
+	}
+	else // Tank
+	{
+		OtherEntityCapsule = MakeCapsule(OtherEntityLocation, FVector(0.f, 0.f, 150.f), FRotator(90.f, 0.f, 0.f), 170.f, 650.f);
+	}
 
 	if (DrawCapsules)
 	{
@@ -315,8 +338,9 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 
 	FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity);
 	FTransformFragment* OtherTransformFragment = OtherEntityView.GetFragmentDataPtr<FTransformFragment>();
+	const bool& bIsOtherEntitySoldier = OtherEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
 
-	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *EntitySubsystem.GetWorld()))
+	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *EntitySubsystem.GetWorld(), bIsOtherEntitySoldier))
 	{
 		return;
 	}
