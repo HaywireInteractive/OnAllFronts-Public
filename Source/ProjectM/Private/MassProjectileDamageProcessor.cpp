@@ -277,14 +277,15 @@ void DrawCapsule(const FCapsule& Capsule, const UWorld& World, const FLinearColo
 	DrawDebugCapsule(&World, GetCapsuleCenter(Capsule), GetCapsuleHalfHeight(Capsule), Capsule.r, CapsuleRot, Color.ToFColor(true), true);
 }
 
-FCapsule MakeCapsule(const FVector& Location, const FVector& CenterOffset, const FRotator& Rotator, const float& Radius, const float& Length)
+FCapsule MakeCapsule(const FTransform& Transform, const FVector& CenterOffset, const float& Radius, const float& Length)
 {
 	FCapsule Capsule;
 
-	FVector Center = Location + CenterOffset;
+	FVector Center = Transform.GetLocation() + CenterOffset;
+	FVector Forward = Transform.GetRotation().GetForwardVector().GetSafeNormal();
 
-	Capsule.a = Center + Rotator.RotateVector(FVector(0.f, 0.f, Length / 2.f));
-	Capsule.b = Center + Rotator.RotateVector(FVector(0.f, 0.f, -Length / 2.f));
+	Capsule.a = Center + Forward * (Length / 2.f);
+	Capsule.b = Center + Forward * (-Length / 2.f);
 	Capsule.r = Radius;
 
 	return Capsule;
@@ -298,7 +299,8 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 		return false;
 	}
 
-	FVector OtherEntityLocation = OtherTransformFragment->GetTransform().GetLocation();
+	FTransform OtherEntityTransform = OtherTransformFragment->GetTransform();
+	FVector OtherEntityLocation = OtherEntityTransform.GetLocation();
 
 	FCapsule ProjectileCapsule;
 	ProjectileCapsule.a = StartLocation;
@@ -316,7 +318,7 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 	}
 	else // Tank
 	{
-		OtherEntityCapsule = MakeCapsule(OtherEntityLocation, FVector(0.f, 0.f, 150.f), FRotator(90.f, 0.f, 0.f), 170.f, 650.f);
+		OtherEntityCapsule = MakeCapsule(OtherEntityTransform, FVector(0.f, 0.f, 150.f), 170.f, 800.f);
 	}
 
 	if (DrawCapsules)
@@ -332,6 +334,10 @@ bool CanProjectileDamageEntity(const FProjectileDamagableFragment* ProjectileDam
 {
 	return ProjectileDamagableFragment && ProjectileCaliber >= ProjectileDamagableFragment->MinCaliberForDamage;
 }
+
+bool UMassProjectileDamageProcessor_SkipDealingDamage = false;
+FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_SkipDealingDamage(TEXT("pm.UMassProjectileDamageProcessor_SkipDealingDamage"), UMassProjectileDamageProcessor_SkipDealingDamage, TEXT("UMassProjectileDamageProcessor: Skip dealing damage"));
+
 
 void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
 {
@@ -368,6 +374,11 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 
 	const bool& bCanProjectileDamageOtherEntity = CanProjectileDamageEntity(OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>(), ProjectileDamageFragment.Caliber);
 	if (!bCanProjectileDamageOtherEntity)
+	{
+		return;
+	}
+
+	if (UMassProjectileDamageProcessor_SkipDealingDamage)
 	{
 		return;
 	}
