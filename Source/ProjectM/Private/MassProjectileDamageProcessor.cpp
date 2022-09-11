@@ -17,6 +17,7 @@ void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildConte
 
 	FProjectileDamageFragment& ProjectileDamageTemplate = BuildContext.AddFragment_GetRef<FProjectileDamageFragment>();
 	ProjectileDamageTemplate.DamagePerHit = DamagePerHit;
+	ProjectileDamageTemplate.Caliber = Caliber;
 
 	BuildContext.AddTag<FMassProjectileWithDamageTag>();
 
@@ -47,6 +48,9 @@ void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContex
 	{
 		BuildContext.AddTag<FMassProjectileDamagableSoldierTag>();
 	}
+
+	FProjectileDamagableFragment& ProjectileDamagableTemplate = BuildContext.AddFragment_GetRef<FProjectileDamagableFragment>();
+	ProjectileDamagableTemplate.MinCaliberForDamage = MinCaliberForDamage;
 }
 
 //----------------------------------------------------------------------//
@@ -320,7 +324,12 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 	return TestCapsuleCapsule(ProjectileCapsule, OtherEntityCapsule);
 }
 
-void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const int16 DamagePerHit, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy)
+bool CanProjectileDamageEntity(const FProjectileDamagableFragment* ProjectileDamagableFragment, const float& ProjectileCaliber)
+{
+	return ProjectileDamagableFragment && ProjectileCaliber >= ProjectileDamagableFragment->MinCaliberForDamage;
+}
+
+void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy)
 {
 	// If collide via line trace, we hit the environment, so destroy projectile.
 	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
@@ -353,7 +362,13 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 		return;
 	}
 
-	OtherHealthFragment->Value -= DamagePerHit;
+	const bool& bCanProjectileDamageOtherEntity = CanProjectileDamageEntity(OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>(), ProjectileDamageFragment.Caliber);
+	if (!bCanProjectileDamageOtherEntity)
+	{
+		return;
+	}
+
+	OtherHealthFragment->Value -= ProjectileDamageFragment.DamagePerHit;
 
 	// Handle health reaching 0.
 	if (OtherHealthFragment->Value <= 0)
@@ -411,7 +426,7 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex].DamagePerHit, CloseEntities, PreviousLocationList[EntityIndex], DebugParameters.DrawLineTraces, ProjectilesToDestroy, SoldiersToDestroy, PlayersToDestroy);
+			ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex], CloseEntities, PreviousLocationList[EntityIndex], DebugParameters.DrawLineTraces, ProjectilesToDestroy, SoldiersToDestroy, PlayersToDestroy);
 			PreviousLocationList[EntityIndex].Location = LocationList[EntityIndex].GetTransform().GetLocation();
 		}
 	};

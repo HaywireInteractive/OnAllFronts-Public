@@ -42,8 +42,21 @@ USTRUCT()
 struct PROJECTM_API FProjectileDamageFragment : public FMassFragment
 {
 	GENERATED_BODY()
+
 	UPROPERTY(EditAnywhere, Category = "")
 	int16 DamagePerHit = 10;
+	
+	UPROPERTY(EditAnywhere, Category = "")
+	float Caliber;
+};
+
+USTRUCT()
+struct PROJECTM_API FProjectileDamagableFragment : public FMassFragment
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = "")
+	float MinCaliberForDamage;
 };
 
 USTRUCT()
@@ -75,6 +88,9 @@ protected:
 	UPROPERTY(Category = "Damage", EditAnywhere)
 	int16 DamagePerHit = 10;
 
+	UPROPERTY(Category = "Damage", EditAnywhere)
+	float Caliber = 5.0f;
+
 	FMassMovementParameters Movement;
 
 	UPROPERTY(Category = "Movement", EditAnywhere)
@@ -98,6 +114,9 @@ protected:
 
 	UPROPERTY(Category = "", EditAnywhere)
 	bool bIsSoldier = true;
+
+	UPROPERTY(Category = "", EditAnywhere)
+	float MinCaliberForDamage = 5.0f;
 };
 
 UCLASS()
