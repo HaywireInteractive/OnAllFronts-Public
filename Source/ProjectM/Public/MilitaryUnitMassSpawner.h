@@ -35,4 +35,7 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	bool bIsTeam1;
+
+	UPROPERTY(EditAnywhere)
+	bool bSpawnVehiclesOnly;
 };

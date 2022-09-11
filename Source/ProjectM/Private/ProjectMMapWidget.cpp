@@ -161,6 +161,12 @@ void UProjectMMapWidget::UpdateMapButtons()
   {
     (bIsOnTeam1 ? CachedTeam1AliveSoldierCount : CachedTeam2AliveSoldierCount)++;
     UMilitaryUnit* Unit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+
+    if (!Unit)
+    {
+      UE_LOG(LogTemp, Warning, TEXT("UProjectMMapWidget: Could not find UMilitaryUnit for entity, not updating button"));
+      return;
+    }
     UButton* Button = MilitaryUnitToButtonMap[Unit];
     UpdateButton(Button, WorldPositionToMapPosition(EntityLocation), Unit, bIsOnTeam1, bIsPlayer);
     UpdatedButtons.Add(Button);

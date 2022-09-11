@@ -56,15 +56,6 @@ TPair<int32, int32> RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* P
 
 	TPair<int32, int32> Result = TPair<int32, int32>(0, 0);
 
-	if (ArmorSubUnitCount > 0)
-	{
-		UMilitaryUnit* RootArmorUnit = NewObject<UMilitaryUnit>();
-		TPair<int32, int32> UnitCounts = RecursivelyCreateArmorUnits(RootArmorUnit, Unit, Depth + 1);
-		Result.Key += UnitCounts.Key;
-		Result.Value += UnitCounts.Value;
-		Unit->SubUnits.Add(RootArmorUnit);
-	}
-
 	if (SubUnitCount == 0)
 	{
 		Unit->bIsSoldier = true;
@@ -82,10 +73,21 @@ TPair<int32, int32> RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* P
 	Unit->SubUnits.Add(Commander);
 	Result.Key += 1;
 
+	uint8 IndexOffset = 0;
+	if (ArmorSubUnitCount > 0)
+	{
+		IndexOffset++;
+		UMilitaryUnit* RootArmorUnit = NewObject<UMilitaryUnit>();
+		TPair<int32, int32> UnitCounts = RecursivelyCreateArmorUnits(RootArmorUnit, Unit, Depth + 1);
+		Result.Key += UnitCounts.Key;
+		Result.Value += UnitCounts.Value;
+		Unit->SubUnits.Add(RootArmorUnit);
+	}
+
 	for (uint8 i = 0; i < SubUnitCount; i++)
 	{
 		UMilitaryUnit* SubUnit = NewObject<UMilitaryUnit>();
-		TPair<int32, int32> UnitCounts = RecursivelyCreateUnits(SubUnit, Unit, Depth + 1, i + 1);
+		TPair<int32, int32> UnitCounts = RecursivelyCreateUnits(SubUnit, Unit, Depth + 1, IndexOffset + i + 1);
 		Result.Key += UnitCounts.Key;
 		Result.Value += UnitCounts.Value;
 		Unit->SubUnits.Add(SubUnit);

@@ -117,7 +117,7 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 		{
 			if (Generator.GeneratorInstance)
 			{
-				const int32 SpawnCount = Index == 0 ? UnitCounts.Key : UnitCounts.Value;
+				const int32 SpawnCount = Index == 0 ? (bSpawnVehiclesOnly ? 0 : UnitCounts.Key) : UnitCounts.Value;
 				const int32 OtherIndex = Index == 0 ? 1 : 0;
 				EntityTypes[Index].Proportion = 1.f;
 				EntityTypes[OtherIndex].Proportion = 0.f;
@@ -143,13 +143,7 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 void AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits()
 {
 	// TODO: This is a bit hacky, refactor.
-
-	// If only soldiers were spawned.
-	if (AllSpawnedEntities.Num() < 2)
-	{
-		AllSpawnedEntitiesSoldierIndex = 0;
-	}
-	else if (const UMassEntityConfigAsset* SoldierEntityConfig = EntityTypes[0].EntityConfig.LoadSynchronous())
+	if (const UMassEntityConfigAsset* SoldierEntityConfig = EntityTypes[0].EntityConfig.LoadSynchronous())
 	{
 		const FMassEntityTemplate& SoldierEntityTemplate = SoldierEntityConfig->GetConfig().GetEntityTemplateChecked(*this, *SoldierEntityConfig);
 		if (AllSpawnedEntities[0].TemplateID == SoldierEntityTemplate.GetTemplateID())
