@@ -29,6 +29,12 @@ struct PROJECTM_API FMassFireProjectileTaskInstanceData
 	// TODO: DRY this somehow. Soldier/vehicle Entity's weapon should have info where it should spawn from instead of needing this.
 	UPROPERTY(EditAnywhere, Category = Parameter)
 	bool IsFromSoldier = true;
+
+	UPROPERTY(EditAnywhere, Category = Parameter)
+	float WeaponCoolDownSeconds = 1.f;
+
+	UPROPERTY(VisibleAnywhere, Category = Parameter)
+	float LastWeaponFireTimeSeconds = -1.f;
 };
 
 USTRUCT(meta = (DisplayName = "Fire Projectile"))
@@ -49,4 +55,6 @@ protected:
 	TStateTreeInstanceDataPropertyHandle<float> InitialVelocityHandle;
 	TStateTreeInstanceDataPropertyHandle<float> ForwardVectorMagnitudeHandle;
 	TStateTreeInstanceDataPropertyHandle<bool> IsFromSoldierHandle;
+	TStateTreeInstanceDataPropertyHandle<float> WeaponCoolDownSecondsHandle;
+	TStateTreeInstanceDataPropertyHandle<float> LastWeaponFireTimeSecondsHandle;
 };

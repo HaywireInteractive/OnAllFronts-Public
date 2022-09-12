@@ -73,14 +73,28 @@ bool FMassFireProjectileTask::Link(FStateTreeLinker& Linker)
 	Linker.LinkInstanceDataProperty(InitialVelocityHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, InitialVelocity));
 	Linker.LinkInstanceDataProperty(ForwardVectorMagnitudeHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, ForwardVectorMagnitude));
 	Linker.LinkInstanceDataProperty(IsFromSoldierHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, IsFromSoldier));
+	Linker.LinkInstanceDataProperty(WeaponCoolDownSecondsHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, WeaponCoolDownSeconds));
+	Linker.LinkInstanceDataProperty(LastWeaponFireTimeSecondsHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, LastWeaponFireTimeSeconds));
 
 	return true;
 }
 
 EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionContext& Context, const EStateTreeStateChangeType ChangeType, const FStateTreeTransitionResult& Transition) const
 {
-	const UWorld* World = Context.GetWorld();
 	const FMassStateTreeExecutionContext& MassContext = static_cast<FMassStateTreeExecutionContext&>(Context);
+	UMassSignalSubsystem& MassSignalSubsystem = Context.GetExternalData(MassSignalSubsystemHandle);
+	const UWorld* World = Context.GetWorld();
+
+	const float& WorldRealTimeSeconds = World->GetRealTimeSeconds();
+	const float& WeaponCoolDownSeconds = Context.GetInstanceData(WeaponCoolDownSecondsHandle);
+	float& LastWeaponFireTimeSeconds = Context.GetInstanceData(LastWeaponFireTimeSecondsHandle);
+
+	if (LastWeaponFireTimeSeconds > 0.f && WorldRealTimeSeconds - LastWeaponFireTimeSeconds < WeaponCoolDownSeconds)
+	{
+		MassSignalSubsystem.DelaySignalEntity(UE::Mass::Signals::NewStateTreeTaskRequired, MassContext.GetEntity(), 1.0f); // TODO: needed?
+		return EStateTreeRunStatus::Running;
+	}
+
 
 	const FTransformFragment& StateTreeEntityTransformFragment = Context.GetExternalData(EntityTransformHandle);
 	const FTransform& StateTreeEntityTransform = StateTreeEntityTransformFragment.GetTransform();
@@ -102,9 +116,9 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 			SpawnProjectile(World, SpawnLocation, SpawnRotation, InitialVelocity, EntityConfig);
 	});
 
-	UMassSignalSubsystem& MassSignalSubsystem = Context.GetExternalData(MassSignalSubsystemHandle);
 	MassSignalSubsystem.DelaySignalEntity(UE::Mass::Signals::NewStateTreeTaskRequired, MassContext.GetEntity(), 1.0f); // TODO: needed?
 
+	LastWeaponFireTimeSeconds = WorldRealTimeSeconds;
 	return EStateTreeRunStatus::Running;
 }
 
