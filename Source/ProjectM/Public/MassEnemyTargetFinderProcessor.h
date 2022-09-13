@@ -61,6 +61,9 @@ struct PROJECTM_API FNeedsEnemyTargetSharedParameters : public FMassSharedFragme
 
 	UPROPERTY(Category = "", EditAnywhere)
 	int32 ParallelJobCount = 1; // This is not as useful anymore now that we use ParallelForEachEntityChunk since that parallelizes better.
+
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	bool DrawSearchAreas = false;
 };
 
 UCLASS(meta = (DisplayName = "NeedsEnemyTarget"))

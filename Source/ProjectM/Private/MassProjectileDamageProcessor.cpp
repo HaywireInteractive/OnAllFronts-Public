@@ -438,9 +438,9 @@ void ProcessQueues(TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMass
 		check(OtherActor);
 		ACommanderCharacter* Character = CastChecked<ACommanderCharacter>(OtherActor);
 		AsyncTask(ENamedThreads::GameThread, [Character]()
-			{
-				Character->DidDie();
-			});
+		{
+			Character->DidDie();
+		});
 	}
 
 	// Draw debug lines.

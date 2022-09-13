@@ -80,11 +80,23 @@ static const FBox BoxForPhase(const uint8& FinderPhase, const float& SearchRadiu
 
 // TODO: Find out how to not duplicate from MassProjectileDamageProcessor.cpp. Right now only difference is number in template type for TFixedAllocator.
 static void FindCloseObstacles(const FVector& Center, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
-	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults, const uint8& FinderPhase)
+	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults, const uint8& FinderPhase, const bool& DrawSearchAreas, const UWorld* World)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_FindCloseObstacles);
 	OutCloseEntities.Reset();
 	const FBox QueryBox = BoxForPhase(FinderPhase, SearchRadius, Center);
+
+	if (DrawSearchAreas)
+	{
+		AsyncTask(ENamedThreads::GameThread, [QueryBox, World, FinderPhase]()
+		{
+			const FVector Center = (QueryBox.Max - QueryBox.Min) / 2.f + QueryBox.Min;
+			FVector Extent = QueryBox.Max - Center;
+			Extent.Z = 1000.f;
+			DrawDebugBox(World, Center, Extent, FColor::Green, false, 10.f);
+			DrawDebugString(World, Center, FString::FromInt(FinderPhase), nullptr, FColor::Green, 10.f);
+		});
+	}
 
 	struct FSortingCell
 	{
@@ -138,12 +150,12 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 	}
 }
 
-bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1, const uint8& FinderPhase)
+bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestEnemy);
 
 	static const float SearchRadius = 5000.f; // TODO: don't hard-code
-	FindCloseObstacles(Location, SearchRadius, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase);
+	FindCloseObstacles(Location, SearchRadius, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld());
 
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 	{
@@ -194,11 +206,11 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	return !bFoundBlockingHit;
 }
 
-void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context)
+void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas)
 {
 	const FVector& EntityLocation = Location.GetTransform().GetLocation();
 	FMassEntityHandle TargetEntity;
-	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityLocation, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase);
+	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityLocation, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas);
 	if (!bFoundTarget) {
 		return;
 	}
@@ -265,17 +277,17 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs; // ceil(NumEntities / NumJobs)
 
 		ParallelFor(NumJobs, [&](int32 JobIndex)
-			{
-				QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ParallelFor);
-				TArray<FMassNavigationObstacleItem, TFixedAllocator<10>> CloseEntities;
+		{
+			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ParallelFor);
+			TArray<FMassNavigationObstacleItem, TFixedAllocator<10>> CloseEntities;
 
-				const int32 StartIndex = JobIndex * CountPerJob;
-				const int32 EndIndexExclusive = StartIndex + CountPerJob;
-				for (int32 EntityIndex = StartIndex; (EntityIndex < NumEntities) && (EntityIndex < EndIndexExclusive); ++EntityIndex)
-				{
-					ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase, Context);
-				}
-			});
+			const int32 StartIndex = JobIndex * CountPerJob;
+			const int32 EndIndexExclusive = StartIndex + CountPerJob;
+			for (int32 EntityIndex = StartIndex; (EntityIndex < NumEntities) && (EntityIndex < EndIndexExclusive); ++EntityIndex)
+			{
+				ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase, Context, SharedParameters.DrawSearchAreas);
+			}
+		});
 	};
 
 	if (UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk)
