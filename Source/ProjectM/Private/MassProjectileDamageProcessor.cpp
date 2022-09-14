@@ -291,6 +291,9 @@ FCapsule MakeCapsule(const FTransform& Transform, const FVector& CenterOffset, c
 	return Capsule;
 }
 
+bool UMassProjectileDamageProcessor_DrawCapsules = false;
+FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_DrawCapsules(TEXT("pm.UMassProjectileDamageProcessor_DrawCapsules"), UMassProjectileDamageProcessor_DrawCapsules, TEXT("UMassProjectileDamageProcessor: Debug draw capsules used for collisions detection"));
+
 bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, FTransformFragment* OtherTransformFragment, const bool& DrawCapsules, const UWorld& World, const bool& bIsOtherEntitySoldier, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_DidCollideWithEntity);
@@ -321,7 +324,7 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 		OtherEntityCapsule = MakeCapsule(OtherEntityTransform, FVector(0.f, 0.f, 150.f), 170.f, 800.f);
 	}
 
-	if (DrawCapsules)
+	if (DrawCapsules || UMassProjectileDamageProcessor_DrawCapsules)
 	{
 		DebugCapsulesToDrawQueue.Enqueue(ProjectileCapsule);
 		DebugCapsulesToDrawQueue.Enqueue(OtherEntityCapsule);
@@ -337,7 +340,6 @@ bool CanProjectileDamageEntity(const FProjectileDamagableFragment* ProjectileDam
 
 bool UMassProjectileDamageProcessor_SkipDealingDamage = false;
 FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_SkipDealingDamage(TEXT("pm.UMassProjectileDamageProcessor_SkipDealingDamage"), UMassProjectileDamageProcessor_SkipDealingDamage, TEXT("UMassProjectileDamageProcessor: Skip dealing damage"));
-
 
 void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
 {
