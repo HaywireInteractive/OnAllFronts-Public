@@ -27,6 +27,7 @@ void UMassNeedsEnemyTargetTrait::BuildTemplate(FMassEntityTemplateBuildContext& 
 {
 	FTargetEntityFragment& TargetEntityTemplate = BuildContext.AddFragment_GetRef<FTargetEntityFragment>();
 	TargetEntityTemplate.TargetMinCaliberForDamage = ProjectileCaliber;
+	TargetEntityTemplate.SearchBreadth = SearchBreadth;
 
 	BuildContext.AddFragment<FTargetEntityFragment>();
 	BuildContext.AddTag<FMassNeedsEnemyTargetTag>();
@@ -65,28 +66,35 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 static const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt = 8;
 static const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCount = UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt * UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
 
-static const FBox BoxForPhase(const uint8& FinderPhase, const float& SearchRadius, const FVector& Center)
+static const FBox BoxForPhase(const uint8& FinderPhase, const float& SearchRadius, const FTransform& SearchCenterTransform, const uint8& SearchBreadth)
 {
-	const uint8 BoxXSegment = FinderPhase % UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
-	const uint8 BoxYSegment = FinderPhase / UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
+	const uint8 BoxXSegment = FinderPhase / (UMassEnemyTargetFinderProcessor_FinderPhaseCount / SearchBreadth);
+	const uint8 BoxYSegment = FinderPhase % (UMassEnemyTargetFinderProcessor_FinderPhaseCount / SearchBreadth);
 	const float SegmentSize = SearchRadius / (UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt / 2.0f);
+	const float XWidth = SearchBreadth * SegmentSize;
 
-	const FVector BoxBottomLeft = Center - FVector(SearchRadius, SearchRadius, 0.f);
+	const FVector& Center = SearchCenterTransform.GetLocation();
+	const FVector& RotationForwardVector = SearchCenterTransform.GetRotation().GetForwardVector();
+	const FVector& RotationRightVector = SearchCenterTransform.GetRotation().GetRightVector();
+	const FVector BoxBottomLeft = Center - RotationRightVector * (XWidth / 2.f);
 	
-	const FVector PhaseBoxBottomLeft = BoxBottomLeft + FVector(BoxXSegment * SegmentSize, BoxYSegment * SegmentSize, 0.f);
-	const FVector PhaseBoxTopRight = PhaseBoxBottomLeft + FVector(SegmentSize, SegmentSize, 0.f);
+	const FVector PhaseBoxBottomLeft = BoxBottomLeft + RotationRightVector * SegmentSize * BoxXSegment + RotationForwardVector * SegmentSize * BoxYSegment;
+	const FVector PhaseBoxTopRight = PhaseBoxBottomLeft + RotationRightVector * SegmentSize + RotationForwardVector * SegmentSize;
 	return FBox(PhaseBoxBottomLeft, PhaseBoxTopRight);
 }
 
+bool UMassEnemyTargetFinderProcessor_DrawSearchAreas = false;
+FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_DrawSearchAreas(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawSearchAreas"), UMassEnemyTargetFinderProcessor_DrawSearchAreas, TEXT("UMassEnemyTargetFinderProcessor: debug draw search areas"));
+
 // TODO: Find out how to not duplicate from MassProjectileDamageProcessor.cpp. Right now only difference is number in template type for TFixedAllocator.
-static void FindCloseObstacles(const FVector& Center, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
-	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults, const uint8& FinderPhase, const bool& DrawSearchAreas, const UWorld* World)
+static void FindCloseObstacles(const FTransform& SearchCenterTransform, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
+	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults, const uint8& FinderPhase, const bool& DrawSearchAreas, const UWorld* World, const uint8& SearchBreadth)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_FindCloseObstacles);
 	OutCloseEntities.Reset();
-	const FBox QueryBox = BoxForPhase(FinderPhase, SearchRadius, Center);
+	const FBox QueryBox = BoxForPhase(FinderPhase, SearchRadius, SearchCenterTransform, SearchBreadth);
 
-	if (DrawSearchAreas)
+	if (DrawSearchAreas || UMassEnemyTargetFinderProcessor_DrawSearchAreas)
 	{
 		AsyncTask(ENamedThreads::GameThread, [QueryBox, World, FinderPhase]()
 		{
@@ -150,12 +158,12 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 	}
 }
 
-bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas)
+bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestEnemy);
 
 	static const float SearchRadius = 5000.f; // TODO: don't hard-code
-	FindCloseObstacles(Location, SearchRadius, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld());
+	FindCloseObstacles(EntityTransform, SearchRadius, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld(), SearchBreadth);
 
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 	{
@@ -208,9 +216,10 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 
 void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas)
 {
-	const FVector& EntityLocation = Location.GetTransform().GetLocation();
+	const FTransform& EntityTransform = Location.GetTransform();
+	const FVector& EntityLocation = EntityTransform.GetLocation();
 	FMassEntityHandle TargetEntity;
-	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityLocation, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas);
+	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, TargetEntityFragment.SearchBreadth);
 	if (!bFoundTarget) {
 		return;
 	}

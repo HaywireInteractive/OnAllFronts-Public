@@ -19,6 +19,10 @@ struct PROJECTM_API FTargetEntityFragment : public FMassFragment
 
 	UPROPERTY(EditAnywhere, Category = "")
 	float TargetMinCaliberForDamage;
+
+	/** The number of cells to search across from where target is looking. The depth is determined by 64 / SearchBreadth so make sure this value is divisible into 64. */
+	UPROPERTY(Category = "", EditAnywhere)
+	uint8 SearchBreadth = 8;
 };
 
 USTRUCT()
@@ -79,6 +83,10 @@ protected:
 
 	UPROPERTY(Category = "", EditAnywhere)
 	float ProjectileCaliber = 5.f; // TODO: DRY this with the Caliber value in projectile data assets.
+
+	/** The number of cells to search across from where target is looking. The depth is determined by 64 / SearchBreadth so make sure this value is divisible into 64. */
+	UPROPERTY(Category = "", EditAnywhere, meta = (ClampMin = 1, ClampMax = 64))
+	uint8 SearchBreadth = 8;
 };
 
 UCLASS()
