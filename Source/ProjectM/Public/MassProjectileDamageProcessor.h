@@ -48,6 +48,9 @@ struct PROJECTM_API FProjectileDamageFragment : public FMassFragment
 	
 	UPROPERTY(EditAnywhere, Category = "")
 	float Caliber;
+
+	UPROPERTY(EditAnywhere, Category = "")
+	int16 ExplosionEntityConfigIndex = -1;
 };
 
 USTRUCT()
@@ -99,6 +102,9 @@ protected:
 	/** Minimum Z value for projectiles at which they get destroyed */
 	UPROPERTY(Category = "Movement", EditAnywhere)
 	FMinZParameters MinZ;
+
+	UPROPERTY(Category = "Effects", EditAnywhere)
+	UMassEntityConfigAsset* ExplosionEntityConfig = nullptr;
 
 	UPROPERTY(Category = "Debug", EditAnywhere)
 	FDebugParameters DebugParameters;

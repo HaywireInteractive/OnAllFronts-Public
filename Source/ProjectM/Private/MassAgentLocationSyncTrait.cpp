@@ -76,9 +76,9 @@ void ULocationToActorTranslator::Execute(UMassEntitySubsystem& EntitySubsystem, 
 			{
 				FMassActorFragment& ActorInfo = ActorList[EntityIdx];
 				const FTransformFragment& TransformFragment = TransformList[EntityIdx];
-				AActor* actor = ActorInfo.GetMutable();
-				if (actor) {
-					actor->SetActorLocation(TransformFragment.GetTransform().GetLocation());
+				AActor* Actor = ActorInfo.GetMutable();
+				if (Actor) {
+					Actor->SetActorLocation(TransformFragment.GetTransform().GetLocation());
 				}
 			}
 		});

@@ -8,6 +8,12 @@
 
 https://youtu.be/3JT4XytxOiQ
 
+Tanks...with a lot of bugs:
+
+[![Tanks...with a lot of bugs](https://img.youtube.com/vi/DS4ORM3VnDk/0.jpg)](https://www.youtube.com/watch?v=DS4ORM3VnDk)
+
+https://youtu.be/DS4ORM3VnDk
+
 ## What is this?
 
 ProjectM is a proof of concept [MilSim](https://en.wikipedia.org/wiki/MilSim) FPS / RTS game developed with [Unreal Engine 5](https://www.unrealengine.com/en-US/unreal-engine-5), leveraging the new [MassEntity](https://docs.unrealengine.com/5.0/en-US/overview-of-mass-entity-in-unreal-engine/) ([ECS](https://en.wikipedia.org/wiki/Entity_component_system)) framework to have a very large number of entities not seen in traditional FPS games (tens or hundreds of thousands). Think [Squad](https://joinsquad.com/) meets [Foxhole](https://www.foxholegame.com/) meets [PlanetSide 2](https://www.planetside2.com/home) mixed in with massive number of AI controlled soldiers.
@@ -67,6 +73,8 @@ The ultimate goal is to recreate a war at a scale such as in this video (with th
 These ideas below would be explored in one of the phases above.
 
 1. Railroad system for logistics. Railroads can be damaged and repaired.
+1. Oil pipelines for transfering oil to vehicles quicker.
+1. Base building (FOBs and COPs)
 1. Pontoon bridges which can be built for river crossings. Bridges can be destroyed.
 1. Building destruction
 1. Naval warfare

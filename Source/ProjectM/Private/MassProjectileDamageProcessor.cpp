@@ -7,6 +7,7 @@
 #include "MassPlayerSubsystem.h"
 #include "Character/CommanderCharacter.h"
 #include "MilitaryStructureSubsystem.h"
+#include <MassVisualEffectsSubsystem.h>
 
 //----------------------------------------------------------------------//
 //  UMassProjectileWithDamageTrait
@@ -15,9 +16,15 @@ void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildConte
 {
 	BuildContext.AddFragment<FMassPreviousLocationFragment>();
 
-	FProjectileDamageFragment& ProjectileDamageTemplate = BuildContext.AddFragment_GetRef<FProjectileDamageFragment>();
-	ProjectileDamageTemplate.DamagePerHit = DamagePerHit;
-	ProjectileDamageTemplate.Caliber = Caliber;
+	FProjectileDamageFragment& ProjectileDamageFragment = BuildContext.AddFragment_GetRef<FProjectileDamageFragment>();
+	ProjectileDamageFragment.DamagePerHit = DamagePerHit;
+	ProjectileDamageFragment.Caliber = Caliber;
+
+	if (ExplosionEntityConfig)
+	{
+		UMassVisualEffectsSubsystem* MassVisualEffectsSubsystem = UWorld::GetSubsystem<UMassVisualEffectsSubsystem>(&World);
+		ProjectileDamageFragment.ExplosionEntityConfigIndex = MassVisualEffectsSubsystem->FindOrAddEntityConfig(ExplosionEntityConfig);
+	}
 
 	BuildContext.AddTag<FMassProjectileWithDamageTag>();
 
@@ -341,13 +348,32 @@ bool CanProjectileDamageEntity(const FProjectileDamagableFragment* ProjectileDam
 bool UMassProjectileDamageProcessor_SkipDealingDamage = false;
 FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_SkipDealingDamage(TEXT("pm.UMassProjectileDamageProcessor_SkipDealingDamage"), UMassProjectileDamageProcessor_SkipDealingDamage, TEXT("UMassProjectileDamageProcessor: Skip dealing damage"));
 
+void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, const FMassEntityHandle Entity, UWorld* World, const FProjectileDamageFragment& ProjectileDamageFragment, const FVector& Location)
+{
+	ProjectilesToDestroy.Enqueue(Entity);
+
+	if (ProjectileDamageFragment.ExplosionEntityConfigIndex >= 0)
+	{
+		UMassVisualEffectsSubsystem* MassVisualEffectsSubsystem = UWorld::GetSubsystem<UMassVisualEffectsSubsystem>(World);
+		check(MassVisualEffectsSubsystem);
+
+		// Must be done async because we can't spawn Mass entities in the middle of a Mass processor's Execute method.
+		AsyncTask(ENamedThreads::GameThread, [MassVisualEffectsSubsystem, ExplosionEntityConfigIndex = ProjectileDamageFragment.ExplosionEntityConfigIndex, Location]()
+		{
+			MassVisualEffectsSubsystem->SpawnEntity(ExplosionEntityConfigIndex, Location);
+		});
+	}
+}
+
 void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
 {
+	UWorld* World = EntitySubsystem.GetWorld();
+
 	// If collide via line trace, we hit the environment, so destroy projectile.
 	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
-	if (DidCollideViaLineTrace(*EntitySubsystem.GetWorld(), PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces, DebugLinesToDrawQueue))
+	if (DidCollideViaLineTrace(*World, PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces, DebugLinesToDrawQueue))
 	{
-		ProjectilesToDestroy.Enqueue(Entity);
+		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation);
 		return;
 	}
 
@@ -361,12 +387,12 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 	FTransformFragment* OtherTransformFragment = OtherEntityView.GetFragmentDataPtr<FTransformFragment>();
 	const bool& bIsOtherEntitySoldier = OtherEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
 
-	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *EntitySubsystem.GetWorld(), bIsOtherEntitySoldier, DebugCapsulesToDrawQueue))
+	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *World, bIsOtherEntitySoldier, DebugCapsulesToDrawQueue))
 	{
 		return;
 	}
 
-	ProjectilesToDestroy.Enqueue(Entity);
+	HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation);
 
 	FMassHealthFragment* OtherHealthFragment = OtherEntityView.GetFragmentDataPtr<FMassHealthFragment>();
 	if (!OtherHealthFragment)
