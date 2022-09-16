@@ -51,6 +51,9 @@ struct PROJECTM_API FProjectileDamageFragment : public FMassFragment
 
 	UPROPERTY(EditAnywhere, Category = "")
 	int16 ExplosionEntityConfigIndex = -1;
+
+	UPROPERTY(EditAnywhere, Category = "")
+	uint32 SplashDamageRadius;
 };
 
 USTRUCT()
@@ -80,6 +83,7 @@ struct PROJECTM_API FDebugParameters : public FMassSharedFragment
 	bool DrawLineTraces = false;
 };
 
+// TODO: Consider moving params that are shared across all instances of a projectile type into a new UDataAsset subclass and having this trait just set on fragment an index into an array of these UDataAsset instances.
 UCLASS(meta = (DisplayName = "ProjectileWithDamage"))
 class PROJECTM_API UMassProjectileWithDamageTrait : public UMassEntityTraitBase
 {
@@ -93,6 +97,10 @@ protected:
 
 	UPROPERTY(Category = "Damage", EditAnywhere)
 	float Caliber = 5.0f;
+
+	/** 0 means no splash damage. */
+	UPROPERTY(Category = "Damage", EditAnywhere)
+	uint32 SplashDamageRadius = 0;
 
 	FMassMovementParameters Movement;
 

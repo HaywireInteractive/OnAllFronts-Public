@@ -9,6 +9,9 @@
 #include "MilitaryStructureSubsystem.h"
 #include <MassVisualEffectsSubsystem.h>
 
+static const uint32 GMaxClosestEntitiesToFind = 20;
+typedef TArray<FMassNavigationObstacleItem, TFixedAllocator<GMaxClosestEntitiesToFind>> TObstacleItemArray;
+
 //----------------------------------------------------------------------//
 //  UMassProjectileWithDamageTrait
 //----------------------------------------------------------------------//
@@ -19,6 +22,7 @@ void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildConte
 	FProjectileDamageFragment& ProjectileDamageFragment = BuildContext.AddFragment_GetRef<FProjectileDamageFragment>();
 	ProjectileDamageFragment.DamagePerHit = DamagePerHit;
 	ProjectileDamageFragment.Caliber = Caliber;
+	ProjectileDamageFragment.SplashDamageRadius = SplashDamageRadius;
 
 	if (ExplosionEntityConfig)
 	{
@@ -81,7 +85,7 @@ void UMassProjectileDamageProcessor::ConfigureQueries()
 }
 
 static void FindCloseObstacles(const FVector& Center, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
-	TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& OutCloseEntities, const int32 MaxResults)
+	TObstacleItemArray& OutCloseEntities)
 {
 	OutCloseEntities.Reset();
 	const FVector Extent(SearchRadius, SearchRadius, 0.f);
@@ -130,7 +134,7 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 			for (int32 Idx = Cell->First; Idx != INDEX_NONE; Idx = Items[Idx].Next)
 			{
 				OutCloseEntities.Add(Items[Idx].ID);
-				if (OutCloseEntities.Num() >= MaxResults)
+				if (OutCloseEntities.Num() >= GMaxClosestEntitiesToFind)
 				{
 					return;
 				}
@@ -146,14 +150,14 @@ void UMassProjectileDamageProcessor::Initialize(UObject& Owner)
 	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
 }
 
-// Returns true if found another entity.
-bool GetClosestEntity(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, const float Radius, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, FMassEntityHandle& OutOtherEntity)
+// Returns true if found at least one close entity that is not Entity. Note that OutCloseEntities may include Entity if it is a navigation obstacle.
+bool GetClosestEntities(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, const float Radius, TObstacleItemArray& OutCloseEntities)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_GetClosestEntity);
 
-	FindCloseObstacles(Location, Radius, AvoidanceObstacleGrid, CloseEntities, 2);
+	FindCloseObstacles(Location, Radius, AvoidanceObstacleGrid, OutCloseEntities);
 
-	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
+	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : OutCloseEntities)
 	{
 		// Skip self
 		if (OtherEntity.Entity == Entity)
@@ -166,11 +170,9 @@ bool GetClosestEntity(const FMassEntityHandle& Entity, UMassEntitySubsystem& Ent
 		{
 			continue;
 		}
-		OutOtherEntity = OtherEntity.Entity;
 		return true;
 	}
 
-	OutOtherEntity = UMassEntitySubsystem::InvalidEntity;
 	return false;
 }
 
@@ -348,7 +350,69 @@ bool CanProjectileDamageEntity(const FProjectileDamagableFragment* ProjectileDam
 bool UMassProjectileDamageProcessor_SkipDealingDamage = false;
 FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_SkipDealingDamage(TEXT("pm.UMassProjectileDamageProcessor_SkipDealingDamage"), UMassProjectileDamageProcessor_SkipDealingDamage, TEXT("UMassProjectileDamageProcessor: Skip dealing damage"));
 
-void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, const FMassEntityHandle Entity, UWorld* World, const FProjectileDamageFragment& ProjectileDamageFragment, const FVector& Location)
+bool UMassProjectileDamageProcessor_DrawDamageDealt = false;
+FAutoConsoleVariableRef CVarUUMassProjectileDamageProcessor_DrawDamageDealt(TEXT("pm.UMassProjectileDamageProcessor_DrawDamageDealt"), UMassProjectileDamageProcessor_DrawDamageDealt, TEXT("UMassProjectileDamageProcessor: Debug draw damage dealt"));
+
+void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDealDamageToView, const FProjectileDamageFragment& ProjectileDamageFragment, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, UWorld* World)
+{
+	FMassHealthFragment* EntityToDealDamageToHealthFragment = EntityToDealDamageToView.GetFragmentDataPtr<FMassHealthFragment>();
+	if (!EntityToDealDamageToHealthFragment)
+	{
+		return;
+	}
+
+	const bool& bCanProjectileDamageOtherEntity = CanProjectileDamageEntity(EntityToDealDamageToView.GetFragmentDataPtr<FProjectileDamagableFragment>(), ProjectileDamageFragment.Caliber);
+	if (!bCanProjectileDamageOtherEntity)
+	{
+		return;
+	}
+
+	FTransformFragment* EntityToDealDamageToTransformFragment = EntityToDealDamageToView.GetFragmentDataPtr<FTransformFragment>();
+	if (!EntityToDealDamageToTransformFragment)
+	{
+		return;
+	}
+	const auto EntityToDealDamageToLocation = EntityToDealDamageToTransformFragment->GetTransform().GetLocation();
+
+	// If no splash damage.
+	int16 DamageToDeal = ProjectileDamageFragment.DamagePerHit;
+	if (ProjectileDamageFragment.SplashDamageRadius > 0)
+	{
+		const auto DistanceBetweenImpactAndEntityToDealDamageTo = (ImpactLocation - EntityToDealDamageToLocation).Size();
+		const auto SplashDamageScale = ProjectileDamageFragment.SplashDamageRadius - DistanceBetweenImpactAndEntityToDealDamageTo;
+		if (SplashDamageScale <= 0)
+		{
+			return;
+		}
+
+		DamageToDeal = SplashDamageScale / ProjectileDamageFragment.SplashDamageRadius * ProjectileDamageFragment.DamagePerHit;
+	}
+
+	EntityToDealDamageToHealthFragment->Value -= DamageToDeal;
+
+	// Handle health reaching 0.
+	if (EntityToDealDamageToHealthFragment->Value <= 0)
+	{
+		bool bHasPlayerTag = EntityToDealDamageToView.HasTag<FMassPlayerControllableCharacterTag>();
+		if (!bHasPlayerTag)
+		{
+			SoldiersToDestroy.Enqueue(EntityToDealDamageToView.GetEntity());
+		}
+		else {
+			PlayersToDestroy.Enqueue(EntityToDealDamageToView.GetEntity());
+		}
+	}
+
+	if (UMassProjectileDamageProcessor_DrawDamageDealt)
+	{
+		AsyncTask(ENamedThreads::GameThread, [World, DamageToDeal, EntityToDealDamageToLocation]()
+		{
+			DrawDebugString(World, EntityToDealDamageToLocation, FString::FromInt(DamageToDeal), nullptr, FColor::Red, 5.f);
+		});
+	}
+}
+
+void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, const FMassEntityHandle Entity, UWorld* World, const FProjectileDamageFragment& ProjectileDamageFragment, const FVector& Location, const TObstacleItemArray& CloseEntities, const bool& DrawLineTraces, TQueue<FHitResult>& DebugLinesToDrawQueue, UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy)
 {
 	ProjectilesToDestroy.Enqueue(Entity);
 
@@ -363,9 +427,44 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, con
 			MassVisualEffectsSubsystem->SpawnEntity(ExplosionEntityConfigIndex, Location);
 		});
 	}
+
+	if (UMassProjectileDamageProcessor_SkipDealingDamage)
+	{
+		return;
+	}
+
+	if (CloseEntities.Num() == 0)
+	{
+		return;
+	}
+
+	const bool bDealSplashDamage = ProjectileDamageFragment.SplashDamageRadius > 0;
+	if (bDealSplashDamage)
+	{
+		for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
+		{
+			FMassEntityView OtherEntityEntityView(EntitySubsystem, OtherEntity.Entity);
+			FTransformFragment* OtherEntityTransformFragment = OtherEntityEntityView.GetFragmentDataPtr<FTransformFragment>();
+			if (!OtherEntityTransformFragment)
+			{
+				continue;
+			}
+
+			if (!DidCollideViaLineTrace(*World, Location, OtherEntityTransformFragment->GetTransform().GetLocation(), DrawLineTraces, DebugLinesToDrawQueue))
+			{
+				DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World);
+			}
+
+		}
+	}
+	else
+	{
+		FMassEntityView OtherEntityEntityView(EntitySubsystem, CloseEntities[0].Entity);
+		DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World);
+	}
 }
 
-void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TArray<FMassNavigationObstacleItem, TFixedAllocator<2>>& CloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
+void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TObstacleItemArray& OutCloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
 {
 	UWorld* World = EntitySubsystem.GetWorld();
 
@@ -373,57 +472,25 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
 	if (DidCollideViaLineTrace(*World, PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces, DebugLinesToDrawQueue))
 	{
-		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation);
+		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, TObstacleItemArray(), DrawLineTraces, DebugLinesToDrawQueue, EntitySubsystem, SoldiersToDestroy, PlayersToDestroy);
 		return;
 	}
 
-	FMassEntityHandle OtherEntity;
-	bool bHasCloseEntity = GetClosestEntity(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), Radius.Radius, CloseEntities, OtherEntity);
+	bool bHasCloseEntity = GetClosestEntities(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), Radius.Radius, OutCloseEntities);
 	if (!bHasCloseEntity) {
 		return;
 	}
 
-	FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity);
-	FTransformFragment* OtherTransformFragment = OtherEntityView.GetFragmentDataPtr<FTransformFragment>();
-	const bool& bIsOtherEntitySoldier = OtherEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
+	FMassEntityView ClosestOtherEntityView(EntitySubsystem, OutCloseEntities[0].Entity);
+	FTransformFragment* OtherTransformFragment = ClosestOtherEntityView.GetFragmentDataPtr<FTransformFragment>();
+	const bool& bIsOtherEntitySoldier = ClosestOtherEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
 
 	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *World, bIsOtherEntitySoldier, DebugCapsulesToDrawQueue))
 	{
 		return;
 	}
 
-	HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation);
-
-	FMassHealthFragment* OtherHealthFragment = OtherEntityView.GetFragmentDataPtr<FMassHealthFragment>();
-	if (!OtherHealthFragment)
-	{
-		return;
-	}
-
-	const bool& bCanProjectileDamageOtherEntity = CanProjectileDamageEntity(OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>(), ProjectileDamageFragment.Caliber);
-	if (!bCanProjectileDamageOtherEntity)
-	{
-		return;
-	}
-
-	if (UMassProjectileDamageProcessor_SkipDealingDamage)
-	{
-		return;
-	}
-
-	OtherHealthFragment->Value -= ProjectileDamageFragment.DamagePerHit;
-
-	// Handle health reaching 0.
-	if (OtherHealthFragment->Value <= 0)
-	{
-		bool bHasPlayerTag = OtherEntityView.HasTag<FMassPlayerControllableCharacterTag>();
-		if (!bHasPlayerTag)
-		{
-			SoldiersToDestroy.Enqueue(OtherEntity);
-		} else {
-			PlayersToDestroy.Enqueue(OtherEntity);
-		}
-	}
+	HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, OutCloseEntities, DrawLineTraces, DebugLinesToDrawQueue, EntitySubsystem, SoldiersToDestroy, PlayersToDestroy);
 }
 
 bool UMassProjectileDamageProcessor_UseParallelForEachEntityChunk = true;
@@ -532,7 +599,7 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 		const FDebugParameters& DebugParameters = Context.GetConstSharedFragment<FDebugParameters>();
 
 		// Arrays used to store close obstacles
-		TArray<FMassNavigationObstacleItem, TFixedAllocator<2>> CloseEntities;
+		TObstacleItemArray CloseEntities;
 
 		// Used for storing sorted list or nearest obstacles.
 		struct FSortedObstacle
