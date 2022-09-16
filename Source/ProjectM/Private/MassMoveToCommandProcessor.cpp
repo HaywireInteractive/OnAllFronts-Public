@@ -112,7 +112,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 		int32 LineEndIndex = 1;
 		for (const FNavPathPoint& NavPathPoint : Result.Path.Get()->GetPathPoints())
 		{
-			DrawDebugPoint(NavSys->GetWorld(), NavPathPoint.Location, 25.f, FColor::Red, true);
+			DrawDebugPoint(NavSys->GetWorld(), NavPathPoint.Location, 10.f, FColor::Red, true);
 			if (LineEndIndex >= Result.Path.Get()->GetPathPoints().Num())
 			{
 				break;
