@@ -81,7 +81,10 @@ void ACommanderCharacter::SetMoveToCommand(FVector2D CommandLocation) const
 
 	if (!MyMilitaryUnit)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Cannot find military unit for player when attempting to set move to command."));
+		UE_LOG(LogTemp, Warning, TEXT("Cannot find military unit for player when attempting to set move to command, setting command for all entities on team."));
+
+		// TODO: don't hard-code 20.f below
+		MoveToCommandSystem->SetMoveToCommandTarget(nullptr, FVector(CommandLocation.X, CommandLocation.Y, 20.f), IsPlayerOnTeam1());
 		return;
 	}
 

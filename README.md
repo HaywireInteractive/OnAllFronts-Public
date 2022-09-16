@@ -114,8 +114,12 @@ These ideas below would be explored in one of the phases above.
         1. Add "Spectate", F key
         1. Add "Respawn", R key
         1. Add "Map", M key
+    1. Engine - Navigation System > Agents > Supported Agents > Add 2 elements:
+        1. Nav Agent Radius: 50.0, Nav Agent Height: 200.0
+        1. Nav Agent Radius: 500.0, Nav Agent Height: 200.0
     1. (Unclear if this is actually needed, but if soldiers or projectiles don't render, do this) Engine - Mass > Mass > Module Settings > Mass Entity > Processor CDOs > "MassSimpleUpdateISMProcessor'/Script/ProjectM.Default__MassSimpleUpdateISMProcessor'" > Auto Register with Processing Phases > check
 1. Now open L_Small level and use PIE to test out the project.
+    1. You might have to build NavMesh paths via menu for move commands to work: Build > Build Paths.
 1. For a larger amount of soldiers see L_Large.
 
 ## To add soldiers to City Sample Level
