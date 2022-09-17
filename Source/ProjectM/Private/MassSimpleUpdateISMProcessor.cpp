@@ -3,12 +3,18 @@
 
 #include "MassSimpleUpdateISMProcessor.h"
 
+bool UMassSimpleUpdateISMProcessor_SkipRendering = false;
+FAutoConsoleVariableRef CVarUMassSimpleUpdateISMProcessor_SkipRendering(TEXT("pm.UMassSimpleUpdateISMProcessor_SkipRendering"), UMassSimpleUpdateISMProcessor_SkipRendering, TEXT("UMassSimpleUpdateISMProcessor: Skip Rendering"));
+
 //----------------------------------------------------------------------//
 //  UMassSimpleUpdateISMTrait
 //----------------------------------------------------------------------//
 void UMassSimpleUpdateISMTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
-  BuildContext.AddTag<FMassSimpleUpdateISMTag>();
+  if (!UMassSimpleUpdateISMProcessor_SkipRendering)
+  {
+    BuildContext.AddTag<FMassSimpleUpdateISMTag>();
+  }
 }
 
 //----------------------------------------------------------------------//

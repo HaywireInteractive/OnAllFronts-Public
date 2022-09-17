@@ -51,11 +51,11 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	FVector NextMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
 
 	const auto DistanceFromNextMovePoint = (EntityLocation - NextMovePoint).Size();
+	MoveTargetFragmentToModify.DistanceToGoal = DistanceFromNextMovePoint;
 	const bool bAtNextMovePoint = DistanceFromNextMovePoint < AgentRadius;
 	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && AtMoveTargetForwardRotation(MoveTargetFragment, EntityTransform) : bAtNextMovePoint;
 	if (!bFinishedNextMovePoint)
 	{
-		MoveTargetFragmentToModify.DistanceToGoal = DistanceFromNextMovePoint;
 		if (UMassNavMeshMoveProcessor_DrawPathState)
 		{
 			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Red, false, 1.f); // Red = Not at next point yet
@@ -76,6 +76,10 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentPathPointIndex >= Points.Num();
 	if (bFinishedNavMeshMove)
 	{
+		MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
+		MoveTargetFragmentToModify.DistanceToGoal = 0.f;
+		MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
+
 		if (UMassNavMeshMoveProcessor_DrawPathState)
 		{
 			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Blue, false, 1.f); // Blue = Reached last point
