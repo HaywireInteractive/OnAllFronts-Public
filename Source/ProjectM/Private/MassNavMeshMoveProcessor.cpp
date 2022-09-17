@@ -8,6 +8,7 @@
 #include "MassCommonFragments.h"
 #include "NavigationSystem.h"
 #include <MassMoveToCommandProcessor.h>
+#include <MassTrackedVehicleOrientationProcessor.h>
 
 UMassNavMeshMoveProcessor::UMassNavMeshMoveProcessor()
 {
@@ -22,46 +23,80 @@ void UMassNavMeshMoveProcessor::ConfigureQueries()
 	EntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FMassCommandableMovementSpeedFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FAgentRadiusFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FMassNeedsNavMeshMoveTag>(EMassFragmentPresence::All);
 }
 
-void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FVector& EntityLocation, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float& MovementSpeed)
+bool UMassNavMeshMoveProcessor_DrawPathState = false;
+FAutoConsoleVariableRef CVarUMassNavMeshMoveProcessor_DrawPathState(TEXT("pm.UMassNavMeshMoveProcessor_DrawPathState"), UMassNavMeshMoveProcessor_DrawPathState, TEXT("UMassNavMeshMoveProcessor: Draw Path State"));
+
+bool AtMoveTargetForwardRotation(const FMassMoveTargetFragment& MoveTargetFragment, const FTransform& EntityTransform)
 {
-	FVector& NextMovePoint = NavMeshMoveFragment.Path.Get()->GetPathPoints()[NavMeshMoveFragment.CurrentPathPointIndex].Location;
+	const FVector CurrentForward = EntityTransform.GetRotation().GetForwardVector();
+	const float CurrentHeading = UE::MassNavigation::GetYawFromDirection(CurrentForward);
+	const float DesiredHeading = UE::MassNavigation::GetYawFromDirection(MoveTargetFragment.Forward);
+	return FMath::IsNearlyEqual(CurrentHeading, DesiredHeading);
+}
 
-	static const float FudgeFactor = 50.f; // TODO: don't hardcode
-	bool bAtNextMovePoint = (EntityLocation - NextMovePoint).Size() < FudgeFactor;
-	if (!bAtNextMovePoint)
-	{
-		// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
-		return;
-	}
-
-	NavMeshMoveFragment.CurrentPathPointIndex++;
-
-	bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentPathPointIndex >= NavMeshMoveFragment.Path.Get()->GetPathPoints().Num();
-	if (bFinishedNavMeshMove)
-	{
-		Context.Defer().RemoveTag<FMassNeedsNavMeshMoveTag>(Entity);
-		return;
-	}
-
-	// We are at the next move point but we haven't reached the final move point, so update FMassMoveTargetFragment.
-
-	NextMovePoint = NavMeshMoveFragment.Path.Get()->GetPathPoints()[NavMeshMoveFragment.CurrentPathPointIndex].Location;
+void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float& MovementSpeed, const float& AgentRadius)
+{
+	const FVector& EntityLocation = EntityTransform.GetLocation();
+	const bool& bIsTrackedVehicle = Context.DoesArchetypeHaveTag<FMassTrackedVehicleOrientationTag>();
 
 	// TODO: would it be faster to have two separate entity queries instead of checking tag here?
 	const bool& bUseStashedMoveTarget = Context.DoesArchetypeHaveTag<FMassTrackTargetTag>();
 	FMassMoveTargetFragment& MoveTargetFragmentToModify = bUseStashedMoveTarget ? StashedMoveTargetFragment : MoveTargetFragment;
 
+	const auto& Points = NavMeshMoveFragment.Path.Get()->GetPathPoints();
+	FVector NextMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
+
+	const auto DistanceFromNextMovePoint = (EntityLocation - NextMovePoint).Size();
+	const bool bAtNextMovePoint = DistanceFromNextMovePoint < AgentRadius;
+	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && AtMoveTargetForwardRotation(MoveTargetFragment, EntityTransform) : bAtNextMovePoint;
+	if (!bFinishedNextMovePoint)
+	{
+		MoveTargetFragmentToModify.DistanceToGoal = DistanceFromNextMovePoint;
+		if (UMassNavMeshMoveProcessor_DrawPathState)
+		{
+			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Red, false, 1.f); // Red = Not at next point yet
+			UE_LOG(LogTemp, Warning, TEXT("UMassNavMeshMoveProcessor: Distance from next move point=%.1f"), DistanceFromNextMovePoint);
+		}
+
+		// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
+		return;
+	}
+
+	if (UMassNavMeshMoveProcessor_DrawPathState)
+	{
+		DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Green, false, 1.f); // Green = Reached next point
+	}
+
+	NavMeshMoveFragment.CurrentPathPointIndex++;
+
+	bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentPathPointIndex >= Points.Num();
+	if (bFinishedNavMeshMove)
+	{
+		if (UMassNavMeshMoveProcessor_DrawPathState)
+		{
+			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Blue, false, 1.f); // Blue = Reached last point
+		}
+
+		Context.Defer().RemoveTag<FMassNeedsNavMeshMoveTag>(Entity);
+		return;
+	}
+
+	// We are at the next move point but we haven't reached the final move point, so update FMassMoveTargetFragment.
+	NextMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
+
 	MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Move, *World);
 	MoveTargetFragmentToModify.Center = NextMovePoint;
 	MoveTargetFragmentToModify.Forward = (NextMovePoint - EntityLocation).GetSafeNormal();
-	float Distance = (EntityLocation - NextMovePoint).Size();
+	const float Distance = (EntityLocation - NextMovePoint).Size();
 	MoveTargetFragmentToModify.DistanceToGoal = Distance;
 	MoveTargetFragmentToModify.bOffBoundaries = true;
 	MoveTargetFragmentToModify.DesiredSpeed.Set(MovementSpeed);
-	MoveTargetFragmentToModify.IntentAtGoal = EMassMovementAction::Stand;
+	const bool& bIsLastMoveTarget = NavMeshMoveFragment.CurrentPathPointIndex + 1 == Points.Num();
+	MoveTargetFragmentToModify.IntentAtGoal = (bIsLastMoveTarget || bIsTrackedVehicle) ? EMassMovementAction::Stand : EMassMovementAction::Move;
 
 	if (bUseStashedMoveTarget) {
 		Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
@@ -80,10 +115,11 @@ void UMassNavMeshMoveProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, F
 		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
 		const TArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetMutableFragmentView<FMassStashedMoveTargetFragment>();
 		const TArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetMutableFragmentView<FMassNavMeshMoveFragment>();
+		const TConstArrayView<FAgentRadiusFragment> AgentRadiusList = Context.GetFragmentView<FAgentRadiusFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
-			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform().GetLocation(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i], MovementSpeedList[i].MovementSpeed);
+			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i], MovementSpeedList[i].MovementSpeed, AgentRadiusList[i].Radius);
 		}
 	});
 }

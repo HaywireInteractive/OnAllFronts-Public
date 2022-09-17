@@ -7,6 +7,12 @@
 #include "MassTrackedVehicleOrientationProcessor.generated.h"
 
 USTRUCT()
+struct FMassTrackedVehicleOrientationTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
+USTRUCT()
 struct PROJECTM_API FMassTrackedVehicleOrientationParameters : public FMassSharedFragment
 {
 	GENERATED_BODY()

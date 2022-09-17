@@ -10,6 +10,7 @@ void UMassTrackedVehicleOrientationTrait::BuildTemplate(FMassEntityTemplateBuild
 
 	BuildContext.AddFragment<FMassMoveTargetFragment>();
 	BuildContext.AddFragment<FTransformFragment>();
+	BuildContext.AddTag<FMassTrackedVehicleOrientationTag>();
 
 	const FConstSharedStruct OrientationFragment = EntitySubsystem->GetOrCreateConstSharedFragment(UE::StructUtils::GetStructCrc32(FConstStructView::Make(Orientation)), Orientation);
 	BuildContext.AddConstSharedFragment(OrientationFragment);
