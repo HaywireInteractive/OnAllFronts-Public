@@ -330,6 +330,7 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 	}
 	else // Tank
 	{
+		// TODO: don't hard-code.
 		OtherEntityCapsule = MakeCapsule(OtherEntityTransform, FVector(0.f, 0.f, 150.f), 170.f, 800.f);
 	}
 

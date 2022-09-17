@@ -50,6 +50,12 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	const auto& Points = NavMeshMoveFragment.Path.Get()->GetPathPoints();
 	FVector NextMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
 
+	// For tracked vehicles set initial move target forward to direction so they first turn if needed.
+	if (NavMeshMoveFragment.CurrentPathPointIndex == 0 && bIsTrackedVehicle)
+	{
+		MoveTargetFragment.Forward = (Points[1].Location - EntityLocation).GetSafeNormal();
+	}
+
 	const auto DistanceFromNextMovePoint = (EntityLocation - NextMovePoint).Size();
 	MoveTargetFragmentToModify.DistanceToGoal = DistanceFromNextMovePoint;
 	const bool bAtNextMovePoint = DistanceFromNextMovePoint < AgentRadius;
