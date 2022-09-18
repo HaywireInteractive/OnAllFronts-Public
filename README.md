@@ -109,7 +109,7 @@ These ideas below would be explored in one of the phases above.
     1. `git clone https://github.com/LeroyTechnologies/ProjectM.git`
 1. Right click the .uproject file again and re-generate the solution to get the new files from the Plugins folder to show in VS.
 1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing argument to editor on launch:
-    1. In VS Solution Explorer, right click CitySample project > Properties.
+    1. In VS Solution Explorer, right click the project under Games folder > Properties.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
 1. Rerun project from VS.
 1. Add First Person Content Pack from Content Drawer > Add > Add Feature or Content Pack > Blueprint > First Person > Add to project.
