@@ -8,9 +8,10 @@
 #include "Character/CommanderCharacter.h"
 #include "MilitaryStructureSubsystem.h"
 #include <MassVisualEffectsSubsystem.h>
+#include "MassCollisionProcessor.h"
 
-static const uint32 GMaxClosestEntitiesToFind = 20;
-typedef TArray<FMassNavigationObstacleItem, TFixedAllocator<GMaxClosestEntitiesToFind>> TObstacleItemArray;
+static const uint32 GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind = 20;
+typedef TArray<FMassNavigationObstacleItem, TFixedAllocator<GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind>> TProjectileDamageObstacleItemArray;
 
 //----------------------------------------------------------------------//
 //  UMassProjectileWithDamageTrait
@@ -84,8 +85,15 @@ void UMassProjectileDamageProcessor::ConfigureQueries()
 	EntityQuery.AddConstSharedRequirement<FDebugParameters>(EMassFragmentPresence::All);
 }
 
+void UMassProjectileDamageProcessor::Initialize(UObject& Owner)
+{
+	Super::Initialize(Owner);
+
+	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
+}
+
 static void FindCloseObstacles(const FVector& Center, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
-	TObstacleItemArray& OutCloseEntities)
+	TProjectileDamageObstacleItemArray& OutCloseEntities)
 {
 	OutCloseEntities.Reset();
 	const FVector Extent(SearchRadius, SearchRadius, 0.f);
@@ -134,7 +142,7 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 			for (int32 Idx = Cell->First; Idx != INDEX_NONE; Idx = Items[Idx].Next)
 			{
 				OutCloseEntities.Add(Items[Idx].ID);
-				if (OutCloseEntities.Num() >= GMaxClosestEntitiesToFind)
+				if (OutCloseEntities.Num() >= GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind)
 				{
 					return;
 				}
@@ -143,15 +151,8 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 	}
 }
 
-void UMassProjectileDamageProcessor::Initialize(UObject& Owner)
-{
-	Super::Initialize(Owner);
-
-	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
-}
-
 // Returns true if found at least one close entity that is not Entity. Note that OutCloseEntities may include Entity if it is a navigation obstacle.
-bool GetClosestEntities(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, const float Radius, TObstacleItemArray& OutCloseEntities)
+bool GetClosestEntities(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, const float Radius, TProjectileDamageObstacleItemArray& OutCloseEntities)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_GetClosestEntity);
 
@@ -190,120 +191,10 @@ bool DidCollideViaLineTrace(const UWorld &World, const FVector& StartLocation, c
 	return bSuccess;
 }
 
-struct FCapsule
-{
-	FVector a;
-	FVector b;
-	float r;
-};
-
-float ClosestPtSegmentSegment(FVector p1, FVector q1, FVector p2, FVector q2,
-	float& s, float& t, FVector& c1, FVector& c2)
-{
-	FVector d1 = q1 - p1; // Direction vector of segment S1
-	FVector d2 = q2 - p2; // Direction vector of segment S2
-	FVector r = p1 - p2;
-	float a = FVector::DotProduct(d1, d1); // Squared length of segment S1, always nonnegative
-	float e = FVector::DotProduct(d2, d2); // Squared length of segment S2, always nonnegative
-	float f = FVector::DotProduct(d2, r);
-	// Check if either or both segments degenerate into points
-	if (a <= SMALL_NUMBER && e <= SMALL_NUMBER) {
-		// Both segments degenerate into points
-		s = t = 0.0f;
-		c1 = p1;
-		c2 = p2;
-		return FVector::DotProduct(c1 - c2, c1 - c2);
-	}
-	if (a <= SMALL_NUMBER) {
-		// First segment degenerates into a point
-		s = 0.0f;
-		t = f / e; // s = 0 => t = (b*s + f) / e = f / e
-		t = FMath::Clamp(t, 0.0f, 1.0f);
-	}
-	else {
-		float c = FVector::DotProduct(d1, r);
-		if (e <= SMALL_NUMBER) {
-			// Second segment degenerates into a point
-			t = 0.0f;
-			s = FMath::Clamp(-c / a, 0.0f, 1.0f); // t = 0 => s = (b*t - c) / a = -c / a
-		}
-		else {
-			// The general nondegenerate case starts here
-			float b = FVector::DotProduct(d1, d2);
-			float denom = a * e - b * b; // Always nonnegative
-			// If segments not parallel, compute closest point on L1 to L2 and
-			// clamp to segment S1. Else pick arbitrary s (here 0)
-			if (denom != 0.0f) {
-				s = FMath::Clamp((b * f - c * e) / denom, 0.0f, 1.0f);
-			}
-			else s = 0.0f;
-			// Compute point on L2 closest to S1(s) using
-			// t = Dot((P1 + D1*s) - P2,D2) / Dot(D2,D2) = (b*s + f) / e
-			t = (b * s + f) / e;
-			// If t in [0,1] done. Else clamp t, recompute s for the new value
-			// of t using s = Dot((P2 + D2*t) - P1,D1) / Dot(D1,D1)= (t*b - c) / a
-			// and clamp s to [0, 1]
-			if (t < 0.0f) {
-				t = 0.0f;
-				s = FMath::Clamp(-c / a, 0.0f, 1.0f);
-			}
-			else if (t > 1.0f) {
-				t = 1.0f;
-				s = FMath::Clamp((b - c) / a, 0.0f, 1.0f);
-			}
-		}
-	}
-	c1 = p1 + d1 * s;
-	c2 = p2 + d2 * t;
-	return FVector::DotProduct(c1 - c2, c1 - c2);
-}
-
-bool TestCapsuleCapsule(FCapsule capsule1, FCapsule capsule2)
-{
-	// Compute (squared) distance between the inner structures of the capsules
-	float s, t;
-	FVector c1, c2;
-	float dist2 = ClosestPtSegmentSegment(capsule1.a, capsule1.b,
-		capsule2.a, capsule2.b, s, t, c1, c2);
-	// If (squared) distance smaller than (squared) sum of radii, they collide
-	float radius = capsule1.r + capsule2.r;
-	return dist2 <= radius * radius;
-}
-
-FVector GetCapsuleCenter(const FCapsule& Capsule)
-{
-	return (Capsule.b - Capsule.a) / 2.f + Capsule.a;
-}
-
-float GetCapsuleHalfHeight(const FCapsule& Capsule)
-{
-	return (Capsule.b - Capsule.a).Size() / 2.f;
-}
-
-void DrawCapsule(const FCapsule& Capsule, const UWorld& World, const FLinearColor &Color = FLinearColor::Red)
-{
-	FQuat const CapsuleRot = FRotationMatrix::MakeFromZ(Capsule.b - Capsule.a).ToQuat();
-	DrawDebugCapsule(&World, GetCapsuleCenter(Capsule), GetCapsuleHalfHeight(Capsule), Capsule.r, CapsuleRot, Color.ToFColor(true), true);
-}
-
-FCapsule MakeCapsule(const FTransform& Transform, const FVector& CenterOffset, const float& Radius, const float& Length)
-{
-	FCapsule Capsule;
-
-	FVector Center = Transform.GetLocation() + CenterOffset;
-	FVector Forward = Transform.GetRotation().GetForwardVector().GetSafeNormal();
-
-	Capsule.a = Center + Forward * (Length / 2.f);
-	Capsule.b = Center + Forward * (-Length / 2.f);
-	Capsule.r = Radius;
-
-	return Capsule;
-}
-
 bool UMassProjectileDamageProcessor_DrawCapsules = false;
 FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_DrawCapsules(TEXT("pm.UMassProjectileDamageProcessor_DrawCapsules"), UMassProjectileDamageProcessor_DrawCapsules, TEXT("UMassProjectileDamageProcessor: Debug draw capsules used for collisions detection"));
 
-bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, FTransformFragment* OtherTransformFragment, const bool& DrawCapsules, const UWorld& World, const bool& bIsOtherEntitySoldier, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
+bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, FTransformFragment* OtherTransformFragment, const bool& DrawCapsules, const UWorld& World, TQueue<FCapsule>& DebugCapsulesToDrawQueue, const FCollisionCapsuleParametersFragment& CollisionCapsuleParametersFragment)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_DidCollideWithEntity);
 	if (!OtherTransformFragment)
@@ -319,20 +210,7 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 	ProjectileCapsule.b = EndLocation;
 	ProjectileCapsule.r = Radius;
 
-	FCapsule OtherEntityCapsule;
-	if (bIsOtherEntitySoldier)
-	{
-		OtherEntityCapsule.a = OtherEntityLocation;
-		static const float EntityHeight = 200.0f; // TODO: don't hard-code; add new fragment for this?
-		static const float EntityRadius = 40.0f; // TODO: don't hard-code; read from other entity's AgentRadius?
-		OtherEntityCapsule.b = OtherEntityLocation + FVector(0.f, 0.f, EntityHeight);
-		OtherEntityCapsule.r = EntityRadius;
-	}
-	else // Tank
-	{
-		// TODO: don't hard-code.
-		OtherEntityCapsule = MakeCapsule(OtherEntityTransform, FVector(0.f, 0.f, 150.f), 170.f, 800.f);
-	}
+	const FCapsule& OtherEntityCapsule = MakeCapsuleForEntity(CollisionCapsuleParametersFragment, OtherEntityTransform);
 
 	if (DrawCapsules || UMassProjectileDamageProcessor_DrawCapsules)
 	{
@@ -413,7 +291,7 @@ void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDea
 	}
 }
 
-void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, const FMassEntityHandle Entity, UWorld* World, const FProjectileDamageFragment& ProjectileDamageFragment, const FVector& Location, const TObstacleItemArray& CloseEntities, const bool& DrawLineTraces, TQueue<FHitResult>& DebugLinesToDrawQueue, UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy)
+void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, const FMassEntityHandle Entity, UWorld* World, const FProjectileDamageFragment& ProjectileDamageFragment, const FVector& Location, const TProjectileDamageObstacleItemArray& CloseEntities, const bool& DrawLineTraces, TQueue<FHitResult>& DebugLinesToDrawQueue, UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy)
 {
 	ProjectilesToDestroy.Enqueue(Entity);
 
@@ -465,7 +343,7 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, con
 	}
 }
 
-void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TObstacleItemArray& OutCloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
+void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TProjectileDamageObstacleItemArray& OutCloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<FCapsule>& DebugCapsulesToDrawQueue)
 {
 	UWorld* World = EntitySubsystem.GetWorld();
 
@@ -473,7 +351,7 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
 	if (DidCollideViaLineTrace(*World, PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces, DebugLinesToDrawQueue))
 	{
-		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, TObstacleItemArray(), DrawLineTraces, DebugLinesToDrawQueue, EntitySubsystem, SoldiersToDestroy, PlayersToDestroy);
+		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, TProjectileDamageObstacleItemArray(), DrawLineTraces, DebugLinesToDrawQueue, EntitySubsystem, SoldiersToDestroy, PlayersToDestroy);
 		return;
 	}
 
@@ -484,9 +362,15 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 
 	FMassEntityView ClosestOtherEntityView(EntitySubsystem, OutCloseEntities[0].Entity);
 	FTransformFragment* OtherTransformFragment = ClosestOtherEntityView.GetFragmentDataPtr<FTransformFragment>();
-	const bool& bIsOtherEntitySoldier = ClosestOtherEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
+	FCollisionCapsuleParametersFragment* OtherCollisionCapsuleParametersFragment = ClosestOtherEntityView.GetFragmentDataPtr<FCollisionCapsuleParametersFragment>();
 
-	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *World, bIsOtherEntitySoldier, DebugCapsulesToDrawQueue))
+	if (!OtherCollisionCapsuleParametersFragment)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ProcessProjectileDamageEntity: Entity does not have expected FCollisionCapsuleParametersFragment."));
+		return;
+	}
+
+	if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *World, DebugCapsulesToDrawQueue, *OtherCollisionCapsuleParametersFragment))
 	{
 		return;
 	}
@@ -599,10 +483,9 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 		const TArrayView<FMassPreviousLocationFragment> PreviousLocationList = Context.GetMutableFragmentView<FMassPreviousLocationFragment>();
 		const FDebugParameters& DebugParameters = Context.GetConstSharedFragment<FDebugParameters>();
 
-		// Arrays used to store close obstacles
-		TObstacleItemArray CloseEntities;
+		TProjectileDamageObstacleItemArray CloseEntities;
 
-		// Used for storing sorted list or nearest obstacles.
+		// Used for storing sorted list of nearest obstacles.
 		struct FSortedObstacle
 		{
 			FVector LocationCached;
