@@ -112,7 +112,7 @@ These ideas below would be explored in one of the phases above.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
 1. Rerun project from VS.
 1. Add First Person Content Pack from Content Drawer > Add > Add Feature or Content Pack > Blueprint > First Person > Add to project.
-1. Add Unreal Engine Marketplace free content to project:
+1. Add Unreal Engine Marketplace free content to project. Note that some of this content hasn't been migrated to UE5 yet, so when you try to add it from the Epic Games Launcher, check "Show all projects" after clicking "Add to Project". Then in the "Select Version" dropdown select the newest version in the list.
     1. Military Weapons Silver: https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver
         1. Then open M_WeaponMaster_01 > Used with Instanced Static Meshes > Apply > Save
     1. M1A1 Abrams Tank: https://www.unrealengine.com/marketplace/en-US/product/m1a1-abrams-tank
@@ -127,9 +127,9 @@ These ideas below would be explored in one of the phases above.
         1. Name: Soldier, Nav Agent Radius: 50.0, Nav Agent Height: 200.0
         1. Name: Tank, Nav Agent Radius: 500.0, Nav Agent Height: 200.0
     1. (Unclear if this is actually needed, but if soldiers or projectiles don't render, do this) Engine - Mass > Mass > Module Settings > Mass Entity > Processor CDOs > "MassSimpleUpdateISMProcessor'/Script/ProjectM.Default__MassSimpleUpdateISMProcessor'" > Auto Register with Processing Phases > check
-1. Now open L_Small level and use PIE to test out the project.
+1. Now in Content Drawer open Plugins/ProjectM Content/Playgrounds/Maps/L_Small level and use PIE to test out the project.
     1. You might have to build NavMesh paths via menu for move commands to work: Build > Build Paths.
-1. For a larger amount of soldiers see L_Large.
+1. For a larger amount of soldiers see L_Large level.
 
 ## To add soldiers to City Sample Level
 1. Duplicate Small_City_LVL and call it Small_City_ProjectM_LVL
