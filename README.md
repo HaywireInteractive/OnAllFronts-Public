@@ -90,18 +90,27 @@ These ideas below would be explored in one of the phases above.
 
 1. Install [Git for Windows](https://gitforwindows.org/). Use the default options.
 1. Install Unreal Engine 5.0.3 from [Epic Games Launcher](https://store.epicgames.com/en-US/download).
-1. Create a new project using the [City Sample project](https://www.unrealengine.com/marketplace/en-US/product/city-sample) from UE Marketplace.
+1. Install Visual Studio 2022.
+1. Create a new project using one of the two options below:
+    1. If you want to use the [City Sample project](https://www.unrealengine.com/marketplace/en-US/product/city-sample) for developing in a large level, get the project from UE Marketplace and then create a project using that template.
+    1. If you want to quickly develop in a smaller project, in UE create a new empty C++ project.
+1. If there is no .sln in the project folder, generate VS project from right clicking .uproject in project folder.
+1. Open .sln in VS if it isn't already open.
+1. If project isn't open yet in UE, run the project from VS.
+1. Enable the required plugins in UE project if they are not already:
+    1. Edit > Plugins
+    1. Search for "mass"
+    1. Check MassAI, MassCrowd, MassEntity, MassGameplay. Answer Yes if it asks if you're sure.
+1. Quit UE.
 1. In PowerShell:
-    1. cd to City Sample project folder
+    1. `cd` to project folder. This is the folder that has the .uproject file.
+    1. If `Plugins` folder does not exist, `mkdir Plugins`.
     1. `cd Plugins`
     1. `git clone https://github.com/LeroyTechnologies/ProjectM.git`
-1. Install Visual Studio 2022.
-1. Generate VS project from right clicking CitySample.uproject in City Sample project folder.
-1. Open CitySample.sln.
 1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing argument to editor on launch:
     1. In VS Solution Explorer, right click CitySample project > Properties.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
-1. Run project from VS.
+1. Rerun project from VS.
 1. Add First Person Content Pack from Content Drawer > Add > Add Feature or Content Pack > Blueprint > First Person > Add to project.
 1. Add Unreal Engine Marketplace free content to project:
     1. Military Weapons Silver: https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver
