@@ -107,6 +107,7 @@ These ideas below would be explored in one of the phases above.
     1. If `Plugins` folder does not exist, `mkdir Plugins`.
     1. `cd Plugins`
     1. `git clone https://github.com/LeroyTechnologies/ProjectM.git`
+1. Right click the .uproject file again and re-generate the solution to get the new files from the Plugins folder to show in VS.
 1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing argument to editor on launch:
     1. In VS Solution Explorer, right click CitySample project > Properties.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
@@ -126,7 +127,6 @@ These ideas below would be explored in one of the phases above.
     1. Engine - Navigation System > Agents > Supported Agents > Add 2 elements:
         1. Name: Soldier, Nav Agent Radius: 50.0, Nav Agent Height: 200.0
         1. Name: Tank, Nav Agent Radius: 500.0, Nav Agent Height: 200.0
-    1. (Unclear if this is actually needed, but if soldiers or projectiles don't render, do this) Engine - Mass > Mass > Module Settings > Mass Entity > Processor CDOs > "MassSimpleUpdateISMProcessor'/Script/ProjectM.Default__MassSimpleUpdateISMProcessor'" > Auto Register with Processing Phases > check
 1. Now in Content Drawer open Plugins/ProjectM Content/Playgrounds/Maps/L_Small level and use PIE to test out the project.
     1. You might have to build NavMesh paths via menu for move commands to work: Build > Build Paths.
 1. For a larger amount of soldiers see L_Large level.
