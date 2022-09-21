@@ -124,12 +124,13 @@ These ideas below would be explored in one of the phases above.
         1. Add "Spectate", F key
         1. Add "Respawn", R key
         1. Add "Map", M key
+    1. Engine - Mass > Search for "MassUpdateISMProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassUpdateISMProcessor) > Auto Register with Processing Phases > uncheck. Note this will already be unchecked in the City Sample project.
     1. Engine - Navigation System > Agents > Supported Agents > Add 2 elements:
         1. Name: Soldier, Nav Agent Radius: 50.0, Nav Agent Height: 200.0
         1. Name: Tank, Nav Agent Radius: 500.0, Nav Agent Height: 200.0
-1. Now in Content Drawer open Plugins/ProjectM Content/Playgrounds/Maps/L_Small level and use PIE to test out the project.
+1. Now in Content Drawer open "Plugins/ProjectM Content/Playgrounds/Maps/L_Small" level and use PIE to test out the project.
     1. You might have to build NavMesh paths via menu for move commands to work: Build > Build Paths.
-1. For a larger amount of soldiers see L_Large level.
+1. For a larger amount of soldiers see L_MediumWithTanks or L_Large levels.
 
 ## To add soldiers to City Sample Level
 1. Duplicate Small_City_LVL and call it Small_City_ProjectM_LVL

@@ -99,21 +99,6 @@ void ACommanderCharacter::SetMoveToCommand(FVector2D CommandLocation) const
 	MoveToCommandSystem->SetMoveToCommandTarget(MyMilitaryUnit->Parent, FVector(CommandLocation.X, CommandLocation.Y, 20.f), IsPlayerOnTeam1()); 
 }
 
-void ACommanderCharacter::SpawnProjectile() const
-{
-	// TODO: don't hard-code
-	static const float ForwardVectorMagnitude = 300.f;
-	static const FVector ProjectileLocationOffset = FVector(0.f, 0.f, 150.f);
-	static const float InitialVelocityMagnitude = 4000.0f;
-
-	const UWorld* World = GetWorld();
-	const FVector& ActorForward = GetActorForwardVector();
-	const FVector ActorFeetLocation = GetActorLocation() - FVector(0.f, 0.f, GetRootComponent()->Bounds.BoxExtent.Z);
-	const FVector SpawnLocation = ActorFeetLocation + ActorForward * ForwardVectorMagnitude + ProjectileLocationOffset;
-	const FVector InitialVelocity = ActorForward * InitialVelocityMagnitude;
-	::SpawnProjectile(World, SpawnLocation, GetActorQuat(), InitialVelocity, ProjectileEntityConfig);
-}
-
 void ACommanderCharacter::ChangePlayerToAISoldier()
 {
 	UWorld* World = GetWorld();

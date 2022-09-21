@@ -116,6 +116,7 @@ protected:
 
 	UPROPERTY(Category = "Debug", EditAnywhere)
 	FDebugParameters DebugParameters;
+
 };
 
 UCLASS(meta = (DisplayName = "ProjectileDamagable"))

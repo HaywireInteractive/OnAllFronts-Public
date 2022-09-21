@@ -43,6 +43,9 @@ void AMilitaryUnitMassSpawner::BeginPlay()
 	}
 }
 
+bool AMilitaryUnitMassSpawner_SpawnVehiclesOnly = false;
+FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnVehiclesOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnVehiclesOnly"), AMilitaryUnitMassSpawner_SpawnVehiclesOnly, TEXT("AMilitaryUnitMassSpawner_SpawnVehiclesOnly"));
+
 void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 {
 	// TODO: Get team from EntityTypes (UMassEntityConfigAsset) once figure out linker issue with using FMassSpawnedEntityType::GetEntityConfig(). Then replace bIsTeam1 below.
@@ -104,6 +107,8 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 		}
 	}
 
+	bDidSpawnVehiclesOnly = bSpawnVehiclesOnly || AMilitaryUnitMassSpawner_SpawnVehiclesOnly;
+
 	auto GenerateSpawningPoints = [this, UnitCounts]()
 	{
 		if (SpawnDataGenerators.Num() != 2 || EntityTypes.Num() != 2)
@@ -117,7 +122,7 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 		{
 			if (Generator.GeneratorInstance)
 			{
-				const int32 SpawnCount = Index == 0 ? (bSpawnVehiclesOnly ? 0 : UnitCounts.Key) : UnitCounts.Value;
+				const int32 SpawnCount = Index == 0 ? (bDidSpawnVehiclesOnly ? 0 : UnitCounts.Key) : UnitCounts.Value;
 				const int32 OtherIndex = Index == 0 ? 1 : 0;
 				EntityTypes[Index].Proportion = 1.f;
 				EntityTypes[OtherIndex].Proportion = 0.f;
@@ -145,8 +150,9 @@ void AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits()
 	// TODO: This is a bit hacky, refactor.
 	if (const UMassEntityConfigAsset* SoldierEntityConfig = EntityTypes[0].EntityConfig.LoadSynchronous())
 	{
-		const FMassEntityTemplate& SoldierEntityTemplate = SoldierEntityConfig->GetConfig().GetEntityTemplateChecked(*this, *SoldierEntityConfig);
-		if (AllSpawnedEntities[0].TemplateID == SoldierEntityTemplate.GetTemplateID())
+		const FMassEntityTemplate* SoldierEntityTemplate = SoldierEntityConfig->GetConfig().GetOrCreateEntityTemplate(*this, *SoldierEntityConfig);
+		check(SoldierEntityTemplate);
+		if (AllSpawnedEntities[0].TemplateID == SoldierEntityTemplate->GetTemplateID())
 		{
 			AllSpawnedEntitiesSoldierIndex = 0;
 			AllSpawnedEntitiesVehicleIndex = 1;
@@ -170,7 +176,10 @@ void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(UMilitaryUnit* Mili
 	{
 		int32 AllSpawnedEntitiesIndex = MilitaryUnit->bIsSoldier ? AllSpawnedEntitiesSoldierIndex : AllSpawnedEntitiesVehicleIndex;
 		int32& EntitiesIndex = MilitaryUnit->bIsSoldier ? SoldierIndex : VehicleIndex;
-		MilitaryStructureSubsystem->BindUnitToMassEntity(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesIndex].Entities[EntitiesIndex++]);
+		if (!(MilitaryUnit->bIsSoldier && bDidSpawnVehiclesOnly))
+		{
+			MilitaryStructureSubsystem->BindUnitToMassEntity(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesIndex].Entities[EntitiesIndex++]);
+		}
 	}
 	else
 	{

@@ -28,6 +28,14 @@ void UMassMoveTargetForwardCompleteProcessor::ConfigureQueries()
 	EntityQuery.AddTagRequirement<FMassNeedsMoveTargetForwardCompleteSignalTag>(EMassFragmentPresence::All);
 }
 
+bool IsTransformFacingDirection(const FTransform& Transform, const FVector& TargetDirection)
+{
+	const FQuat& CurrentRotation = Transform.GetRotation();
+	const float MoveTargetForwardHeading = UE::MassNavigation::GetYawFromDirection(TargetDirection);
+	FQuat MoveTargetForwardRotation(FVector::UpVector, MoveTargetForwardHeading);
+	return CurrentRotation.Equals(MoveTargetForwardRotation);
+}
+
 void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
 	TransientEntitiesToSignal.Reset();
@@ -41,15 +49,7 @@ void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& Enti
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			const FTransform& CurrentTransform = LocationList[EntityIndex].GetTransform();
-			const FMassMoveTargetFragment& MoveTargetFragment = MoveTargetList[EntityIndex];
-
-			const FQuat& CurrentRotation = CurrentTransform.GetRotation();
-
-			const float MoveTargetForwardHeading = UE::MassNavigation::GetYawFromDirection(MoveTargetFragment.Forward);
-			FQuat MoveTargetForwardRotation(FVector::UpVector, MoveTargetForwardHeading);
-
-			const bool bAtMoveTargetForward = CurrentRotation.Equals(MoveTargetForwardRotation);
+			const bool bAtMoveTargetForward = IsTransformFacingDirection(LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex].Forward);
 
 			if (bAtMoveTargetForward) {
 				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);

@@ -10,6 +10,9 @@
 #include "MassTrackTargetProcessor.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "MassProjectileDamageProcessor.h"
+#include <MassNavigationTypes.h>
+#include "MassNavigationFragments.h"
+#include "MassMoveTargetForwardCompleteProcessor.h"
 
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
@@ -52,6 +55,7 @@ void UMassEnemyTargetFinderProcessor::ConfigureQueries()
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
 	EntityQuery.AddConstSharedRequirement<FNeedsEnemyTargetSharedParameters>(EMassFragmentPresence::All);
 }
@@ -61,38 +65,38 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 	Super::Initialize(Owner);
 
 	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
+	SoundPerceptionSubsystem = UWorld::GetSubsystem<UMassSoundPerceptionSubsystem>(Owner.GetWorld());
 }
 
-static const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt = 8;
-static const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCount = UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt * UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
-
-static const FBox BoxForPhase(const uint8& FinderPhase, const float& SearchRadius, const FTransform& SearchCenterTransform, const uint8& SearchBreadth)
+static const FBox BoxForPhase(const uint8& FinderPhase, const FTransform& SearchCenterTransform, const uint8& SearchBreadth)
 {
 	const uint8 BoxXSegment = FinderPhase / (UMassEnemyTargetFinderProcessor_FinderPhaseCount / SearchBreadth);
 	const uint8 BoxYSegment = FinderPhase % (UMassEnemyTargetFinderProcessor_FinderPhaseCount / SearchBreadth);
-	const float SegmentSize = SearchRadius / (UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt / 2.0f);
-	const float XWidth = SearchBreadth * SegmentSize;
+	const float XWidth = SearchBreadth * UMassEnemyTargetFinderProcessor_CellSize;
 
 	const FVector& Center = SearchCenterTransform.GetLocation();
 	const FVector& RotationForwardVector = SearchCenterTransform.GetRotation().GetForwardVector();
 	const FVector& RotationRightVector = SearchCenterTransform.GetRotation().GetRightVector();
 	const FVector BoxBottomLeft = Center - RotationRightVector * (XWidth / 2.f);
 	
-	const FVector PhaseBoxBottomLeft = BoxBottomLeft + RotationRightVector * SegmentSize * BoxXSegment + RotationForwardVector * SegmentSize * BoxYSegment;
-	const FVector PhaseBoxTopRight = PhaseBoxBottomLeft + RotationRightVector * SegmentSize + RotationForwardVector * SegmentSize;
+	const FVector PhaseBoxBottomLeft = BoxBottomLeft + RotationRightVector * UMassEnemyTargetFinderProcessor_CellSize * BoxXSegment + RotationForwardVector * UMassEnemyTargetFinderProcessor_CellSize * BoxYSegment;
+	const FVector PhaseBoxTopRight = PhaseBoxBottomLeft + RotationRightVector * UMassEnemyTargetFinderProcessor_CellSize + RotationForwardVector * UMassEnemyTargetFinderProcessor_CellSize;
 	return FBox(PhaseBoxBottomLeft, PhaseBoxTopRight);
 }
 
 bool UMassEnemyTargetFinderProcessor_DrawSearchAreas = false;
 FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_DrawSearchAreas(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawSearchAreas"), UMassEnemyTargetFinderProcessor_DrawSearchAreas, TEXT("UMassEnemyTargetFinderProcessor: debug draw search areas"));
 
+bool UMassEnemyTargetFinderProcessor_DrawEntitiesSearching = false;
+FAutoConsoleVariableRef CVar_UMassEnemyTargetFinderProcessor_DrawEntitiesSearching(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawEntitiesSearching"), UMassEnemyTargetFinderProcessor_DrawEntitiesSearching, TEXT("UMassEnemyTargetFinderProcessor_DrawEntitiesSearching"));
+
 // TODO: Find out how to not duplicate from MassProjectileDamageProcessor.cpp. Right now only difference is number in template type for TFixedAllocator.
-static void FindCloseObstacles(const FTransform& SearchCenterTransform, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
+static void FindCloseObstacles(const FTransform& SearchCenterTransform, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
 	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults, const uint8& FinderPhase, const bool& DrawSearchAreas, const UWorld* World, const uint8& SearchBreadth)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_FindCloseObstacles);
 	OutCloseEntities.Reset();
-	const FBox QueryBox = BoxForPhase(FinderPhase, SearchRadius, SearchCenterTransform, SearchBreadth);
+	const FBox QueryBox = BoxForPhase(FinderPhase, SearchCenterTransform, SearchBreadth);
 
 	if (DrawSearchAreas || UMassEnemyTargetFinderProcessor_DrawSearchAreas)
 	{
@@ -162,8 +166,7 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestEnemy);
 
-	static const float SearchRadius = 5000.f; // TODO: don't hard-code
-	FindCloseObstacles(EntityTransform, SearchRadius, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld(), SearchBreadth);
+	FindCloseObstacles(EntityTransform, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld(), SearchBreadth);
 
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 	{
@@ -214,14 +217,14 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	return !bFoundBlockingHit;
 }
 
-void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas)
+bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas)
 {
 	const FTransform& EntityTransform = Location.GetTransform();
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	FMassEntityHandle TargetEntity;
 	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, TargetEntityFragment.SearchBreadth);
 	if (!bFoundTarget) {
-		return;
+		return false;
 	}
 
 	FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
@@ -229,7 +232,7 @@ void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEnti
 	const bool& bCanEntityDamageTargetEntity = CanEntityDamageTargetEntity(TargetEntityFragment.TargetMinCaliberForDamage, TargetEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>());
 	if (!bCanEntityDamageTargetEntity)
 	{
-		return;
+		return false;
 	}
 
 	FTransformFragment& TargetTransformFragment = TargetEntityView.GetFragmentData<FTransformFragment>();
@@ -239,12 +242,43 @@ void ProcessEntity(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEnti
 	const bool& bTargetEntityVisibleViaSphereTrace = IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), EntityLocation + ProjectileOffset, TargetTransformFragment.GetTransform().GetLocation() + ProjectileOffset);
 	if (!bTargetEntityVisibleViaSphereTrace)
 	{
-		return;
+		return false;
 	}
 
 	TargetEntityFragment.Entity = TargetEntity;
-
 	TargetFinderEntityQueue.Enqueue(Entity);
+
+	return true;
+}
+
+bool UMassEnemyTargetFinderProcessor_DrawTrackedSounds = false;
+FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_DrawTrackedSounds(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawTrackedSounds"), UMassEnemyTargetFinderProcessor_DrawTrackedSounds, TEXT("UMassEnemyTargetFinderProcessor: Draw Tracked Sounds"));
+
+void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1)
+{
+	UWorld* World = SoundPerceptionSubsystem->GetWorld();
+	const FVector& EntityLocation = EntityTransform.GetLocation();
+	FVector OutSoundSource;
+	const bool& bIsFacingMoveTarget = IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward);
+	const bool& bIsCurrentlyStanding = MoveTargetFragment.GetCurrentAction() == EMassMovementAction::Stand ||
+		(MoveTargetFragment.GetCurrentAction() == EMassMovementAction::Move && MoveTargetFragment.GetCurrentActionID() == 0);
+	if (SoundPerceptionSubsystem->HasSoundAtLocation(EntityLocation, OutSoundSource, !bIsEntityOnTeam1) && bIsFacingMoveTarget && bIsCurrentlyStanding)
+	{
+		const FVector& NewGlobalDirection = (OutSoundSource - EntityLocation).GetSafeNormal();
+
+		MoveTargetFragment.CreateNewAction(EMassMovementAction::Stand, *World);
+		MoveTargetFragment.Center = EntityLocation;
+		MoveTargetFragment.Forward = NewGlobalDirection;
+
+		if (UMassEnemyTargetFinderProcessor_DrawTrackedSounds)
+		{
+			AsyncTask(ENamedThreads::GameThread, [World, EntityLocation, OutSoundSource]()
+			{
+				FVector VerticalOffset(0.f, 0.f, 400.f);
+				DrawDebugDirectionalArrow(World, EntityLocation + VerticalOffset, OutSoundSource + VerticalOffset, 100.f, FColor::Green, false, 5.f);
+			});
+		}
+	}
 }
 
 bool UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk = true;
@@ -252,6 +286,19 @@ FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_UseParallelForEachEn
 
 bool UMassEnemyTargetFinderProcessor_SkipFindingTargets = false;
 FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_SkipFindingTargets(TEXT("pm.UMassEnemyTargetFinderProcessor_SkipFindingTargets"), UMassEnemyTargetFinderProcessor_SkipFindingTargets, TEXT("UMassEnemyTargetFinderProcessor: Skip Finding Targets"));
+
+void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location)
+{
+	if (!UMassEnemyTargetFinderProcessor_DrawEntitiesSearching)
+	{
+		return;
+	}
+
+	AsyncTask(ENamedThreads::GameThread, [World, Location]()
+	{
+		::DrawDebugSphere(World, Location + FVector(0.f, 0.f, 300.f), 200.f, 10, FColor::Yellow, false, 1.f);
+	});
+}
 
 void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
@@ -264,13 +311,14 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 
 	TQueue<FMassEntityHandle> TargetFinderEntityQueue;
 
-	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase, &TargetFinderEntityQueue](FMassExecutionContext& Context)
+	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase, &TargetFinderEntityQueue, &SoundPerceptionSubsystem = SoundPerceptionSubsystem](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 
 		const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 		const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
+		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
 		const FNeedsEnemyTargetSharedParameters& SharedParameters = Context.GetConstSharedFragment<FNeedsEnemyTargetSharedParameters>();
 
 		// Used for storing sorted list of nearest entities.
@@ -297,7 +345,12 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 			const int32 EndIndexExclusive = StartIndex + CountPerJob;
 			for (int32 EntityIndex = StartIndex; (EntityIndex < NumEntities) && (EntityIndex < EndIndexExclusive); ++EntityIndex)
 			{
-				ProcessEntity(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase, Context, SharedParameters.DrawSearchAreas);
+				const bool& bFoundVisualTarget = ProcessEntityForVisualTarget(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase, Context, SharedParameters.DrawSearchAreas);
+				if (!bFoundVisualTarget)
+				{
+					ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1);
+				}
+				DrawEntitySearchingIfNeeded(EntitySubsystem.GetWorld(), LocationList[EntityIndex].GetTransform().GetLocation());
 			}
 		});
 	};

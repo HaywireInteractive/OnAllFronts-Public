@@ -17,7 +17,7 @@ public:
 
 protected:
 	UFUNCTION(BlueprintCallable)
-	void SpawnProjectile(const FTransform SpawnTransform) const;
+	void SpawnProjectile(const FTransform SpawnTransform, const bool bIsPlayerTeam1) const;
 
 	UPROPERTY(EditAnywhere, Category = "Mass")
 	FMassEntityConfig ProjectileEntityConfig;

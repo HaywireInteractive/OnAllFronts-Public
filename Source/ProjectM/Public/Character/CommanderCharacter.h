@@ -54,9 +54,6 @@ protected:
 	void SetMoveToCommand(FVector2D CommandLocation) const;
 
 	UFUNCTION(BlueprintCallable)
-	void SpawnProjectile() const;
-
-	UFUNCTION(BlueprintCallable)
 	class UMilitaryUnit* GetMyMilitaryUnit() const;
 
 public:

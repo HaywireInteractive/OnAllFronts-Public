@@ -6,9 +6,16 @@
 #include "MassProcessor.h"
 #include "MassEntityTraitBase.h"
 #include "MassEntityTemplateRegistry.h"
+#include <MassSoundPerceptionSubsystem.h>
+
 #include "MassEnemyTargetFinderProcessor.generated.h"
 
 class UMassNavigationSubsystem;
+
+const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt = 8;
+const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCount = UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt * UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
+const float UMassEnemyTargetFinderProcessor_SearchRadius = 5000.f; // TODO: don't hard-code
+const float UMassEnemyTargetFinderProcessor_CellSize = UMassEnemyTargetFinderProcessor_SearchRadius / (UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt / 2.0f);
 
 USTRUCT()
 struct PROJECTM_API FTargetEntityFragment : public FMassFragment
@@ -104,6 +111,7 @@ protected:
 
 private:
 	TObjectPtr<UMassNavigationSubsystem> NavigationSubsystem;
+	TObjectPtr<UMassSoundPerceptionSubsystem> SoundPerceptionSubsystem;
 	FMassEntityQuery EntityQuery;
 	uint8 FinderPhase = 0;
 };

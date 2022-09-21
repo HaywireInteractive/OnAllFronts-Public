@@ -9,8 +9,9 @@
 
 class UMassSignalSubsystem;
 struct FTransformFragment;
+struct FTeamMemberFragment;
 
-void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQuat& SpawnRotation, const FVector& InitialVelocity, const FMassEntityConfig& EntityConfig);
+void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQuat& SpawnRotation, const FVector& InitialVelocity, const FMassEntityConfig& EntityConfig, const bool& bIsProjectileFromTeam1);
 
 USTRUCT()
 struct PROJECTM_API FMassFireProjectileTaskInstanceData
@@ -50,6 +51,7 @@ protected:
 
 	TStateTreeExternalDataHandle<UMassSignalSubsystem> MassSignalSubsystemHandle;
 	TStateTreeExternalDataHandle<FTransformFragment> EntityTransformHandle;
+	TStateTreeExternalDataHandle<FTeamMemberFragment> TeamMemberHandle;
 
 	TStateTreeInstanceDataPropertyHandle<FMassEntityConfig> EntityConfigHandle;
 	TStateTreeInstanceDataPropertyHandle<float> InitialVelocityHandle;

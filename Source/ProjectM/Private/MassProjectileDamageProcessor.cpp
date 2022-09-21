@@ -9,6 +9,8 @@
 #include "MilitaryStructureSubsystem.h"
 #include <MassVisualEffectsSubsystem.h>
 #include "MassCollisionProcessor.h"
+#include <MassEnemyTargetFinderProcessor.h>
+#include <MassSoundPerceptionSubsystem.h>
 
 static const uint32 GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind = 20;
 typedef TArray<FMassNavigationObstacleItem, TFixedAllocator<GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind>> TProjectileDamageObstacleItemArray;
@@ -294,9 +296,46 @@ void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDea
 	}
 }
 
+void HandleProjectImpactSoundPerception(UWorld* World, const FVector& Location, const FMassEntityHandle& CollidedEntity, UMassEntitySubsystem& EntitySubsystem)
+{
+	const bool& bHasCollidedEntity = CollidedEntity.IsSet();
+	bool bIsCollidedEntityOnTeam1;
+
+	if (bHasCollidedEntity)
+	{
+		FMassEntityView CollidedEntityView(EntitySubsystem, CollidedEntity);
+		FTeamMemberFragment* CollidedEntityTeamMemberFragment = CollidedEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
+		if (CollidedEntityTeamMemberFragment)
+		{
+			bIsCollidedEntityOnTeam1 = CollidedEntityTeamMemberFragment->IsOnTeam1;
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("HandleProjectImpactSoundPerception: Collided Entity does not have expected FTeamMemberFragment."));
+		}
+	}
+
+	AsyncTask(ENamedThreads::GameThread, [World, Location = Location, bHasCollidedEntity, bIsCollidedEntityOnTeam1]()
+	{
+		UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem = UWorld::GetSubsystem<UMassSoundPerceptionSubsystem>(World);
+		check(SoundPerceptionSubsystem);
+		if (bHasCollidedEntity)
+		{
+			SoundPerceptionSubsystem->AddSoundPerception(Location, bIsCollidedEntityOnTeam1);
+		}
+		else
+		{
+			SoundPerceptionSubsystem->AddSoundPerception(Location, true);
+			SoundPerceptionSubsystem->AddSoundPerception(Location, false);
+		}
+	});
+}
+
 void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, const FMassEntityHandle Entity, UWorld* World, const FProjectileDamageFragment& ProjectileDamageFragment, const FVector& Location, const TProjectileDamageObstacleItemArray& CloseEntities, const bool& DrawLineTraces, TQueue<FHitResult>& DebugLinesToDrawQueue, UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, const FMassEntityHandle& CollidedEntity)
 {
 	ProjectilesToDestroy.Enqueue(Entity);
+
+	HandleProjectImpactSoundPerception(World, Location, CollidedEntity, EntitySubsystem);
 
 	if (ProjectileDamageFragment.ExplosionEntityConfigIndex >= 0)
 	{
@@ -366,6 +405,11 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 	
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : OutCloseEntities)
 	{
+		if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
+		{
+			continue;
+		}
+
 		FMassEntityView ClosestOtherEntityView(EntitySubsystem, OtherEntity.Entity);
 		FTransformFragment* OtherTransformFragment = ClosestOtherEntityView.GetFragmentDataPtr<FTransformFragment>();
 		FCollisionCapsuleParametersFragment* OtherCollisionCapsuleParametersFragment = ClosestOtherEntityView.GetFragmentDataPtr<FCollisionCapsuleParametersFragment>();

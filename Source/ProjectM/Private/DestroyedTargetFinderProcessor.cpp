@@ -43,15 +43,15 @@ void UDestroyedTargetFinderProcessor::ConfigureQueries()
 	EntityQuery.AddTagRequirement<FMassWillNeedEnemyTargetTag>(EMassFragmentPresence::All);
 }
 
-bool IsTargetEntityOutOfRange(const FMassEntityHandle& TargetEntity, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem)
+bool IsTargetEntityOutOfRange(const FMassEntityHandle& TargetEntity, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment)
 {
-	const FTransformFragment* TargetTransformFragment = EntitySubsystem.GetFragmentDataPtr<FTransformFragment>(TargetEntity);
-	check(TargetTransformFragment);
+	const FTransformFragment& TargetTransformFragment = EntitySubsystem.GetFragmentDataChecked<FTransformFragment>(TargetEntity);
+	const FVector& TargetEntityLocation = TargetTransformFragment.GetTransform().GetLocation();
+	const double& DistanceBetweenEntities = (TargetEntityLocation - EntityLocation).Size();
 
-	const FVector& TargetEntityLocation = TargetTransformFragment->GetTransform().GetLocation();
-	const double DistanceBetweenEntities = (TargetEntityLocation - EntityLocation).Size();
+	const uint8 SearchDepth = UMassEnemyTargetFinderProcessor_FinderPhaseCount / TargetEntityFragment.SearchBreadth;
+	const float MaxRange = SearchDepth * UMassEnemyTargetFinderProcessor_CellSize;
 
-	static const double MaxRange = 7000.f; // TODO: make configurable in data asset
 	return DistanceBetweenEntities > MaxRange;
 }
 
@@ -59,7 +59,7 @@ void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle
 {
 	FMassEntityHandle& TargetEntity = TargetEntityFragment.Entity;
 	bool bTargetEntityWasDestroyed = !EntitySubsystem.IsEntityValid(TargetEntity);
-	bool bTargetEntityOutOfRange = !bTargetEntityWasDestroyed && IsTargetEntityOutOfRange(TargetEntity, EntityLocation, EntitySubsystem);
+	bool bTargetEntityOutOfRange = !bTargetEntityWasDestroyed && IsTargetEntityOutOfRange(TargetEntity, EntityLocation, EntitySubsystem, TargetEntityFragment);
 	if (bTargetEntityWasDestroyed || bTargetEntityOutOfRange)
 	{
 		TargetEntity.Reset();

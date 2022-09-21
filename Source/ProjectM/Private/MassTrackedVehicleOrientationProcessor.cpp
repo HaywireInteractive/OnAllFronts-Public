@@ -29,6 +29,51 @@ void UMassTrackedVehicleOrientationProcessor::ConfigureQueries()
 	EntityQuery.AddConstSharedRequirement<FMassTrackedVehicleOrientationParameters>(EMassFragmentPresence::All);
 }
 
+struct FProcessEntityContext
+{
+	FProcessEntityContext(const FMassMoveTargetFragment& InMoveTarget, FTransform& InTransform, const FMassTrackedVehicleOrientationParameters& InOrientationParams, const float& InDeltaTime, const FMassEntityHandle& InEntity) : MoveTarget(InMoveTarget), Transform(InTransform), OrientationParams(InOrientationParams), DeltaTime(InDeltaTime), Entity(InEntity) {}
+
+	const FMassMoveTargetFragment& MoveTarget;
+	FTransform& Transform;
+	const FMassTrackedVehicleOrientationParameters& OrientationParams;
+	const float& DeltaTime;
+	const FMassEntityHandle& Entity;
+
+	void ProcessEntity()
+	{
+		const FVector CurrentForward = Transform.GetRotation().GetForwardVector();
+
+		const float& CurrentHeading = UE::MassNavigation::GetYawFromDirection(CurrentForward);
+		const float& DesiredHeading = UE::MassNavigation::GetYawFromDirection(MoveTarget.Forward);
+
+		const bool& bIsAtDesiredHeading = FMath::IsNearlyEqual(CurrentHeading, DesiredHeading);
+		if (UE::Mass::Debug::IsDebuggingEntity(Entity, nullptr))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("UMassTrackedVehicleOrientationProcessor: Entity sn=%d, CurrentHeading=%.2f , DesiredHeading=%.2f, IsAtDesiredHeading=%d"), Entity.SerialNumber, CurrentHeading, DesiredHeading, bIsAtDesiredHeading);
+		}
+
+		if (bIsAtDesiredHeading)
+		{
+			return;
+		}
+
+		float NewHeading;
+		float DeltaHeading = FMath::DegreesToRadians(OrientationParams.TurningSpeed) * DeltaTime;
+		if (FMath::Abs(CurrentHeading - DesiredHeading) <= DeltaHeading)
+		{
+			NewHeading = DesiredHeading;
+		}
+		else
+		{
+			DeltaHeading = DesiredHeading > CurrentHeading ? DeltaHeading : -DeltaHeading;
+			NewHeading = CurrentHeading + DeltaHeading;
+		}
+
+		FQuat Rotation(FVector::UpVector, NewHeading);
+		Transform.SetRotation(Rotation);
+	}
+};
+
 void UMassTrackedVehicleOrientationProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 	FMassExecutionContext& Context)
 {
@@ -42,39 +87,12 @@ void UMassTrackedVehicleOrientationProcessor::Execute(UMassEntitySubsystem& Enti
 		const int32 NumEntities = Context.GetNumEntities();
 
 		const FMassTrackedVehicleOrientationParameters& OrientationParams = Context.GetConstSharedFragment<FMassTrackedVehicleOrientationParameters>();
-
 		const TConstArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetFragmentView<FMassMoveTargetFragment>();
 		const TArrayView<FTransformFragment> LocationList = Context.GetMutableFragmentView<FTransformFragment>();
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			const FMassMoveTargetFragment& MoveTarget = MoveTargetList[EntityIndex];
-
-			FTransform& CurrentTransform = LocationList[EntityIndex].GetMutableTransform();
-			const FVector CurrentForward = CurrentTransform.GetRotation().GetForwardVector();
-			
-			const float CurrentHeading = UE::MassNavigation::GetYawFromDirection(CurrentForward);
-			const float DesiredHeading = UE::MassNavigation::GetYawFromDirection(MoveTarget.Forward);
-
-			if (FMath::IsNearlyEqual(CurrentHeading, DesiredHeading))
-			{
-				return;
-			}
-
-			float NewHeading;
-			float DeltaHeading = FMath::DegreesToRadians(OrientationParams.TurningSpeed) * DeltaTime;
-			if (FMath::Abs(CurrentHeading - DesiredHeading) <= DeltaHeading)
-			{
-				NewHeading = DesiredHeading;
-			}
-			else
-			{
-				DeltaHeading = DesiredHeading > CurrentHeading ? DeltaHeading : -DeltaHeading;
-				NewHeading = CurrentHeading + DeltaHeading;
-			}
-
-			FQuat Rotation(FVector::UpVector, NewHeading);
-			CurrentTransform.SetRotation(Rotation);
+			FProcessEntityContext(MoveTargetList[EntityIndex], LocationList[EntityIndex].GetMutableTransform(), OrientationParams, DeltaTime, Context.GetEntity(EntityIndex)).ProcessEntity();
 		}
 	});
 }
