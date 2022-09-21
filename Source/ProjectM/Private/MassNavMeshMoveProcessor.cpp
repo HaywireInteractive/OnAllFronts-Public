@@ -30,14 +30,6 @@ void UMassNavMeshMoveProcessor::ConfigureQueries()
 bool UMassNavMeshMoveProcessor_DrawPathState = false;
 FAutoConsoleVariableRef CVarUMassNavMeshMoveProcessor_DrawPathState(TEXT("pm.UMassNavMeshMoveProcessor_DrawPathState"), UMassNavMeshMoveProcessor_DrawPathState, TEXT("UMassNavMeshMoveProcessor: Draw Path State"));
 
-bool AtMoveTargetForwardRotation(const FMassMoveTargetFragment& MoveTargetFragment, const FTransform& EntityTransform)
-{
-	const FVector CurrentForward = EntityTransform.GetRotation().GetForwardVector();
-	const float CurrentHeading = UE::MassNavigation::GetYawFromDirection(CurrentForward);
-	const float DesiredHeading = UE::MassNavigation::GetYawFromDirection(MoveTargetFragment.Forward);
-	return FMath::IsNearlyEqual(CurrentHeading, DesiredHeading);
-}
-
 void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float& MovementSpeed, const float& AgentRadius)
 {
 	const FVector& EntityLocation = EntityTransform.GetLocation();
@@ -59,7 +51,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	const auto DistanceFromNextMovePoint = (EntityLocation - NextMovePoint).Size();
 	MoveTargetFragmentToModify.DistanceToGoal = DistanceFromNextMovePoint;
 	const bool bAtNextMovePoint = DistanceFromNextMovePoint < AgentRadius;
-	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && AtMoveTargetForwardRotation(MoveTargetFragment, EntityTransform) : bAtNextMovePoint;
+	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward) : bAtNextMovePoint;
 	if (!bFinishedNextMovePoint)
 	{
 		if (UMassNavMeshMoveProcessor_DrawPathState)

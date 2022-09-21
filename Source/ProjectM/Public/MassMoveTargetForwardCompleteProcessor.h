@@ -11,8 +11,6 @@
 
 class UMassSignalSubsystem;
 
-bool IsTransformFacingDirection(const FTransform& Transform, const FVector& TargetDirection);
-
 USTRUCT()
 struct FMassNeedsMoveTargetForwardCompleteSignalTag : public FMassTag
 {

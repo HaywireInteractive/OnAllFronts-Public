@@ -6,6 +6,8 @@
 #include "MassProcessor.h"
 #include "MassTrackedVehicleOrientationProcessor.generated.h"
 
+bool IsTransformFacingDirection(const FTransform& Transform, const FVector& TargetDirection, float* OutCurrentHeadingRadians = nullptr, float* OutDesiredHeadingRadians = nullptr, float* OutDeltaAngleRadians = nullptr, float* OutAbsDeltaAngleRadians = nullptr);
+
 USTRUCT()
 struct FMassTrackedVehicleOrientationTag : public FMassTag
 {
@@ -34,6 +36,7 @@ protected:
 	FMassTrackedVehicleOrientationParameters Orientation;
 };
 
+/** Processor for turning trached vehicles towards their MoveTarget at a constant turning speed. The one used for soldiers UMassSmoothOrientationProcessor cannot be used because it does not turn entity at constant speed. */
 UCLASS()
 class PROJECTM_API UMassTrackedVehicleOrientationProcessor : public UMassProcessor
 {

@@ -29,6 +29,39 @@ void UMassTrackedVehicleOrientationProcessor::ConfigureQueries()
 	EntityQuery.AddConstSharedRequirement<FMassTrackedVehicleOrientationParameters>(EMassFragmentPresence::All);
 }
 
+bool IsTransformFacingDirection(const FTransform& Transform, const FVector& TargetDirection, float* OutCurrentHeadingRadians, float* OutDesiredHeadingRadians, float* OutDeltaAngleRadians, float* OutAbsDeltaAngleRadians)
+{
+	const FVector CurrentForward = Transform.GetRotation().GetForwardVector();
+
+	// These are in range of (-PI, PI].
+	const float& CurrentHeadingRadians = UE::MassNavigation::GetYawFromDirection(CurrentForward);
+	const float& DesiredHeadingRadians = UE::MassNavigation::GetYawFromDirection(TargetDirection);
+
+	// In Range [-PI, PI].
+	const float& DeltaAngleRadians = (FMath::FindDeltaAngleRadians(CurrentHeadingRadians, DesiredHeadingRadians));
+	// In Range [0, PI].
+	const float& AbsDeltaAngleRadians = FMath::Abs(DeltaAngleRadians);
+
+	if (OutCurrentHeadingRadians)
+	{
+		*OutCurrentHeadingRadians = CurrentHeadingRadians;
+	}
+	if (OutDesiredHeadingRadians)
+	{
+		*OutDesiredHeadingRadians = DesiredHeadingRadians;
+	}
+	if (OutDeltaAngleRadians)
+	{
+		*OutDeltaAngleRadians = DeltaAngleRadians;
+	}
+	if (OutAbsDeltaAngleRadians)
+	{
+		*OutAbsDeltaAngleRadians = AbsDeltaAngleRadians;
+	}
+
+	return FMath::IsNearlyEqual(AbsDeltaAngleRadians, 0.f, 0.01f); // TODO: Is this a good tolerance?
+}
+
 struct FProcessEntityContext
 {
 	FProcessEntityContext(const FMassMoveTargetFragment& InMoveTarget, FTransform& InTransform, const FMassTrackedVehicleOrientationParameters& InOrientationParams, const float& InDeltaTime, const FMassEntityHandle& InEntity) : MoveTarget(InMoveTarget), Transform(InTransform), OrientationParams(InOrientationParams), DeltaTime(InDeltaTime), Entity(InEntity) {}
@@ -41,15 +74,20 @@ struct FProcessEntityContext
 
 	void ProcessEntity()
 	{
-		const FVector CurrentForward = Transform.GetRotation().GetForwardVector();
+		// These are in range of (-PI, PI].
+		float OutCurrentHeadingRadians;
+		float OutDesiredHeadingRadians;
 
-		const float& CurrentHeading = UE::MassNavigation::GetYawFromDirection(CurrentForward);
-		const float& DesiredHeading = UE::MassNavigation::GetYawFromDirection(MoveTarget.Forward);
+		// In Range [-PI, PI].
+		float OutTotalDeltaAngleRadians;
 
-		const bool& bIsAtDesiredHeading = FMath::IsNearlyEqual(CurrentHeading, DesiredHeading);
+		// In Range [0, PI].
+		float OutAbsTotalDeltaAngleRadians;
+
+		const bool& bIsAtDesiredHeading = IsTransformFacingDirection(Transform, MoveTarget.Forward, &OutCurrentHeadingRadians, &OutDesiredHeadingRadians, &OutTotalDeltaAngleRadians, &OutAbsTotalDeltaAngleRadians);
 		if (UE::Mass::Debug::IsDebuggingEntity(Entity, nullptr))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("UMassTrackedVehicleOrientationProcessor: Entity sn=%d, CurrentHeading=%.2f , DesiredHeading=%.2f, IsAtDesiredHeading=%d"), Entity.SerialNumber, CurrentHeading, DesiredHeading, bIsAtDesiredHeading);
+			UE_LOG(LogTemp, Warning, TEXT("UMassTrackedVehicleOrientationProcessor: Entity sn=%d, CurrentHeadingRadians=%.2f , DesiredHeadingRadians=%.2f, IsAtDesiredHeading=%d"), Entity.SerialNumber, OutCurrentHeadingRadians, OutDesiredHeadingRadians, bIsAtDesiredHeading);
 		}
 
 		if (bIsAtDesiredHeading)
@@ -57,19 +95,18 @@ struct FProcessEntityContext
 			return;
 		}
 
-		float NewHeading;
-		float DeltaHeading = FMath::DegreesToRadians(OrientationParams.TurningSpeed) * DeltaTime;
-		if (FMath::Abs(CurrentHeading - DesiredHeading) <= DeltaHeading)
+		float NewHeadingRadians;
+		float DeltaHeadingRadians = FMath::DegreesToRadians(OrientationParams.TurningSpeed) * DeltaTime;
+		if (OutAbsTotalDeltaAngleRadians <= DeltaHeadingRadians)
 		{
-			NewHeading = DesiredHeading;
+			NewHeadingRadians = OutDesiredHeadingRadians;
 		}
 		else
 		{
-			DeltaHeading = DesiredHeading > CurrentHeading ? DeltaHeading : -DeltaHeading;
-			NewHeading = CurrentHeading + DeltaHeading;
+			NewHeadingRadians = OutCurrentHeadingRadians + (OutTotalDeltaAngleRadians > 0.f ? DeltaHeadingRadians : -DeltaHeadingRadians);
 		}
 
-		FQuat Rotation(FVector::UpVector, NewHeading);
+		FQuat Rotation(FVector::UpVector, NewHeadingRadians);
 		Transform.SetRotation(Rotation);
 	}
 };

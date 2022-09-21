@@ -13,6 +13,7 @@
 #include <MassNavigationTypes.h>
 #include "MassNavigationFragments.h"
 #include "MassMoveTargetForwardCompleteProcessor.h"
+#include "MassTrackedVehicleOrientationProcessor.h"
 
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
