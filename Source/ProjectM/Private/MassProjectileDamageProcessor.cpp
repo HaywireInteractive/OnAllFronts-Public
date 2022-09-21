@@ -237,7 +237,7 @@ FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_SkipDealingDamage(TEX
 bool UMassProjectileDamageProcessor_DrawDamageDealt = false;
 FAutoConsoleVariableRef CVarUUMassProjectileDamageProcessor_DrawDamageDealt(TEXT("pm.UMassProjectileDamageProcessor_DrawDamageDealt"), UMassProjectileDamageProcessor_DrawDamageDealt, TEXT("UMassProjectileDamageProcessor: Debug draw damage dealt"));
 
-void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDealDamageToView, const FProjectileDamageFragment& ProjectileDamageFragment, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, UWorld* World)
+void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDealDamageToView, const FProjectileDamageFragment& ProjectileDamageFragment, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, UWorld* World, const bool OverrideSplashDamageWithRegularDamage = false)
 {
 	FMassHealthFragment* EntityToDealDamageToHealthFragment = EntityToDealDamageToView.GetFragmentDataPtr<FMassHealthFragment>();
 	if (!EntityToDealDamageToHealthFragment)
@@ -258,9 +258,9 @@ void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDea
 	}
 	const auto EntityToDealDamageToLocation = EntityToDealDamageToTransformFragment->GetTransform().GetLocation();
 
-	// If no splash damage.
+	// If splash damage calculate scaled amout of damage based on distance from impact.
 	int16 DamageToDeal = ProjectileDamageFragment.DamagePerHit;
-	if (ProjectileDamageFragment.SplashDamageRadius > 0)
+	if (ProjectileDamageFragment.SplashDamageRadius > 0 && !OverrideSplashDamageWithRegularDamage)
 	{
 		const auto DistanceBetweenImpactAndEntityToDealDamageTo = (ImpactLocation - EntityToDealDamageToLocation).Size();
 		const auto SplashDamageScale = ProjectileDamageFragment.SplashDamageRadius - DistanceBetweenImpactAndEntityToDealDamageTo;
@@ -359,12 +359,20 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, con
 		return;
 	}
 
+	check(CollidedEntity.IsValid());
+
 	const bool bDealSplashDamage = ProjectileDamageFragment.SplashDamageRadius > 0;
 	if (bDealSplashDamage)
 	{
 		for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 		{
 			FMassEntityView OtherEntityEntityView(EntitySubsystem, OtherEntity.Entity);
+			if (CollidedEntity == OtherEntity.Entity)
+			{
+				// Deal full damage (not splash damage) to entity which was collided with.
+				DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World, true);
+				continue;
+			}
 			FTransformFragment* OtherEntityTransformFragment = OtherEntityEntityView.GetFragmentDataPtr<FTransformFragment>();
 			if (!OtherEntityTransformFragment)
 			{
@@ -380,7 +388,6 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, con
 	}
 	else
 	{
-		check(CollidedEntity.IsValid());
 		FMassEntityView OtherEntityEntityView(EntitySubsystem, CollidedEntity);
 		DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World);
 	}
