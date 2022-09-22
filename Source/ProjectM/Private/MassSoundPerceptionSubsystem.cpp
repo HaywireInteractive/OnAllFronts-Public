@@ -57,7 +57,7 @@ void UMassSoundPerceptionSubsystem::Tick(float DeltaTime)
 bool UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception = false;
 FAutoConsoleVariableRef CVarUMassSoundPerceptionSubsystem_DrawOnAddSoundPerception(TEXT("pm.UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception"), UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception, TEXT("UMassSoundPerceptionSubsystem: Draw On AddSoundPerception"));
 
-void UMassSoundPerceptionSubsystem::AddSoundPerception(FVector Location, const bool& bIsSourceFromTeam1)
+void UMassSoundPerceptionSubsystem::AddSoundPerception(FVector Location, const bool& bIsSourceFromTeam1, const bool SkipDebugDraw)
 {
 	auto& SoundPerceptionGrid = bIsSourceFromTeam1 ? SoundPerceptionGridForTeam1 : SoundPerceptionGridForTeam2;
 	uint32 ItemID = GMassSoundPerceptionSubsystemCounter++;
@@ -70,9 +70,29 @@ void UMassSoundPerceptionSubsystem::AddSoundPerception(FVector Location, const b
 	auto& IdsToMetaData = bIsSourceFromTeam1 ? IdsToMetaDataForTeam1 : IdsToMetaDataForTeam2;
 	IdsToMetaData.Add(ItemID, ItemMetaData);
 
-	if (UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception)
+	if (UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception && !SkipDebugDraw)
 	{
 		::DrawDebugSphere(GetWorld(), Location, 200.f, 10, bIsSourceFromTeam1 ? FColor::Red : FColor::Blue, false, GSecondsTilSoundPerceptionDestruction);
+	}
+}
+
+// TODO: This isn't on by default yet because it makes the AI do pretty dumb stuff like turn away from enemies if there's an explosion behind them. Need to improve.
+bool UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds = false;
+FAutoConsoleVariableRef CVar_UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds(TEXT("pm.UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds"), UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds, TEXT("UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds"));
+
+void UMassSoundPerceptionSubsystem::AddSoundPerception(FVector Location)
+{
+	if (!UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds)
+	{
+		return;
+	}
+
+	AddSoundPerception(Location, true, true);
+	AddSoundPerception(Location, false, true);
+
+	if (UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception)
+	{
+		::DrawDebugSphere(GetWorld(), Location, 200.f, 10, FColor::White, false, GSecondsTilSoundPerceptionDestruction);
 	}
 }
 

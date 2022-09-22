@@ -325,8 +325,7 @@ void HandleProjectImpactSoundPerception(UWorld* World, const FVector& Location, 
 		}
 		else
 		{
-			SoundPerceptionSubsystem->AddSoundPerception(Location, true);
-			SoundPerceptionSubsystem->AddSoundPerception(Location, false);
+			SoundPerceptionSubsystem->AddSoundPerception(Location);
 		}
 	});
 }

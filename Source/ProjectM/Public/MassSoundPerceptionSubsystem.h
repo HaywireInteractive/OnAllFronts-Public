@@ -27,7 +27,8 @@ public:
 	UMassSoundPerceptionSubsystem();
 
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-	void AddSoundPerception(FVector Location, const bool& bIsSourceFromTeam1);
+	void AddSoundPerception(FVector Location, const bool& bIsSourceFromTeam1, const bool SkipDebugDraw = false);
+	void AddSoundPerception(FVector Location);
 	bool HasSoundAtLocation(FVector Location, FVector& OutSoundSource, const bool& bFilterToTeam1);
 
 protected:
