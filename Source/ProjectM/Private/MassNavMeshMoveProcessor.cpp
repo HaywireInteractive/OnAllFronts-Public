@@ -45,7 +45,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	// For tracked vehicles set initial move target forward to direction so they first turn if needed.
 	if (NavMeshMoveFragment.CurrentPathPointIndex == 0 && bIsTrackedVehicle)
 	{
-		MoveTargetFragment.Forward = (Points[1].Location - EntityLocation).GetSafeNormal();
+		MoveTargetFragmentToModify.Forward = (Points[1].Location - EntityLocation).GetSafeNormal();
 	}
 
 	const auto DistanceFromNextMovePoint = (EntityLocation - NextMovePoint).Size();
