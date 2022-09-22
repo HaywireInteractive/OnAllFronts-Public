@@ -123,7 +123,7 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 
 	AsyncTask(ENamedThreads::GameThread, [EntityConfig, InitialVelocity, SpawnLocation, World, SpawnRotation, bIsProjectileSourceTeam1]()
 	{
-			SpawnProjectile(World, SpawnLocation, SpawnRotation, InitialVelocity, EntityConfig, bIsProjectileSourceTeam1);
+		SpawnProjectile(World, SpawnLocation, SpawnRotation, InitialVelocity, EntityConfig, bIsProjectileSourceTeam1);
 	});
 
 	MassSignalSubsystem.DelaySignalEntity(UE::Mass::Signals::NewStateTreeTaskRequired, MassContext.GetEntity(), 1.0f); // TODO: needed?

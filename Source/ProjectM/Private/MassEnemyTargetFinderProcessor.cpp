@@ -69,7 +69,7 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 	SoundPerceptionSubsystem = UWorld::GetSubsystem<UMassSoundPerceptionSubsystem>(Owner.GetWorld());
 }
 
-static const FBox BoxForPhase(const uint8& FinderPhase, const FTransform& SearchCenterTransform, const uint8& SearchBreadth)
+static const FBox BoxForPhase(const uint8& FinderPhase, const FTransform& SearchCenterTransform, const uint8& SearchBreadth, const FMassEntityHandle& Entity, const UWorld* World)
 {
 	const uint8 BoxXSegment = FinderPhase / (UMassEnemyTargetFinderProcessor_FinderPhaseCount / SearchBreadth);
 	const uint8 BoxYSegment = FinderPhase % (UMassEnemyTargetFinderProcessor_FinderPhaseCount / SearchBreadth);
@@ -80,36 +80,32 @@ static const FBox BoxForPhase(const uint8& FinderPhase, const FTransform& Search
 	const FVector& RotationRightVector = SearchCenterTransform.GetRotation().GetRightVector();
 	const FVector BoxBottomLeft = Center - RotationRightVector * (XWidth / 2.f);
 	
+	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
+	{
+		AsyncTask(ENamedThreads::GameThread, [World, BoxBottomLeft, RotationForwardVector, RotationRightVector, Center]()
+		{
+			const FVector CenterOffsetVertical = Center + FVector(0.f, 0.f, 1000.f);
+			DrawDebugDirectionalArrow(World, CenterOffsetVertical, CenterOffsetVertical + RotationForwardVector * 100, 10.f, FColor::Green, false, 2.f);
+			DrawDebugDirectionalArrow(World, CenterOffsetVertical, CenterOffsetVertical + RotationRightVector * 100, 10.f, FColor::Red, false, 2.f);
+			DrawDebugPoint(World, BoxBottomLeft + FVector(0.f, 0.f, 1000.f), 5.f, FColor::Yellow, false, 2.f);
+		});
+	}
+
 	const FVector PhaseBoxBottomLeft = BoxBottomLeft + RotationRightVector * UMassEnemyTargetFinderProcessor_CellSize * BoxXSegment + RotationForwardVector * UMassEnemyTargetFinderProcessor_CellSize * BoxYSegment;
 	const FVector PhaseBoxTopRight = PhaseBoxBottomLeft + RotationRightVector * UMassEnemyTargetFinderProcessor_CellSize + RotationForwardVector * UMassEnemyTargetFinderProcessor_CellSize;
 	return FBox(PhaseBoxBottomLeft, PhaseBoxTopRight);
 }
-
-bool UMassEnemyTargetFinderProcessor_DrawSearchAreas = false;
-FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_DrawSearchAreas(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawSearchAreas"), UMassEnemyTargetFinderProcessor_DrawSearchAreas, TEXT("UMassEnemyTargetFinderProcessor: debug draw search areas"));
 
 bool UMassEnemyTargetFinderProcessor_DrawEntitiesSearching = false;
 FAutoConsoleVariableRef CVar_UMassEnemyTargetFinderProcessor_DrawEntitiesSearching(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawEntitiesSearching"), UMassEnemyTargetFinderProcessor_DrawEntitiesSearching, TEXT("UMassEnemyTargetFinderProcessor_DrawEntitiesSearching"));
 
 // TODO: Find out how to not duplicate from MassProjectileDamageProcessor.cpp. Right now only difference is number in template type for TFixedAllocator.
 static void FindCloseObstacles(const FTransform& SearchCenterTransform, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
-	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults, const uint8& FinderPhase, const bool& DrawSearchAreas, const UWorld* World, const uint8& SearchBreadth)
+	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults, const uint8& FinderPhase, const bool& DrawSearchAreas, const UWorld* World, const uint8& SearchBreadth, const FMassEntityHandle& Entity)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_FindCloseObstacles);
 	OutCloseEntities.Reset();
-	const FBox QueryBox = BoxForPhase(FinderPhase, SearchCenterTransform, SearchBreadth);
-
-	if (DrawSearchAreas || UMassEnemyTargetFinderProcessor_DrawSearchAreas)
-	{
-		AsyncTask(ENamedThreads::GameThread, [QueryBox, World, FinderPhase]()
-		{
-			const FVector Center = (QueryBox.Max - QueryBox.Min) / 2.f + QueryBox.Min;
-			FVector Extent = QueryBox.Max - Center;
-			Extent.Z = 1000.f;
-			DrawDebugBox(World, Center, Extent, FColor::Green, false, 10.f);
-			DrawDebugString(World, Center, FString::FromInt(FinderPhase), nullptr, FColor::Green, 10.f);
-		});
-	}
+	const FBox QueryBox = BoxForPhase(FinderPhase, SearchCenterTransform, SearchBreadth, Entity, World);
 
 	struct FSortingCell
 	{
@@ -146,6 +142,7 @@ static void FindCloseObstacles(const FTransform& SearchCenterTransform, const FN
 
 	Cells.Sort([](const FSortingCell& A, const FSortingCell& B) { return A.SqDist < B.SqDist; });
 
+	bool bIsComplete = false;
 	for (const FSortingCell& SortedCell : Cells)
 	{
 		if (const FNavigationObstacleHashGrid2D::FCell* Cell = AvoidanceObstacleGrid.FindCell(SortedCell.X, SortedCell.Y, SortedCell.Level))
@@ -156,10 +153,27 @@ static void FindCloseObstacles(const FTransform& SearchCenterTransform, const FN
 				OutCloseEntities.Add(Items[Idx].ID);
 				if (OutCloseEntities.Num() >= MaxResults)
 				{
-					return;
+					bIsComplete = true;
+					break;
 				}
 			}
+
+			if (bIsComplete)
+			{
+				break;
+			}
 		}
+	}
+
+	if (DrawSearchAreas || UE::Mass::Debug::IsDebuggingEntity(Entity))
+	{
+		AsyncTask(ENamedThreads::GameThread, [QueryBox, World, FinderPhase, Rotation = SearchCenterTransform.GetRotation(), NumCloseEntities = OutCloseEntities.Num()]()
+		{
+			const FVector Center = (QueryBox.Max + QueryBox.Min) / 2.f;
+			FVector Extent(UMassEnemyTargetFinderProcessor_CellSize / 2, UMassEnemyTargetFinderProcessor_CellSize / 2, 1000.f);
+			DrawDebugBox(World, Center, Extent, Rotation, FColor::Green, false, 2.f);
+			DrawDebugString(World, Center, FString::Printf(TEXT("%d (%d)"), FinderPhase, NumCloseEntities), nullptr, FColor::Green, 2.f);
+		});
 	}
 }
 
@@ -167,7 +181,7 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestEnemy);
 
-	FindCloseObstacles(EntityTransform, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld(), SearchBreadth);
+	FindCloseObstacles(EntityTransform, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld(), SearchBreadth, Entity);
 
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 	{
@@ -288,17 +302,15 @@ FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_UseParallelForEachEn
 bool UMassEnemyTargetFinderProcessor_SkipFindingTargets = false;
 FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_SkipFindingTargets(TEXT("pm.UMassEnemyTargetFinderProcessor_SkipFindingTargets"), UMassEnemyTargetFinderProcessor_SkipFindingTargets, TEXT("UMassEnemyTargetFinderProcessor: Skip Finding Targets"));
 
-void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location)
+void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location, const FMassEntityHandle& Entity)
 {
-	if (!UMassEnemyTargetFinderProcessor_DrawEntitiesSearching)
+	if (UMassEnemyTargetFinderProcessor_DrawEntitiesSearching || UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
-		return;
+		AsyncTask(ENamedThreads::GameThread, [World, Location]()
+		{
+			::DrawDebugSphere(World, Location + FVector(0.f, 0.f, 300.f), 200.f, 10, FColor::Yellow, false, 0.1f);
+		});
 	}
-
-	AsyncTask(ENamedThreads::GameThread, [World, Location]()
-	{
-		::DrawDebugSphere(World, Location + FVector(0.f, 0.f, 300.f), 200.f, 10, FColor::Yellow, false, 1.f);
-	});
 }
 
 void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
@@ -351,7 +363,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 				{
 					ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1);
 				}
-				DrawEntitySearchingIfNeeded(EntitySubsystem.GetWorld(), LocationList[EntityIndex].GetTransform().GetLocation());
+				DrawEntitySearchingIfNeeded(EntitySubsystem.GetWorld(), LocationList[EntityIndex].GetTransform().GetLocation(), Context.GetEntity(EntityIndex));
 			}
 		});
 	};

@@ -85,7 +85,7 @@ struct FProcessEntityContext
 		float OutAbsTotalDeltaAngleRadians;
 
 		const bool& bIsAtDesiredHeading = IsTransformFacingDirection(Transform, MoveTarget.Forward, &OutCurrentHeadingRadians, &OutDesiredHeadingRadians, &OutTotalDeltaAngleRadians, &OutAbsTotalDeltaAngleRadians);
-		if (UE::Mass::Debug::IsDebuggingEntity(Entity, nullptr))
+		if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("UMassTrackedVehicleOrientationProcessor: Entity sn=%d, CurrentHeadingRadians=%.2f , DesiredHeadingRadians=%.2f, IsAtDesiredHeading=%d"), Entity.SerialNumber, OutCurrentHeadingRadians, OutDesiredHeadingRadians, bIsAtDesiredHeading);
 		}
