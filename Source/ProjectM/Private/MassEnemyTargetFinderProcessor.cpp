@@ -91,9 +91,16 @@ static const FBox BoxForPhase(const uint8& FinderPhase, const FTransform& Search
 		});
 	}
 
-	const FVector PhaseBoxBottomLeft = BoxBottomLeft + RotationRightVector * UMassEnemyTargetFinderProcessor_CellSize * BoxXSegment + RotationForwardVector * UMassEnemyTargetFinderProcessor_CellSize * BoxYSegment;
-	const FVector PhaseBoxTopRight = PhaseBoxBottomLeft + RotationRightVector * UMassEnemyTargetFinderProcessor_CellSize + RotationForwardVector * UMassEnemyTargetFinderProcessor_CellSize;
-	return FBox(PhaseBoxBottomLeft, PhaseBoxTopRight);
+	FVector PhaseBoxBottomLeft = BoxBottomLeft + RotationRightVector * UMassEnemyTargetFinderProcessor_CellSize * BoxXSegment + RotationForwardVector * UMassEnemyTargetFinderProcessor_CellSize * BoxYSegment;
+	FVector PhaseBoxTopRight = PhaseBoxBottomLeft + RotationRightVector * UMassEnemyTargetFinderProcessor_CellSize + RotationForwardVector * UMassEnemyTargetFinderProcessor_CellSize;
+
+	const auto Pivot = (PhaseBoxBottomLeft + PhaseBoxTopRight) / 2.f;
+	
+	auto PhaseBoxBottomLeftDir = PhaseBoxBottomLeft - Pivot;
+	PhaseBoxBottomLeftDir = SearchCenterTransform.GetRotation().UnrotateVector(PhaseBoxBottomLeftDir);
+	PhaseBoxBottomLeft = PhaseBoxBottomLeftDir + PhaseBoxBottomLeft;
+
+	return FBox(PhaseBoxBottomLeft, PhaseBoxBottomLeft + FVector(UMassEnemyTargetFinderProcessor_CellSize, UMassEnemyTargetFinderProcessor_CellSize, 0.f));
 }
 
 bool UMassEnemyTargetFinderProcessor_DrawEntitiesSearching = false;
@@ -167,11 +174,11 @@ static void FindCloseObstacles(const FTransform& SearchCenterTransform, const FN
 
 	if (DrawSearchAreas || UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
-		AsyncTask(ENamedThreads::GameThread, [QueryBox, World, FinderPhase, Rotation = SearchCenterTransform.GetRotation(), NumCloseEntities = OutCloseEntities.Num()]()
+		AsyncTask(ENamedThreads::GameThread, [QueryBox, World, FinderPhase, NumCloseEntities = OutCloseEntities.Num()]()
 		{
 			const FVector Center = (QueryBox.Max + QueryBox.Min) / 2.f;
 			FVector Extent(UMassEnemyTargetFinderProcessor_CellSize / 2, UMassEnemyTargetFinderProcessor_CellSize / 2, 1000.f);
-			DrawDebugBox(World, Center, Extent, Rotation, FColor::Green, false, 2.f);
+			DrawDebugBox(World, Center, Extent, FColor::Green, false, 2.f);
 			DrawDebugString(World, Center, FString::Printf(TEXT("%d (%d)"), FinderPhase, NumCloseEntities), nullptr, FColor::Green, 2.f);
 		});
 	}
