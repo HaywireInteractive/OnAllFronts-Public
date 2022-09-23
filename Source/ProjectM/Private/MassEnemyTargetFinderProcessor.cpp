@@ -207,6 +207,7 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 
 	FindCloseObstacles(EntityTransform, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld(), SearchBreadth, Entity);
 
+	bool bFoundEnemy = false;
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 	{
 		// Skip self.
@@ -235,12 +236,20 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 			continue;
 		}
 
-		OutTargetEntity = OtherEntity.Entity;
-		return true;
+		if (!bFoundEnemy)
+		{
+			// We can't break out of for loop here because we want to add other nearly teammates found to CachedCloseUnhittableEntities.
+			bFoundEnemy = true;
+			OutTargetEntity = OtherEntity.Entity;
+		}
 	}
 
-	OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
-	return false;
+	if (!bFoundEnemy)
+	{
+		OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
+	}
+
+	return bFoundEnemy;
 }
 
 bool CanEntityDamageTargetEntity(const float& TargetMinCaliberForDamage, const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment)
