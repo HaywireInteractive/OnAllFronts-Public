@@ -43,7 +43,7 @@ void UDestroyedTargetFinderProcessor::ConfigureQueries()
 	EntityQuery.AddTagRequirement<FMassWillNeedEnemyTargetTag>(EMassFragmentPresence::All);
 }
 
-bool IsTargetEntityOutOfRange(const FMassEntityHandle& TargetEntity, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment)
+bool IsTargetEntityOutOfRange(const FMassEntityHandle& TargetEntity, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FMassEntityHandle Entity)
 {
 	const FTransformFragment& TargetTransformFragment = EntitySubsystem.GetFragmentDataChecked<FTransformFragment>(TargetEntity);
 	const FVector& TargetEntityLocation = TargetTransformFragment.GetTransform().GetLocation();
@@ -52,6 +52,14 @@ bool IsTargetEntityOutOfRange(const FMassEntityHandle& TargetEntity, const FVect
 	const uint8 SearchDepth = UMassEnemyTargetFinderProcessor_FinderPhaseCount / TargetEntityFragment.SearchBreadth;
 	const float MaxRange = SearchDepth * UMassEnemyTargetFinderProcessor_CellSize;
 
+	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
+	{
+		AsyncTask(ENamedThreads::GameThread, [World = EntitySubsystem.GetWorld(), EntityLocation, TargetEntityLocation]()
+		{
+			DrawDebugDirectionalArrow(World, EntityLocation, TargetEntityLocation, 10.f, FColor::Yellow, false, 0.1f);
+		});
+	}
+
 	return DistanceBetweenEntities > MaxRange;
 }
 
@@ -59,7 +67,7 @@ void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle
 {
 	FMassEntityHandle& TargetEntity = TargetEntityFragment.Entity;
 	bool bTargetEntityWasDestroyed = !EntitySubsystem.IsEntityValid(TargetEntity);
-	bool bTargetEntityOutOfRange = !bTargetEntityWasDestroyed && IsTargetEntityOutOfRange(TargetEntity, EntityLocation, EntitySubsystem, TargetEntityFragment);
+	bool bTargetEntityOutOfRange = !bTargetEntityWasDestroyed && IsTargetEntityOutOfRange(TargetEntity, EntityLocation, EntitySubsystem, TargetEntityFragment, Entity);
 	if (bTargetEntityWasDestroyed || bTargetEntityOutOfRange)
 	{
 		TargetEntity.Reset();
