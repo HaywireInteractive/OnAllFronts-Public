@@ -7,6 +7,7 @@
 #include "MassEntityTraitBase.h"
 #include "MassEntityTemplateRegistry.h"
 #include <MassSoundPerceptionSubsystem.h>
+#include <MassCollisionProcessor.h>
 
 #include "MassEnemyTargetFinderProcessor.generated.h"
 
@@ -17,18 +18,29 @@ const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCount = UMassEnemyTargetF
 const float UMassEnemyTargetFinderProcessor_SearchRadius = 5000.f; // TODO: don't hard-code
 const float UMassEnemyTargetFinderProcessor_CellSize = UMassEnemyTargetFinderProcessor_SearchRadius / (UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt / 2.0f);
 
+struct FCloseUnhittableEntityData
+{
+	FCloseUnhittableEntityData() = default;
+	FCloseUnhittableEntityData(FCapsule InCapsule, uint8 InPhasesLeft) : Capsule(InCapsule), PhasesLeft(InPhasesLeft) {}
+	FCapsule Capsule;
+	uint8 PhasesLeft;
+};
+
+const uint8 UMassEnemyTargetFinderProcessor_MaxCachedCloseUnhittableEntities = 50;
+
 USTRUCT()
 struct PROJECTM_API FTargetEntityFragment : public FMassFragment
 {
 	GENERATED_BODY()
-	UPROPERTY(EditAnywhere, Category = "")
-	FMassEntityHandle Entity;
 
-	UPROPERTY(EditAnywhere, Category = "")
+	FMassEntityHandle Entity;
 	float TargetMinCaliberForDamage;
 
+	/** Cache close teammates so when we find a target we can ensure we won't hit teammate. */
+	TStaticArray<FCloseUnhittableEntityData, UMassEnemyTargetFinderProcessor_MaxCachedCloseUnhittableEntities> CachedCloseUnhittableEntities;
+	uint8 CachedCloseUnhittableEntitiesNextIndex = 0;
+
 	/** The number of cells to search across from where target is looking. The depth is determined by 64 / SearchBreadth so make sure this value is divisible into 64. */
-	UPROPERTY(Category = "", EditAnywhere)
 	uint8 SearchBreadth = 8;
 };
 

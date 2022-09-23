@@ -207,10 +207,7 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 	FTransform OtherEntityTransform = OtherTransformFragment->GetTransform();
 	FVector OtherEntityLocation = OtherEntityTransform.GetLocation();
 
-	FCapsule ProjectileCapsule;
-	ProjectileCapsule.a = StartLocation;
-	ProjectileCapsule.b = EndLocation;
-	ProjectileCapsule.r = Radius;
+	FCapsule ProjectileCapsule(StartLocation, EndLocation, Radius);
 
 	const FCapsule& OtherEntityCapsule = MakeCapsuleForEntity(CollisionCapsuleParametersFragment, OtherEntityTransform);
 

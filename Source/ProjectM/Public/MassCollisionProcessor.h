@@ -19,9 +19,11 @@ struct FMassCollisionTag : public FMassTag
 
 struct FCapsule
 {
-	FVector a;
-	FVector b;
-	float r;
+	FCapsule(FVector InA, FVector InB, float InR) : a(InA), b(InB), r(InR) {}
+	FCapsule() {}
+	FVector a; // One edge of Capsule.
+	FVector b; // Other edge of Capsule.
+	float r; // Radius
 };
 
 USTRUCT()
