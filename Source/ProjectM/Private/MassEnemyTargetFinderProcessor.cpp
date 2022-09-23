@@ -201,13 +201,47 @@ void AddToCachedCloseUnhittableEntities(FTargetEntityFragment& TargetEntityFragm
 	}
 }
 
-bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment)
+bool CanEntityDamageTargetEntity(const float& TargetMinCaliberForDamage, const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestEnemy);
+	return TargetEntityProjectileDamagableFragment && TargetMinCaliberForDamage >= TargetEntityProjectileDamagableFragment->MinCaliberForDamage;
+}
+
+bool AreCloseUnhittableEntitiesBlockingTarget(const FVector& ProjectileSpawnLocation, const FVector& ProjectileTargetLocation, const FTargetEntityFragment& TargetEntityFragment)
+{
+	static const float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
+	FCapsule ProjectileCapsule(ProjectileSpawnLocation, ProjectileTargetLocation, ProjectileRadius);
+
+	for (const FCloseUnhittableEntityData& CloseUnhittableEntityData : TargetEntityFragment.CachedCloseUnhittableEntities)
+	{
+		if (CloseUnhittableEntityData.PhasesLeft <= 0)
+		{
+			continue;
+		}
+
+		if (TestCapsuleCapsule(ProjectileCapsule, CloseUnhittableEntityData.Capsule))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation)
+{
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace);
+	FHitResult Result;
+	static const float Radius = 20.f; // TODO: don't hard-code
+	bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
+	return !bFoundBlockingHit;
+}
+
+bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, const FVector& EntityLocation)
+{
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestValidEnemy);
 
 	FindCloseObstacles(EntityTransform, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld(), SearchBreadth, Entity);
 
-	bool bFoundEnemy = false;
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 	{
 		// Skip self.
@@ -236,34 +270,34 @@ bool GetClosestEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& Enti
 			continue;
 		}
 
-		if (!bFoundEnemy)
+		if (!CanEntityDamageTargetEntity(TargetEntityFragment.TargetMinCaliberForDamage, OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>()))
 		{
-			// We can't break out of for loop here because we want to add other nearly teammates found to CachedCloseUnhittableEntities.
-			bFoundEnemy = true;
-			OutTargetEntity = OtherEntity.Entity;
+			AddToCachedCloseUnhittableEntities(TargetEntityFragment, OtherEntityView);
+			continue;
 		}
+
+		const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+		const FVector ProjectileOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
+		const FVector ProjectileSpawnLocation = EntityLocation + ProjectileOffset;
+		FTransformFragment& OtherTransformFragment = OtherEntityView.GetFragmentData<FTransformFragment>();
+		FVector ProjectileTargetLocation = OtherTransformFragment.GetTransform().GetLocation() + ProjectileOffset;
+
+		if (AreCloseUnhittableEntitiesBlockingTarget(ProjectileSpawnLocation, ProjectileTargetLocation, TargetEntityFragment))
+		{
+			continue;
+		}
+
+		if (!IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), ProjectileSpawnLocation, ProjectileTargetLocation))
+		{
+			continue;
+		}
+
+		OutTargetEntity = OtherEntity.Entity;
+		return true;
 	}
 
-	if (!bFoundEnemy)
-	{
-		OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
-	}
-
-	return bFoundEnemy;
-}
-
-bool CanEntityDamageTargetEntity(const float& TargetMinCaliberForDamage, const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment)
-{
-	return TargetEntityProjectileDamagableFragment && TargetMinCaliberForDamage >= TargetEntityProjectileDamagableFragment->MinCaliberForDamage;
-}
-
-bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation)
-{
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace);
-	FHitResult Result;
-	static const float Radius = 20.f; // TODO: don't hard-code
-	bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
-	return !bFoundBlockingHit;
+	OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
+	return false;
 }
 
 void UpdatePhasesLeftOnCachedCloseUnhittableEntities(FTargetEntityFragment& TargetEntityFragment)
@@ -277,27 +311,6 @@ void UpdatePhasesLeftOnCachedCloseUnhittableEntities(FTargetEntityFragment& Targ
 	}
 }
 
-bool AreCloseUnhittableEntitiesBlockingTarget(const FVector& ProjectileSpawnLocation, const FVector& ProjectileTargetLocation, const FTargetEntityFragment& TargetEntityFragment)
-{
-	static const float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
-	FCapsule ProjectileCapsule(ProjectileSpawnLocation, ProjectileTargetLocation, ProjectileRadius);
-
-	for (const FCloseUnhittableEntityData& CloseUnhittableEntityData : TargetEntityFragment.CachedCloseUnhittableEntities)
-	{
-		if (CloseUnhittableEntityData.PhasesLeft <= 0)
-		{
-			continue;
-		}
-
-		if (TestCapsuleCapsule(ProjectileCapsule, CloseUnhittableEntityData.Capsule))
-		{
-			return true;
-		}
-	}
-
-	return false;
-}
-
 bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas)
 {
 	UpdatePhasesLeftOnCachedCloseUnhittableEntities(TargetEntityFragment);
@@ -305,36 +318,8 @@ bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQ
 	const FTransform& EntityTransform = Location.GetTransform();
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	FMassEntityHandle TargetEntity;
-	auto bFoundTarget = GetClosestEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, TargetEntityFragment.SearchBreadth, TargetEntityFragment);
+	auto bFoundTarget = GetClosestValidEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, TargetEntityFragment.SearchBreadth, TargetEntityFragment, Context, EntityLocation);
 	if (!bFoundTarget) {
-		return false;
-	}
-
-	FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
-	
-	const bool& bCanEntityDamageTargetEntity = CanEntityDamageTargetEntity(TargetEntityFragment.TargetMinCaliberForDamage, TargetEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>());
-	if (!bCanEntityDamageTargetEntity)
-	{
-		AddToCachedCloseUnhittableEntities(TargetEntityFragment, TargetEntityView);
-		return false;
-	}
-
-	const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-	const FVector ProjectileOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
-	const FVector ProjectileSpawnLocation = EntityLocation + ProjectileOffset;
-
-	FTransformFragment& TargetTransformFragment = TargetEntityView.GetFragmentData<FTransformFragment>();
-	FVector ProjectileTargetLocation = TargetTransformFragment.GetTransform().GetLocation() + ProjectileOffset;
-
-	const bool& bAreCloseUnhittableEntitiesBlockingTarget = AreCloseUnhittableEntitiesBlockingTarget(ProjectileSpawnLocation, ProjectileTargetLocation, TargetEntityFragment);
-	if (bAreCloseUnhittableEntitiesBlockingTarget)
-	{
-		return false;
-	}
-
-	const bool& bTargetEntityVisibleViaSphereTrace = IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), ProjectileSpawnLocation, ProjectileTargetLocation);
-	if (!bTargetEntityVisibleViaSphereTrace)
-	{
 		return false;
 	}
 
