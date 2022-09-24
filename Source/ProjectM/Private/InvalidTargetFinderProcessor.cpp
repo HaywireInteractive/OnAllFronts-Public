@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "DestroyedTargetFinderProcessor.h"
+#include "InvalidTargetFinderProcessor.h"
 #include "MassEnemyTargetFinderProcessor.h"
 #include "MassTrackTargetProcessor.h"
 #include "MassCommonFragments.h"
@@ -26,19 +26,19 @@ void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragme
 	Destination.IntentAtGoal = Source.IntentAtGoal;
 }
 
-UDestroyedTargetFinderProcessor::UDestroyedTargetFinderProcessor()
+UInvalidTargetFinderProcessor::UInvalidTargetFinderProcessor()
 {
 	bAutoRegisterWithProcessingPhases = true;
 	ExecutionFlags = (int32)EProcessorExecutionFlags::All;
 }
 
-void UDestroyedTargetFinderProcessor::Initialize(UObject& Owner)
+void UInvalidTargetFinderProcessor::Initialize(UObject& Owner)
 {
 	SignalSubsystem = UWorld::GetSubsystem<UMassSignalSubsystem>(Owner.GetWorld());
 	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
 }
 
-void UDestroyedTargetFinderProcessor::ConfigureQueries()
+void UInvalidTargetFinderProcessor::ConfigureQueries()
 {
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
@@ -182,9 +182,9 @@ void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle
 	}
 }
 
-void UDestroyedTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
+void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UDestroyedTargetFinderProcessor);
+	QUICK_SCOPE_CYCLE_COUNTER(UInvalidTargetFinderProcessor);
 
 	if (!NavigationSubsystem)
 	{

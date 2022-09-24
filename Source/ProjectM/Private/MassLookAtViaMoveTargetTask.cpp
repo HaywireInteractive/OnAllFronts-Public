@@ -5,7 +5,7 @@
 #include "MassStateTreeExecutionContext.h"
 #include "MassEntitySubsystem.h"
 #include "MassMoveTargetForwardCompleteProcessor.h"
-#include "DestroyedTargetFinderProcessor.h"
+#include "InvalidTargetFinderProcessor.h"
 #include "MassTrackTargetProcessor.h"
 #include "MassNavigationTypes.h"
 

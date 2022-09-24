@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "MassProcessor.h"
 #include "MassNavigationFragments.h"
-#include "DestroyedTargetFinderProcessor.generated.h"
+#include "InvalidTargetFinderProcessor.generated.h"
 
 class UMassSignalSubsystem;
 class UMassNavigationSubsystem;
@@ -13,11 +13,11 @@ class UMassNavigationSubsystem;
 void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World);
 
 UCLASS()
-class PROJECTM_API UDestroyedTargetFinderProcessor : public UMassProcessor
+class PROJECTM_API UInvalidTargetFinderProcessor : public UMassProcessor
 {
 	GENERATED_BODY()
 public:
-	UDestroyedTargetFinderProcessor();
+	UInvalidTargetFinderProcessor();
 
 protected:
 	virtual void Initialize(UObject& Owner) override;
