@@ -346,15 +346,13 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, con
 		return;
 	}
 
-	check(CollidedEntity.IsValid());
-
 	const bool bDealSplashDamage = ProjectileDamageFragment.SplashDamageRadius > 0;
 	if (bDealSplashDamage)
 	{
 		for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 		{
 			FMassEntityView OtherEntityEntityView(EntitySubsystem, OtherEntity.Entity);
-			if (CollidedEntity == OtherEntity.Entity)
+			if (CollidedEntity.IsValid() && CollidedEntity == OtherEntity.Entity)
 			{
 				// Deal full damage (not splash damage) to entity which was collided with.
 				DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World, true);
@@ -373,7 +371,7 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle>& ProjectilesToDestroy, con
 
 		}
 	}
-	else
+	else if (CollidedEntity.IsValid())
 	{
 		FMassEntityView OtherEntityEntityView(EntitySubsystem, CollidedEntity);
 		DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World);
@@ -384,15 +382,17 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 {
 	UWorld* World = EntitySubsystem.GetWorld();
 
-	// If collide via line trace, we hit the environment, so destroy projectile.
+	const float CloseEntitiesRadius = ProjectileDamageFragment.SplashDamageRadius > 0 ? ProjectileDamageFragment.SplashDamageRadius : Radius.Radius;
+	bool bHasCloseEntity = GetClosestEntities(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), CloseEntitiesRadius, OutCloseEntities);
+
+	// If collide via line trace, we hit the environment, so destroy projectile and deal splash damage if needed.
 	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
 	if (DidCollideViaLineTrace(*World, PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces, DebugLinesToDrawQueue))
 	{
-		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, TProjectileDamageObstacleItemArray(), DrawLineTraces, DebugLinesToDrawQueue, EntitySubsystem, SoldiersToDestroy, PlayersToDestroy, FMassEntityHandle());
+		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, OutCloseEntities, DrawLineTraces, DebugLinesToDrawQueue, EntitySubsystem, SoldiersToDestroy, PlayersToDestroy, FMassEntityHandle());
 		return;
 	}
 
-	bool bHasCloseEntity = GetClosestEntities(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), Radius.Radius, OutCloseEntities);
 	if (!bHasCloseEntity) {
 		return;
 	}
