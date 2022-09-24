@@ -13,6 +13,8 @@
 
 class UMassNavigationSubsystem;
 
+const float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
+
 const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt = 8;
 const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCount = UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt * UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
 const float UMassEnemyTargetFinderProcessor_SearchRadius = 5000.f; // TODO: don't hard-code
@@ -27,6 +29,8 @@ struct FCloseUnhittableEntityData
 };
 
 const uint8 UMassEnemyTargetFinderProcessor_MaxCachedCloseUnhittableEntities = 50;
+
+bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView);
 
 USTRUCT()
 struct PROJECTM_API FTargetEntityFragment : public FMassFragment

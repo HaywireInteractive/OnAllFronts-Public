@@ -8,6 +8,7 @@
 #include "DestroyedTargetFinderProcessor.generated.h"
 
 class UMassSignalSubsystem;
+class UMassNavigationSubsystem;
 
 void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World);
 
@@ -23,8 +24,8 @@ protected:
 	virtual void ConfigureQueries() override;
 	virtual void Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context) override;
 
-	UPROPERTY(Transient)
-	UMassSignalSubsystem* SignalSubsystem;
+	TObjectPtr<UMassSignalSubsystem> SignalSubsystem;
+	TObjectPtr<UMassNavigationSubsystem> NavigationSubsystem;
 
 private:
 	FMassEntityQuery EntityQuery;

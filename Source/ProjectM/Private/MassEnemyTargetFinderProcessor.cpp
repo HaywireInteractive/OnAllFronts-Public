@@ -84,9 +84,9 @@ static const FBox BoxForPhase(const uint8& FinderPhase, const FTransform& Search
 		AsyncTask(ENamedThreads::GameThread, [World, BoxBottomLeft, RotationForwardVector, RotationRightVector, Center]()
 		{
 			const FVector CenterOffsetVertical = Center + FVector(0.f, 0.f, 1000.f);
-			DrawDebugDirectionalArrow(World, CenterOffsetVertical, CenterOffsetVertical + RotationForwardVector * 100, 10.f, FColor::Green, false, 2.f);
-			DrawDebugDirectionalArrow(World, CenterOffsetVertical, CenterOffsetVertical + RotationRightVector * 100, 10.f, FColor::Red, false, 2.f);
-			DrawDebugPoint(World, BoxBottomLeft + FVector(0.f, 0.f, 1000.f), 5.f, FColor::Yellow, false, 2.f);
+			DrawDebugDirectionalArrow(World, CenterOffsetVertical, CenterOffsetVertical + RotationForwardVector * 100, 10.f, FColor::Green, false, 0.1f);
+			DrawDebugDirectionalArrow(World, CenterOffsetVertical, CenterOffsetVertical + RotationRightVector * 100, 10.f, FColor::Red, false, 0.1f);
+			DrawDebugPoint(World, BoxBottomLeft + FVector(0.f, 0.f, 1000.f), 5.f, FColor::Yellow, false, 0.1f);
 		});
 	}
 
@@ -177,22 +177,15 @@ static void FindCloseObstacles(const FTransform& SearchCenterTransform, const FN
 		{
 			const FVector Center = (QueryBox.Max + QueryBox.Min) / 2.f;
 			FVector Extent(UMassEnemyTargetFinderProcessor_CellSize / 2, UMassEnemyTargetFinderProcessor_CellSize / 2, 1000.f);
-			DrawDebugBox(World, Center, Extent, FColor::Green, false, 2.f);
-			DrawDebugString(World, Center, FString::Printf(TEXT("%d (%d)"), FinderPhase, NumCloseEntities), nullptr, FColor::Green, 2.f);
+			DrawDebugBox(World, Center, Extent, FColor::Green, false, 0.1f);
+			DrawDebugString(World, Center, FString::Printf(TEXT("%d (%d)"), FinderPhase, NumCloseEntities), nullptr, FColor::Green, 0.1f);
 		});
 	}
 }
 
 void AddToCachedCloseUnhittableEntities(FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView)
 {
-	FCollisionCapsuleParametersFragment* OtherCollisionCapsuleParametersFragment = OtherEntityView.GetFragmentDataPtr<FCollisionCapsuleParametersFragment>();
-	FTransformFragment* OtherTransformFragment = OtherEntityView.GetFragmentDataPtr<FTransformFragment>();
-	if (!OtherCollisionCapsuleParametersFragment || !OtherTransformFragment)
-	{
-		return;
-	}
-
-	FCapsule OtherEntityCapsule = MakeCapsuleForEntity(*OtherCollisionCapsuleParametersFragment, OtherTransformFragment->GetTransform());
+	FCapsule OtherEntityCapsule = MakeCapsuleForEntity(OtherEntityView);
 	TargetEntityFragment.CachedCloseUnhittableEntities[TargetEntityFragment.CachedCloseUnhittableEntitiesNextIndex] = FCloseUnhittableEntityData(OtherEntityCapsule, UMassEnemyTargetFinderProcessor_FinderPhaseCount);
 	TargetEntityFragment.CachedCloseUnhittableEntitiesNextIndex++;
 	if (TargetEntityFragment.CachedCloseUnhittableEntitiesNextIndex >= UMassEnemyTargetFinderProcessor_MaxCachedCloseUnhittableEntities)
@@ -201,14 +194,14 @@ void AddToCachedCloseUnhittableEntities(FTargetEntityFragment& TargetEntityFragm
 	}
 }
 
-bool CanEntityDamageTargetEntity(const float& TargetMinCaliberForDamage, const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment)
+bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView)
 {
-	return TargetEntityProjectileDamagableFragment && TargetMinCaliberForDamage >= TargetEntityProjectileDamagableFragment->MinCaliberForDamage;
+	const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment = OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>();
+	return TargetEntityProjectileDamagableFragment && TargetEntityFragment.TargetMinCaliberForDamage >= TargetEntityProjectileDamagableFragment->MinCaliberForDamage;
 }
 
 bool AreCloseUnhittableEntitiesBlockingTarget(const FVector& ProjectileSpawnLocation, const FVector& ProjectileTargetLocation, const FTargetEntityFragment& TargetEntityFragment)
 {
-	static const float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
 	FCapsule ProjectileCapsule(ProjectileSpawnLocation, ProjectileTargetLocation, ProjectileRadius);
 
 	for (const FCloseUnhittableEntityData& CloseUnhittableEntityData : TargetEntityFragment.CachedCloseUnhittableEntities)
@@ -236,7 +229,7 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	return !bFoundBlockingHit;
 }
 
-bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, const FVector& EntityLocation)
+bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, const FVector& EntityLocation)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestValidEnemy);
 
@@ -270,7 +263,7 @@ bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem&
 			continue;
 		}
 
-		if (!CanEntityDamageTargetEntity(TargetEntityFragment.TargetMinCaliberForDamage, OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>()))
+		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntityView))
 		{
 			AddToCachedCloseUnhittableEntities(TargetEntityFragment, OtherEntityView);
 			continue;
@@ -407,7 +400,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		};
 
 		// TODO: We're incorrectly assuming all obstacles can be targets.
-		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGridMutable();
+		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGrid();
 
 		const int32 NumJobs = SharedParameters.ParallelJobCount;
 		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs; // ceil(NumEntities / NumJobs)

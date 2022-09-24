@@ -28,7 +28,7 @@ public:
 
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	void AddSoundPerception(FVector Location, const bool& bIsSourceFromTeam1, const bool SkipDebugDraw = false);
-	void AddSoundPerception(FVector Location);
+	void AddSoundPerception(FVector Location); // Use this overload for sounds that are not specific to a team.
 	bool HasSoundAtLocation(FVector Location, FVector& OutSoundSource, const bool& bFilterToTeam1);
 
 protected:

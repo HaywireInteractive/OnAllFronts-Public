@@ -196,21 +196,12 @@ bool DidCollideViaLineTrace(const UWorld &World, const FVector& StartLocation, c
 bool UMassProjectileDamageProcessor_DrawCapsules = false;
 FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_DrawCapsules(TEXT("pm.UMassProjectileDamageProcessor_DrawCapsules"), UMassProjectileDamageProcessor_DrawCapsules, TEXT("UMassProjectileDamageProcessor: Debug draw capsules used for collisions detection"));
 
-bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, FTransformFragment* OtherTransformFragment, const bool& DrawCapsules, const UWorld& World, TQueue<TPair<FCapsule, FLinearColor>>& DebugCapsulesToDrawQueue, const FCollisionCapsuleParametersFragment& CollisionCapsuleParametersFragment)
+bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, const bool& DrawCapsules, const UWorld& World, TQueue<TPair<FCapsule, FLinearColor>>& DebugCapsulesToDrawQueue, const FMassEntityView& OtherEntityView)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_DidCollideWithEntity);
-	if (!OtherTransformFragment)
-	{
-		return false;
-	}
-
-	FTransform OtherEntityTransform = OtherTransformFragment->GetTransform();
-	FVector OtherEntityLocation = OtherEntityTransform.GetLocation();
 
 	FCapsule ProjectileCapsule(StartLocation, EndLocation, Radius);
-
-	const FCapsule& OtherEntityCapsule = MakeCapsuleForEntity(CollisionCapsuleParametersFragment, OtherEntityTransform);
-
+	const FCapsule& OtherEntityCapsule = MakeCapsuleForEntity(OtherEntityView);
 	const bool& bDidCollide = TestCapsuleCapsule(ProjectileCapsule, OtherEntityCapsule);
 
 	if (DrawCapsules || UMassProjectileDamageProcessor_DrawCapsules)
@@ -414,16 +405,8 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 		}
 
 		FMassEntityView ClosestOtherEntityView(EntitySubsystem, OtherEntity.Entity);
-		FTransformFragment* OtherTransformFragment = ClosestOtherEntityView.GetFragmentDataPtr<FTransformFragment>();
-		FCollisionCapsuleParametersFragment* OtherCollisionCapsuleParametersFragment = ClosestOtherEntityView.GetFragmentDataPtr<FCollisionCapsuleParametersFragment>();
 
-		if (!OtherCollisionCapsuleParametersFragment)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("ProcessProjectileDamageEntity: Entity does not have expected FCollisionCapsuleParametersFragment."));
-			continue;
-		}
-
-		if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, OtherTransformFragment, DrawLineTraces, *World, DebugCapsulesToDrawQueue, *OtherCollisionCapsuleParametersFragment))
+		if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, DrawLineTraces, *World, DebugCapsulesToDrawQueue, ClosestOtherEntityView))
 		{
 			continue;
 		}

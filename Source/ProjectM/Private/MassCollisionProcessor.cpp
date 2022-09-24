@@ -82,6 +82,19 @@ FCapsule MakeCapsuleForEntity(const FCollisionCapsuleParametersFragment& Collisi
 	return Capsule;
 }
 
+FCapsule MakeCapsuleForEntity(const FMassEntityView& EntityView)
+{
+	FCollisionCapsuleParametersFragment* CollisionCapsuleParametersFragment = EntityView.GetFragmentDataPtr<FCollisionCapsuleParametersFragment>();
+	FTransformFragment* TransformFragment = EntityView.GetFragmentDataPtr<FTransformFragment>();
+	if (!CollisionCapsuleParametersFragment || !TransformFragment)
+	{
+		UE_LOG(LogTemp, Error, TEXT("MakeCapsuleForEntity: Expected FCollisionCapsuleParametersFragment and FTransformFragment on Entity."));
+		return FCapsule();
+	}
+
+	return MakeCapsuleForEntity(*CollisionCapsuleParametersFragment, TransformFragment->GetTransform());
+}
+
 float ClosestPtSegmentSegment(FVector p1, FVector q1, FVector p2, FVector q2,
 	float& s, float& t, FVector& c1, FVector& c2)
 {
@@ -165,10 +178,10 @@ float GetCapsuleHalfHeight(const FCapsule& Capsule)
 	return (Capsule.b - Capsule.a).Size() / 2.f;
 }
 
-void DrawCapsule(const FCapsule& Capsule, const UWorld& World, const FLinearColor& Color)
+void DrawCapsule(const FCapsule& Capsule, const UWorld& World, const FLinearColor& Color, const bool bPersistentLines, float LifeTime)
 {
 	FQuat const CapsuleRot = FRotationMatrix::MakeFromZ(Capsule.b - Capsule.a).ToQuat();
-	DrawDebugCapsule(&World, GetCapsuleCenter(Capsule), GetCapsuleHalfHeight(Capsule), Capsule.r, CapsuleRot, Color.ToFColor(true), true);
+	DrawDebugCapsule(&World, GetCapsuleCenter(Capsule), GetCapsuleHalfHeight(Capsule), Capsule.r, CapsuleRot, Color.ToFColor(true), bPersistentLines, LifeTime);
 }
 
 // TODO: DRY with other processors
@@ -258,11 +271,12 @@ void ProcessEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, con
 			continue;
 		}
 
-		FCapsule OtherEntityCapsule = MakeCapsuleForEntity(*OtherCollisionCapsuleParametersFragment, OtherTransformFragment->GetTransform());
+		const FTransform& OtherTransform = OtherTransformFragment->GetTransform();
+		FCapsule OtherEntityCapsule = MakeCapsuleForEntity(*OtherCollisionCapsuleParametersFragment, OtherTransform);
 
 		if (TestCapsuleCapsule(EntityCapsule, OtherEntityCapsule))
 		{
-			const auto& OtherLocation = OtherTransformFragment->GetTransform().GetLocation();
+			const auto& OtherLocation = OtherTransform.GetLocation();
 			const auto NewForce = FMath::IsNearlyEqual(VelocityFragment.Value.Size(), 0.f) ? Transform.GetLocation() - OtherLocation : -VelocityFragment.Value;
 			ForceFragment.Value = NewForce;
 			//VelocityFragment.Value = FVector::ZeroVector;

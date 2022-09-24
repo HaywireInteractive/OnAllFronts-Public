@@ -45,11 +45,12 @@ struct PROJECTM_API FCollisionCapsuleParametersFragment : public FMassFragment
 };
 
 FCapsule MakeCapsuleForEntity(const FCollisionCapsuleParametersFragment& CollisionCapsuleParametersFragment, const FTransform& EntityTransform);
+FCapsule MakeCapsuleForEntity(const FMassEntityView& EntityView);
 
 // Returns true if capsules collide.
 bool TestCapsuleCapsule(FCapsule capsule1, FCapsule capsule2);
 
-void DrawCapsule(const FCapsule& Capsule, const UWorld& World, const FLinearColor& Color = FLinearColor::Red);
+void DrawCapsule(const FCapsule& Capsule, const UWorld& World, const FLinearColor& Color = FLinearColor::Red, const bool bPersistentLines = true, float LifeTime = -1.f);
 
 UCLASS(meta = (DisplayName = "Collision"))
 class PROJECTM_API UMassCollisionTrait : public UMassEntityTraitBase
