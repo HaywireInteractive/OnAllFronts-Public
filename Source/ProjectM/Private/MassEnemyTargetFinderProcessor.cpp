@@ -14,6 +14,7 @@
 #include "MassNavigationFragments.h"
 #include "MassMoveTargetForwardCompleteProcessor.h"
 #include "MassTrackedVehicleOrientationProcessor.h"
+#include "InvalidTargetFinderProcessor.h"
 
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
@@ -200,10 +201,20 @@ bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragme
 	return TargetEntityProjectileDamagableFragment && TargetEntityFragment.TargetMinCaliberForDamage >= TargetEntityProjectileDamagableFragment->MinCaliberForDamage;
 }
 
-bool AreCloseUnhittableEntitiesBlockingTarget(const FVector& ProjectileSpawnLocation, const FVector& ProjectileTargetLocation, const FTargetEntityFragment& TargetEntityFragment)
+FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation)
 {
-	FCapsule ProjectileCapsule(ProjectileSpawnLocation, ProjectileTargetLocation, ProjectileRadius);
+	const FVector& EntityLocation = EntityTransform.GetLocation();
+	const FVector ProjectileZOffset(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
+	const FVector ProjectileSpawnLocation = EntityLocation + UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(EntityTransform, bIsEntitySoldier);
 
+	const bool bShouldAimAtFeet = !bIsEntitySoldier && bIsTargetEntitySoldier;
+	static const float VerticalBuffer = 50.f; // This is needed because otherwise for tanks we always hit the ground when doing trace. TODO: Come up with a better way to handle this.
+	FVector ProjectileTargetLocation = bShouldAimAtFeet ? TargetEntityLocation + FVector(0.f, 0.f, ProjectileRadius + VerticalBuffer) : TargetEntityLocation + ProjectileZOffset;
+	return FCapsule(ProjectileSpawnLocation, ProjectileTargetLocation, ProjectileRadius);
+}
+
+bool AreCloseUnhittableEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FTargetEntityFragment& TargetEntityFragment, const FMassEntityHandle& Entity, const UWorld& World)
+{
 	for (const FCloseUnhittableEntityData& CloseUnhittableEntityData : TargetEntityFragment.CachedCloseUnhittableEntities)
 	{
 		if (CloseUnhittableEntityData.PhasesLeft <= 0)
@@ -211,7 +222,7 @@ bool AreCloseUnhittableEntitiesBlockingTarget(const FVector& ProjectileSpawnLoca
 			continue;
 		}
 
-		if (TestCapsuleCapsule(ProjectileCapsule, CloseUnhittableEntityData.Capsule))
+		if (DidCapsulesCollide(ProjectileTraceCapsule, CloseUnhittableEntityData.Capsule, Entity, World))
 		{
 			return true;
 		}
@@ -220,20 +231,21 @@ bool AreCloseUnhittableEntitiesBlockingTarget(const FVector& ProjectileSpawnLoca
 	return false;
 }
 
-bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation)
+bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation, const bool DrawTrace)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace);
 	FHitResult Result;
 	static const float Radius = 20.f; // TODO: don't hard-code
-	bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
+	bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), DrawTrace ? EDrawDebugTrace::Type::ForDuration : EDrawDebugTrace::Type::None, Result, false, FLinearColor::Red, FLinearColor::Green, 2.f);
 	return !bFoundBlockingHit;
 }
 
-bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, const FVector& EntityLocation)
+bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestValidEnemy);
 
-	FindCloseObstacles(EntityTransform, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, EntitySubsystem.GetWorld(), SearchBreadth, Entity);
+	UWorld& World = *EntitySubsystem.GetWorld();
+	FindCloseObstacles(EntityTransform, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, &World, SearchBreadth, Entity);
 
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 	{
@@ -270,22 +282,22 @@ bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem&
 		}
 
 		const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-		const FVector ProjectileOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
-		const FVector ProjectileSpawnLocation = EntityLocation + ProjectileOffset;
-		FTransformFragment& OtherTransformFragment = OtherEntityView.GetFragmentData<FTransformFragment>();
-		FVector ProjectileTargetLocation = OtherTransformFragment.GetTransform().GetLocation() + ProjectileOffset;
+		bOutIsTargetEntitySoldier = OtherEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
+		const FVector& OtherEntityLocation = OtherEntityView.GetFragmentData<FTransformFragment>().GetTransform().GetLocation();
+		const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, bOutIsTargetEntitySoldier, EntityTransform, OtherEntityLocation);
 
-		if (AreCloseUnhittableEntitiesBlockingTarget(ProjectileSpawnLocation, ProjectileTargetLocation, TargetEntityFragment))
+		if (AreCloseUnhittableEntitiesBlockingTarget(ProjectileTraceCapsule, TargetEntityFragment, Entity, World))
 		{
 			continue;
 		}
 
-		if (!IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), ProjectileSpawnLocation, ProjectileTargetLocation))
+		if (!IsTargetEntityVisibleViaSphereTrace(World, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, UE::Mass::Debug::IsDebuggingEntity(Entity)))
 		{
 			continue;
 		}
 
 		OutTargetEntity = OtherEntity.Entity;
+		OutTargetEntityLocation = OtherEntityLocation;
 		return true;
 	}
 
@@ -304,19 +316,39 @@ void UpdatePhasesLeftOnCachedCloseUnhittableEntities(FTargetEntityFragment& Targ
 	}
 }
 
-bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas)
+float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
+{
+	return bIsEntitySoldier ? 4000.f : 7340.f; // TODO: make this configurable in data asset and get from there?
+}
+
+bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& TranformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas)
 {
 	UpdatePhasesLeftOnCachedCloseUnhittableEntities(TargetEntityFragment);
 
-	const FTransform& EntityTransform = Location.GetTransform();
+	const FTransform& EntityTransform = TranformFragment.GetTransform();
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	FMassEntityHandle TargetEntity;
-	auto bFoundTarget = GetClosestValidEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, TargetEntityFragment.SearchBreadth, TargetEntityFragment, Context, EntityLocation);
+	FVector OutTargetEntityLocation;
+	bool bOutIsTargetEntitySoldier;
+	auto bFoundTarget = GetClosestValidEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, TargetEntityFragment.SearchBreadth, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier);
 	if (!bFoundTarget) {
 		return false;
 	}
 
 	TargetEntityFragment.Entity = TargetEntity;
+	TargetEntityFragment.VerticalAimOffset = 0.f;
+	const bool bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+	const bool bShouldAimAtFeet = !bIsEntitySoldier && bOutIsTargetEntitySoldier;
+	if (bShouldAimAtFeet)
+	{
+		const FVector ProjectileSpawnLocation = EntityLocation + UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(EntityTransform, bIsEntitySoldier);
+		const float XYDistanceToTarget = (FVector2D(OutTargetEntityLocation) - FVector2D(ProjectileSpawnLocation)).Size();
+		const float TimeToTarget = XYDistanceToTarget / GetProjectileInitialXYVelocityMagnitude(false);
+		const float VerticalDistanceToTravel = OutTargetEntityLocation.Z - UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(false);
+		const float& GravityZ = EntitySubsystem.GetWorld()->GetGravityZ();
+		const float VerticalDistanceTraveledDueToGravity = (1.f / 2.f) * GravityZ * TimeToTarget * TimeToTarget;
+		TargetEntityFragment.VerticalAimOffset = (VerticalDistanceToTravel - VerticalDistanceTraveledDueToGravity) / TimeToTarget;
+	}
 	TargetFinderEntityQueue.Enqueue(Entity);
 
 	return true;
@@ -450,4 +482,11 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 /*static*/ const float UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(const bool& bIsSoldier)
 {
 	return bIsSoldier ? 150.f : 180.f; // TODO: don't hard-code
+}
+
+/*static*/ const FVector UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(const FTransform& EntityTransform, const bool& bIsSoldier)
+{
+	const float ForwardVectorMagnitude = bIsSoldier ? 300.f : 800.f; // TODO: don't hard-code
+	const FVector& ProjectileZOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsSoldier));
+	return EntityTransform.GetRotation().GetForwardVector() * ForwardVectorMagnitude + ProjectileZOffset;
 }

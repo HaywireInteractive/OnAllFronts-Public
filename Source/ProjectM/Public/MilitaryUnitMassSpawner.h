@@ -28,6 +28,7 @@ protected:
 	int32 AllSpawnedEntitiesVehicleIndex;
 
 	bool bDidSpawnVehiclesOnly = false;
+	bool bDidSpawnSoldiersOnly = false;
 
 public:
 	AMilitaryUnitMassSpawner();

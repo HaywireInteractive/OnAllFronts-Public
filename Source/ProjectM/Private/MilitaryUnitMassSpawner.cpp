@@ -46,6 +46,9 @@ void AMilitaryUnitMassSpawner::BeginPlay()
 bool AMilitaryUnitMassSpawner_SpawnVehiclesOnly = false;
 FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnVehiclesOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnVehiclesOnly"), AMilitaryUnitMassSpawner_SpawnVehiclesOnly, TEXT("AMilitaryUnitMassSpawner_SpawnVehiclesOnly"));
 
+bool AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly = false;
+FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"), AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly, TEXT("AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"));
+
 void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 {
 	// TODO: Get team from EntityTypes (UMassEntityConfigAsset) once figure out linker issue with using FMassSpawnedEntityType::GetEntityConfig(). Then replace bIsTeam1 below.
@@ -107,6 +110,7 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 		}
 	}
 
+	bDidSpawnSoldiersOnly = bIsTeam1 && AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly;
 	bDidSpawnVehiclesOnly = bSpawnVehiclesOnly || AMilitaryUnitMassSpawner_SpawnVehiclesOnly;
 
 	auto GenerateSpawningPoints = [this, UnitCounts]()
@@ -122,7 +126,7 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 		{
 			if (Generator.GeneratorInstance)
 			{
-				const int32 SpawnCount = Index == 0 ? (bDidSpawnVehiclesOnly ? 0 : UnitCounts.Key) : UnitCounts.Value;
+				const int32 SpawnCount = Index == 0 ? (bDidSpawnVehiclesOnly ? 0 : UnitCounts.Key) : (bDidSpawnSoldiersOnly ? 0 : UnitCounts.Value);
 				const int32 OtherIndex = Index == 0 ? 1 : 0;
 				EntityTypes[Index].Proportion = 1.f;
 				EntityTypes[OtherIndex].Proportion = 0.f;
@@ -176,9 +180,19 @@ void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(UMilitaryUnit* Mili
 	{
 		int32 AllSpawnedEntitiesIndex = MilitaryUnit->bIsSoldier ? AllSpawnedEntitiesSoldierIndex : AllSpawnedEntitiesVehicleIndex;
 		int32& EntitiesIndex = MilitaryUnit->bIsSoldier ? SoldierIndex : VehicleIndex;
-		if (!(MilitaryUnit->bIsSoldier && bDidSpawnVehiclesOnly))
+		if (MilitaryUnit->bIsSoldier)
 		{
-			MilitaryStructureSubsystem->BindUnitToMassEntity(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesIndex].Entities[EntitiesIndex++]);
+			if (!bDidSpawnVehiclesOnly)
+			{
+				MilitaryStructureSubsystem->BindUnitToMassEntity(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesIndex].Entities[EntitiesIndex++]);
+			}
+		}
+		else
+		{
+			if (!bDidSpawnSoldiersOnly)
+			{
+				MilitaryStructureSubsystem->BindUnitToMassEntity(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesIndex].Entities[EntitiesIndex++]);
+			}
 		}
 	}
 	else

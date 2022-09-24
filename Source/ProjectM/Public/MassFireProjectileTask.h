@@ -10,6 +10,7 @@
 class UMassSignalSubsystem;
 struct FTransformFragment;
 struct FTeamMemberFragment;
+struct FTargetEntityFragment;
 
 void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQuat& SpawnRotation, const FVector& InitialVelocity, const FMassEntityConfig& EntityConfig, const bool& bIsProjectileFromTeam1);
 
@@ -20,16 +21,6 @@ struct PROJECTM_API FMassFireProjectileTaskInstanceData
 
 	UPROPERTY(EditAnywhere, Category = Parameter)
 	FMassEntityConfig EntityConfig;
-
-	UPROPERTY(EditAnywhere, Category = Parameter)
-	float InitialVelocity = 100.f;
-
-	UPROPERTY(EditAnywhere, Category = Parameter)
-	float ForwardVectorMagnitude = 100.f;
-
-	// TODO: DRY this somehow. Soldier/vehicle Entity's weapon should have info where it should spawn from instead of needing this.
-	UPROPERTY(EditAnywhere, Category = Parameter)
-	bool IsFromSoldier = true;
 
 	UPROPERTY(EditAnywhere, Category = Parameter)
 	float WeaponCoolDownSeconds = 1.f;
@@ -52,11 +43,9 @@ protected:
 	TStateTreeExternalDataHandle<UMassSignalSubsystem> MassSignalSubsystemHandle;
 	TStateTreeExternalDataHandle<FTransformFragment> EntityTransformHandle;
 	TStateTreeExternalDataHandle<FTeamMemberFragment> TeamMemberHandle;
+	TStateTreeExternalDataHandle<FTargetEntityFragment> TargetEntityHandle;
 
 	TStateTreeInstanceDataPropertyHandle<FMassEntityConfig> EntityConfigHandle;
-	TStateTreeInstanceDataPropertyHandle<float> InitialVelocityHandle;
-	TStateTreeInstanceDataPropertyHandle<float> ForwardVectorMagnitudeHandle;
-	TStateTreeInstanceDataPropertyHandle<bool> IsFromSoldierHandle;
 	TStateTreeInstanceDataPropertyHandle<float> WeaponCoolDownSecondsHandle;
 	TStateTreeInstanceDataPropertyHandle<float> LastWeaponFireTimeSecondsHandle;
 };

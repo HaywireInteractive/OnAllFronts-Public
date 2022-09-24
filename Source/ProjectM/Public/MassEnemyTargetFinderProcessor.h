@@ -31,13 +31,17 @@ struct FCloseUnhittableEntityData
 const uint8 UMassEnemyTargetFinderProcessor_MaxCachedCloseUnhittableEntities = 50;
 
 bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView);
+FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation);
+float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier);
 
 USTRUCT()
 struct PROJECTM_API FTargetEntityFragment : public FMassFragment
 {
 	GENERATED_BODY()
 
+	/** The entity that the fragment owner is targeting. */
 	FMassEntityHandle Entity;
+	
 	float TargetMinCaliberForDamage;
 
 	/** Cache close teammates so when we find a target we can ensure we won't hit teammate. */
@@ -46,6 +50,8 @@ struct PROJECTM_API FTargetEntityFragment : public FMassFragment
 
 	/** The number of cells to search across from where target is looking. The depth is determined by 64 / SearchBreadth so make sure this value is divisible into 64. */
 	uint8 SearchBreadth = 8;
+
+	float VerticalAimOffset = 0.f;
 };
 
 USTRUCT()
@@ -119,6 +125,7 @@ class PROJECTM_API UMassEnemyTargetFinderProcessor : public UMassProcessor
 public:
 	UMassEnemyTargetFinderProcessor();
 	static const float GetProjectileSpawnLocationZOffset(const bool& bIsSoldier);
+	static const FVector GetProjectileSpawnLocationOffset(const FTransform& EntityTransform, const bool& bIsSoldier);
 
 protected:
 	virtual void ConfigureQueries() override;

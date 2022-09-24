@@ -16,6 +16,7 @@
 #include "MassProjectileDamageProcessor.h"
 #include "MassEnemyTargetFinderProcessor.h"
 #include "MassSoundPerceptionSubsystem.h"
+#include "MassEntityView.h"
 
 void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQuat& SpawnRotation, const FVector& InitialVelocity, const FMassEntityConfig& EntityConfig, const bool& bIsProjectileFromTeam1)
 {
@@ -47,22 +48,23 @@ void SpawnProjectile(const UWorld* World, const FVector& SpawnLocation, const FQ
 
 	const UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(World);
 	check(EntitySubsystem);
-	if (FMassVelocityFragment* SpawnedEntityVelocityFragment = EntitySubsystem->GetFragmentDataPtr<FMassVelocityFragment>(SpawnedEntities[0]))
+
+	FMassVelocityFragment* SpawnedEntityVelocityFragment = EntitySubsystem->GetFragmentDataPtr<FMassVelocityFragment>(SpawnedEntities[0]);
+	if (ensureMsgf(SpawnedEntityVelocityFragment, TEXT("SpawnProjectile: Spawned entity has no FMassVelocityFragment")))
 	{
 		SpawnedEntityVelocityFragment->Value = InitialVelocity;
 	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("SpawnProjectile: Spawned entity has no FMassVelocityFragment"));
-	}
 
-	if (FMassPreviousLocationFragment* SpawnedEntityPreviousLocationFragment = EntitySubsystem->GetFragmentDataPtr<FMassPreviousLocationFragment>(SpawnedEntities[0]))
+	FMassPreviousLocationFragment* SpawnedEntityPreviousLocationFragment = EntitySubsystem->GetFragmentDataPtr<FMassPreviousLocationFragment>(SpawnedEntities[0]);
+	if (ensureMsgf(SpawnedEntityPreviousLocationFragment, TEXT("SpawnProjectile: Spawned entity has no FMassPreviousLocationFragment")))
 	{
 		SpawnedEntityPreviousLocationFragment->Location = SpawnLocation;
 	}
-	else
+
+	FMassForceFragment* SpawnedEntityForceFragment = EntitySubsystem->GetFragmentDataPtr<FMassForceFragment>(SpawnedEntities[0]);
+	if (ensureMsgf(SpawnedEntityForceFragment, TEXT("SpawnProjectile: Spawned entity has no FMassForceFragment")))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SpawnProjectile: Spawned entity has no FMassPreviousLocationFragment"));
+		SpawnedEntityForceFragment->Value = FVector(0.f, 0.f, World->GetGravityZ());
 	}
 
 	UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem = UWorld::GetSubsystem<UMassSoundPerceptionSubsystem>(World);
@@ -74,12 +76,10 @@ bool FMassFireProjectileTask::Link(FStateTreeLinker& Linker)
 {
 	Linker.LinkExternalData(MassSignalSubsystemHandle);
 	Linker.LinkExternalData(EntityTransformHandle);
+	Linker.LinkExternalData(TargetEntityHandle);
 	Linker.LinkExternalData(TeamMemberHandle);
 
 	Linker.LinkInstanceDataProperty(EntityConfigHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, EntityConfig));
-	Linker.LinkInstanceDataProperty(InitialVelocityHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, InitialVelocity));
-	Linker.LinkInstanceDataProperty(ForwardVectorMagnitudeHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, ForwardVectorMagnitude));
-	Linker.LinkInstanceDataProperty(IsFromSoldierHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, IsFromSoldier));
 	Linker.LinkInstanceDataProperty(WeaponCoolDownSecondsHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, WeaponCoolDownSeconds));
 	Linker.LinkInstanceDataProperty(LastWeaponFireTimeSecondsHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassFireProjectileTaskInstanceData, LastWeaponFireTimeSeconds));
 
@@ -102,20 +102,23 @@ EStateTreeRunStatus FMassFireProjectileTask::EnterState(FStateTreeExecutionConte
 		return EStateTreeRunStatus::Running;
 	}
 
+	const UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(World);
+	check(EntitySubsystem);
 
+	const FMassEntityView StateTreeEntityView(*EntitySubsystem, MassContext.GetEntity());
 	const FTransformFragment& StateTreeEntityTransformFragment = Context.GetExternalData(EntityTransformHandle);
 	const FTransform& StateTreeEntityTransform = StateTreeEntityTransformFragment.GetTransform();
 	const FVector StateTreeEntityLocation = StateTreeEntityTransform.GetLocation();
 	const FVector StateTreeEntityCurrentForward = StateTreeEntityTransform.GetRotation().GetForwardVector();
 
 	const FMassEntityConfig& EntityConfig = Context.GetInstanceData(EntityConfigHandle);
-	const float InitialVelocityMagnitude = Context.GetInstanceData(InitialVelocityHandle);
-	const FVector InitialVelocity = StateTreeEntityCurrentForward * InitialVelocityMagnitude;
-	const float ForwardVectorMagnitude = Context.GetInstanceData(ForwardVectorMagnitudeHandle);
-	const bool IsFromSoldier = Context.GetInstanceData(IsFromSoldierHandle);
-	const FVector& ProjectileLocationOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(IsFromSoldier));
+	const bool bIsFromSoldier = StateTreeEntityView.HasTag< FMassProjectileDamagableSoldierTag>();
+	const float InitialVelocityMagnitude = GetProjectileInitialXYVelocityMagnitude(bIsFromSoldier);
+	const FTargetEntityFragment& StateTreeEntityTargetEntityFragment = Context.GetExternalData(TargetEntityHandle);
+	const float InitialVelocityZMagnitude = StateTreeEntityTargetEntityFragment.VerticalAimOffset;
+	const FVector InitialVelocity = (StateTreeEntityCurrentForward * InitialVelocityMagnitude) + FVector(0.f, 0.f, InitialVelocityZMagnitude);
 
-	const FVector SpawnLocation = StateTreeEntityLocation + StateTreeEntityCurrentForward * ForwardVectorMagnitude + ProjectileLocationOffset;
+	const FVector SpawnLocation = StateTreeEntityLocation + UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(StateTreeEntityTransform, bIsFromSoldier);
 	const FQuat SpawnRotation = StateTreeEntityTransform.GetRotation();
 
 	const FTeamMemberFragment& StateTreeEntityTeamMemberFragment = Context.GetExternalData(TeamMemberHandle);

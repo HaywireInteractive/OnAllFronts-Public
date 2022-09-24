@@ -83,7 +83,7 @@ bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, cons
 	return Result;
 }
 
-bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context, FTargetEntityFragment& TargetEntityFragment)
+bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context, FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& TargetEntityView, const FTransform& EntityTransform)
 {
 	FVector Buffer(10.f, 10.f, 10.f); // We keep a buffer in case EntityLocation and TargetEntityLocation are same value on any axis.
 	FBox QueryBounds(EntityLocation.ComponentMin(TargetEntityLocation) - Buffer, EntityLocation.ComponentMax(TargetEntityLocation) + Buffer);
@@ -101,10 +101,8 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 	}
 
 	const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-	const FVector ProjectileOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
-	const FVector ProjectileSpawnLocation = EntityLocation + ProjectileOffset;
-	FVector ProjectileTargetLocation = TargetEntityLocation + ProjectileOffset;
-	FCapsule ProjectileCapsule(ProjectileSpawnLocation, ProjectileTargetLocation, ProjectileRadius);
+	const bool& bIsTargetEntitySoldier = TargetEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
+	const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, bIsTargetEntitySoldier, EntityTransform, TargetEntityLocation);
 
 	for (const FMassNavigationObstacleItem& OtherEntity : CloseEntities)
 	{
@@ -131,7 +129,7 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 		// If same team or undamagable, check for collision.
 		if (IsEntityOnTeam1 == OtherEntityTeamMemberFragment->IsOnTeam1 || !CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntityView)) {
 			FCapsule OtherEntityCapsule = MakeCapsuleForEntity(OtherEntityView);
-			if (DidCapsulesCollide(ProjectileCapsule, OtherEntityCapsule, Entity, *EntitySubsystem.GetWorld()))
+			if (DidCapsulesCollide(ProjectileTraceCapsule, OtherEntityCapsule, Entity, *EntitySubsystem.GetWorld()))
 			{
 				return true;
 			}
@@ -141,20 +139,21 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 	return false;
 }
 
-bool IsTargetValid(const FMassEntityHandle& Entity, FMassEntityHandle& TargetEntity, const UMassEntitySubsystem& EntitySubsystem, const FVector& EntityLocation, FTargetEntityFragment& TargetEntityFragment, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context)
+bool IsTargetValid(const FMassEntityHandle& Entity, FMassEntityHandle& TargetEntity, const UMassEntitySubsystem& EntitySubsystem, const FVector& EntityLocation, FTargetEntityFragment& TargetEntityFragment, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context, const FTransform& EntityTransform)
 {
 	if (!EntitySubsystem.IsEntityValid(TargetEntity))
 	{
 		return false;
 	}
 
-	const FVector& TargetEntityLocation = EntitySubsystem.GetFragmentDataChecked<FTransformFragment>(TargetEntity).GetTransform().GetLocation();
+	FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
+	const FVector& TargetEntityLocation = TargetEntityView.GetFragmentData<FTransformFragment>().GetTransform().GetLocation();
 	if (IsTargetEntityOutOfRange(TargetEntityLocation, EntityLocation, EntitySubsystem, TargetEntityFragment, Entity))
 	{
 		return false;
 	}
 
-	if (IsTargetEntityObstructed(EntityLocation, TargetEntityLocation, AvoidanceObstacleGrid, Entity, EntitySubsystem, IsEntityOnTeam1, Context, TargetEntityFragment))
+	if (IsTargetEntityObstructed(EntityLocation, TargetEntityLocation, AvoidanceObstacleGrid, Entity, EntitySubsystem, IsEntityOnTeam1, Context, TargetEntityFragment, TargetEntityView, EntityTransform))
 	{
 		return false;
 	}
@@ -162,10 +161,10 @@ bool IsTargetValid(const FMassEntityHandle& Entity, FMassEntityHandle& TargetEnt
 	return true;
 }
 
-void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector &EntityLocation, const FMassStashedMoveTargetFragment* StashedMoveTargetFragment, FMassMoveTargetFragment* MoveTargetFragment, TArray<FMassEntityHandle>& TransientEntitiesToSignal, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1)
+void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector &EntityLocation, const FMassStashedMoveTargetFragment* StashedMoveTargetFragment, FMassMoveTargetFragment* MoveTargetFragment, TArray<FMassEntityHandle>& TransientEntitiesToSignal, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1, const FTransform& EntityTransform)
 {
 	FMassEntityHandle& TargetEntity = TargetEntityFragment.Entity;
-	if (!IsTargetValid(Entity, TargetEntity, EntitySubsystem, EntityLocation, TargetEntityFragment, AvoidanceObstacleGrid, IsEntityOnTeam1, Context))
+	if (!IsTargetValid(Entity, TargetEntity, EntitySubsystem, EntityLocation, TargetEntityFragment, AvoidanceObstacleGrid, IsEntityOnTeam1, Context, EntityTransform))
 	{
 		TargetEntity.Reset();
 		TransientEntitiesToSignal.Add(Entity);
@@ -208,7 +207,7 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			ProcessEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, TargetEntityList[EntityIndex], TransformList[EntityIndex].GetTransform().GetLocation(), StashedMoveTargetList.Num() > 0 ? &StashedMoveTargetList[EntityIndex] : nullptr, MoveTargetList.Num() > 0 ? &MoveTargetList[EntityIndex] : nullptr, TransientEntitiesToSignal, AvoidanceObstacleGrid, TeamMemberList[EntityIndex].IsOnTeam1);
+			ProcessEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, TargetEntityList[EntityIndex], TransformList[EntityIndex].GetTransform().GetLocation(), StashedMoveTargetList.Num() > 0 ? &StashedMoveTargetList[EntityIndex] : nullptr, MoveTargetList.Num() > 0 ? &MoveTargetList[EntityIndex] : nullptr, TransientEntitiesToSignal, AvoidanceObstacleGrid, TeamMemberList[EntityIndex].IsOnTeam1, TransformList[EntityIndex].GetTransform());
 		}
 	});
 

@@ -9,8 +9,10 @@
 
 class UMassSignalSubsystem;
 class UMassNavigationSubsystem;
+struct FCapsule;
 
 void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World);
+bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, const FMassEntityHandle& Entity, const UWorld& World);
 
 UCLASS()
 class PROJECTM_API UInvalidTargetFinderProcessor : public UMassProcessor

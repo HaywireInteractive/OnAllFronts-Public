@@ -3,6 +3,7 @@
 
 #include "MassRifle.h"
 #include "MassFireProjectileTask.h"
+#include "MassEnemyTargetFinderProcessor.h"
 
 AMassRifle::AMassRifle()
 {
@@ -11,10 +12,7 @@ AMassRifle::AMassRifle()
 
 void AMassRifle::SpawnProjectile(const FTransform SpawnTransform, const bool bIsPlayerTeam1) const
 {
-	// TODO: don't hard-code
-	static const float InitialVelocityMagnitude = 4000.0f;
-
 	const UWorld* World = GetWorld();
-	const FVector InitialVelocity = SpawnTransform.GetRotation().Vector() * InitialVelocityMagnitude;
+	const FVector InitialVelocity = SpawnTransform.GetRotation().Vector() * GetProjectileInitialXYVelocityMagnitude(true);
 	::SpawnProjectile(World, SpawnTransform.GetLocation(), SpawnTransform.GetRotation(), InitialVelocity, ProjectileEntityConfig, bIsPlayerTeam1);
 }
