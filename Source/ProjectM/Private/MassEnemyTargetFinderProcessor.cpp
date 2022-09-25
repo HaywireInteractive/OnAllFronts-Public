@@ -318,7 +318,25 @@ void UpdatePhasesLeftOnCachedCloseUnhittableEntities(FTargetEntityFragment& Targ
 
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
 {
-	return bIsEntitySoldier ? 4000.f : 7340.f; // TODO: make this configurable in data asset and get from there?
+	return bIsEntitySoldier ? 6000.f : 10000.f; // TODO: make this configurable in data asset and get from there?
+}
+
+float GetVerticalAimOffset(FMassExecutionContext& Context, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation, UMassEntitySubsystem& EntitySubsystem)
+{
+	const FVector& EntityLocation = EntityTransform.GetLocation();
+	const bool bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+	const bool bShouldAimAtFeet = !bIsEntitySoldier && bIsTargetEntitySoldier;
+	const FVector ProjectileSpawnLocation = EntityLocation + UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(EntityTransform, bIsEntitySoldier);
+	const FVector ProjectileTargetLocation = bShouldAimAtFeet ? TargetEntityLocation : FVector(TargetEntityLocation.X, TargetEntityLocation.Y, ProjectileSpawnLocation.Z);
+	const float XYDistanceToTarget = (FVector2D(ProjectileTargetLocation) - FVector2D(ProjectileSpawnLocation)).Size();
+	const float ProjectileInitialXYVelocityMagnitude = GetProjectileInitialXYVelocityMagnitude(bIsEntitySoldier);
+	const float TimeToTarget = XYDistanceToTarget / ProjectileInitialXYVelocityMagnitude;
+	const float VerticalDistanceToTravel = ProjectileTargetLocation.Z - UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier);
+	const float& GravityZ = EntitySubsystem.GetWorld()->GetGravityZ();
+	const float VerticalDistanceTraveledDueToGravity = (1.f / 2.f) * GravityZ * TimeToTarget * TimeToTarget;
+	const float Result = (VerticalDistanceToTravel - VerticalDistanceTraveledDueToGravity) / TimeToTarget;
+
+	return Result;
 }
 
 bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& TranformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas)
@@ -326,7 +344,6 @@ bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQ
 	UpdatePhasesLeftOnCachedCloseUnhittableEntities(TargetEntityFragment);
 
 	const FTransform& EntityTransform = TranformFragment.GetTransform();
-	const FVector& EntityLocation = EntityTransform.GetLocation();
 	FMassEntityHandle TargetEntity;
 	FVector OutTargetEntityLocation;
 	bool bOutIsTargetEntitySoldier;
@@ -336,19 +353,8 @@ bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQ
 	}
 
 	TargetEntityFragment.Entity = TargetEntity;
-	TargetEntityFragment.VerticalAimOffset = 0.f;
-	const bool bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-	const bool bShouldAimAtFeet = !bIsEntitySoldier && bOutIsTargetEntitySoldier;
-	if (bShouldAimAtFeet)
-	{
-		const FVector ProjectileSpawnLocation = EntityLocation + UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(EntityTransform, bIsEntitySoldier);
-		const float XYDistanceToTarget = (FVector2D(OutTargetEntityLocation) - FVector2D(ProjectileSpawnLocation)).Size();
-		const float TimeToTarget = XYDistanceToTarget / GetProjectileInitialXYVelocityMagnitude(false);
-		const float VerticalDistanceToTravel = OutTargetEntityLocation.Z - UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(false);
-		const float& GravityZ = EntitySubsystem.GetWorld()->GetGravityZ();
-		const float VerticalDistanceTraveledDueToGravity = (1.f / 2.f) * GravityZ * TimeToTarget * TimeToTarget;
-		TargetEntityFragment.VerticalAimOffset = (VerticalDistanceToTravel - VerticalDistanceTraveledDueToGravity) / TimeToTarget;
-	}
+
+	TargetEntityFragment.VerticalAimOffset = GetVerticalAimOffset(Context, bOutIsTargetEntitySoldier, EntityTransform, OutTargetEntityLocation, EntitySubsystem);
 	TargetFinderEntityQueue.Enqueue(Entity);
 
 	return true;
