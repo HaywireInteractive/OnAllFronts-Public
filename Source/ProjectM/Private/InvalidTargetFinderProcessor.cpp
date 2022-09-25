@@ -11,6 +11,7 @@
 #include "MassNavigationSubsystem.h"
 #include "MassEntityView.h"
 #include "MassProjectileDamageProcessor.h"
+#include "MassEnemyTargetFinderProcessor.h"
 
 void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World)
 {
@@ -48,12 +49,12 @@ void UInvalidTargetFinderProcessor::ConfigureQueries()
 	EntityQuery.AddTagRequirement<FMassWillNeedEnemyTargetTag>(EMassFragmentPresence::All);
 }
 
-bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FMassEntityHandle Entity)
+bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FMassEntityHandle Entity, const FMassExecutionContext& Context)
 {
 	const double& DistanceBetweenEntities = (TargetEntityLocation - EntityLocation).Size();
 
-	const uint8 SearchDepth = UMassEnemyTargetFinderProcessor_FinderPhaseCount / TargetEntityFragment.SearchBreadth;
-	const float MaxRange = SearchDepth * UMassEnemyTargetFinderProcessor_CellSize;
+	const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+	const float MaxRange = GetEntityRange(bIsEntitySoldier);
 
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
@@ -150,7 +151,7 @@ bool IsTargetValid(const FMassEntityHandle& Entity, FMassEntityHandle& TargetEnt
 
 	FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
 	const FVector& TargetEntityLocation = TargetEntityView.GetFragmentData<FTransformFragment>().GetTransform().GetLocation();
-	if (IsTargetEntityOutOfRange(TargetEntityLocation, EntityLocation, EntitySubsystem, TargetEntityFragment, Entity))
+	if (IsTargetEntityOutOfRange(TargetEntityLocation, EntityLocation, EntitySubsystem, TargetEntityFragment, Entity, Context))
 	{
 		return false;
 	}

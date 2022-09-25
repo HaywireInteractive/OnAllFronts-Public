@@ -17,24 +17,10 @@ class UMassTargetFinderSubsystem;
 const float UMassEnemyTargetFinder_FinestCellSize = 5000.f; // TODO: Don't hard-code, get from data asset.
 const float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
 
-const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt = 8;
-const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCount = UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt * UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt;
-const float UMassEnemyTargetFinderProcessor_SearchRadius = 5000.f; // TODO: don't hard-code
-const float UMassEnemyTargetFinderProcessor_CellSize = UMassEnemyTargetFinderProcessor_SearchRadius / (UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt / 2.0f);
-
-struct FCloseUnhittableEntityData
-{
-	FCloseUnhittableEntityData() = default;
-	FCloseUnhittableEntityData(FCapsule InCapsule, uint8 InPhasesLeft) : Capsule(InCapsule), PhasesLeft(InPhasesLeft) {}
-	FCapsule Capsule;
-	uint8 PhasesLeft;
-};
-
-const uint8 UMassEnemyTargetFinderProcessor_MaxCachedCloseUnhittableEntities = 50;
-
 bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView);
 FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation);
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier);
+float GetEntityRange(const bool bIsEntitySoldier);
 
 USTRUCT()
 struct PROJECTM_API FTargetEntityFragment : public FMassFragment
@@ -45,13 +31,6 @@ struct PROJECTM_API FTargetEntityFragment : public FMassFragment
 	FMassEntityHandle Entity;
 	
 	float TargetMinCaliberForDamage;
-
-	/** Cache close teammates so when we find a target we can ensure we won't hit teammate. */
-	TStaticArray<FCloseUnhittableEntityData, UMassEnemyTargetFinderProcessor_MaxCachedCloseUnhittableEntities> CachedCloseUnhittableEntities;
-	uint8 CachedCloseUnhittableEntitiesNextIndex = 0;
-
-	/** The number of cells to search across from where target is looking. The depth is determined by 64 / SearchBreadth so make sure this value is divisible into 64. */
-	uint8 SearchBreadth = 8;
 
 	float VerticalAimOffset = 0.f;
 };
@@ -95,18 +74,6 @@ struct FMassWillNeedEnemyTargetTag : public FMassTag
 	GENERATED_BODY()
 };
 
-USTRUCT()
-struct PROJECTM_API FNeedsEnemyTargetSharedParameters : public FMassSharedFragment
-{
-	GENERATED_BODY()
-
-	UPROPERTY(Category = "", EditAnywhere)
-	int32 ParallelJobCount = 1; // This is not as useful anymore now that we use ParallelForEachEntityChunk since that parallelizes better.
-
-	UPROPERTY(EditAnywhere, Category = "Debug")
-	bool DrawSearchAreas = false;
-};
-
 UCLASS(meta = (DisplayName = "NeedsEnemyTarget"))
 class PROJECTM_API UMassNeedsEnemyTargetTrait : public UMassEntityTraitBase
 {
@@ -116,14 +83,7 @@ protected:
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const override;
 
 	UPROPERTY(Category = "", EditAnywhere)
-	FNeedsEnemyTargetSharedParameters SharedParameters;
-
-	UPROPERTY(Category = "", EditAnywhere)
 	float ProjectileCaliber = 5.f; // TODO: DRY this with the Caliber value in projectile data assets.
-
-	/** The number of cells to search across from where target is looking. The depth is determined by 64 / SearchBreadth so make sure this value is divisible into 64. */
-	UPROPERTY(Category = "", EditAnywhere, meta = (ClampMin = 1, ClampMax = 64))
-	uint8 SearchBreadth = 8;
 };
 
 UCLASS()
@@ -141,9 +101,7 @@ protected:
 	virtual void Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context) override;
 
 private:
-	TObjectPtr<UMassNavigationSubsystem> NavigationSubsystem;
 	TObjectPtr<UMassTargetFinderSubsystem> TargetFinderSubsystem;
 	TObjectPtr<UMassSoundPerceptionSubsystem> SoundPerceptionSubsystem;
 	FMassEntityQuery EntityQuery;
-	uint8 FinderPhase = 0;
 };
