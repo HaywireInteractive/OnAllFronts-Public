@@ -110,6 +110,9 @@ static const FBox BoxForPhase(const uint8& FinderPhase, const FTransform& Search
 bool UMassEnemyTargetFinderProcessor_DrawEntitiesSearching = false;
 FAutoConsoleVariableRef CVar_UMassEnemyTargetFinderProcessor_DrawEntitiesSearching(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawEntitiesSearching"), UMassEnemyTargetFinderProcessor_DrawEntitiesSearching, TEXT("UMassEnemyTargetFinderProcessor_DrawEntitiesSearching"));
 
+bool UMassEnemyTargetFinderProcessor_SearchInSinglePhase = false;
+FAutoConsoleVariableRef CVar_UMassEnemyTargetFinderProcessor_SearchInSinglePhase(TEXT("pm.UMassEnemyTargetFinderProcessor_SearchInSinglePhase"), UMassEnemyTargetFinderProcessor_SearchInSinglePhase, TEXT("UMassEnemyTargetFinderProcessor_SearchInSinglePhase"));
+
 // TODO: Find out how to not duplicate from MassProjectileDamageProcessor.cpp. Right now only difference is number in template type for TFixedAllocator.
 static void FindCloseObstacles(const FTransform& SearchCenterTransform, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
 	TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, const int32 MaxResults, const uint8& FinderPhase, const bool& DrawSearchAreas, const UWorld* World, const uint8& SearchBreadth, const FMassEntityHandle& Entity)
@@ -235,6 +238,19 @@ bool AreCloseUnhittableEntitiesBlockingTarget(const FCapsule& ProjectileTraceCap
 	return false;
 }
 
+bool AreCloseUnhittableEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const TArray<FCapsule>& CloseUnhittableEntities, const FMassEntityHandle& Entity, const UWorld& World)
+{
+	for (const FCapsule& CloseUnhittableCapsule : CloseUnhittableEntities)
+	{
+		if (DidCapsulesCollide(ProjectileTraceCapsule, CloseUnhittableCapsule, Entity, World))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation, const bool DrawTrace)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace);
@@ -244,9 +260,138 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	return !bFoundBlockingHit;
 }
 
+void GetCloseUnhittableEntities(const TArray<FMassNavigationObstacleItem> &CloseEntities, TArray<FCapsule>& OutCloseUnhittableEntities, const bool& IsEntityOnTeam1, const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment)
+{
+	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
+	{
+		// Skip self.
+		if (OtherEntity.Entity == Entity)
+		{
+			continue;
+		}
+
+		// Skip invalid entities.
+		if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
+		{
+			continue;
+		}
+
+		FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity.Entity);
+		FTeamMemberFragment* OtherEntityTeamMemberFragment = OtherEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
+
+		// Skip entities that don't have FTeamMemberFragment.
+		if (!OtherEntityTeamMemberFragment) {
+			continue;
+		}
+
+		// Skip same team.
+		if (IsEntityOnTeam1 == OtherEntityTeamMemberFragment->IsOnTeam1) {
+			OutCloseUnhittableEntities.Add(MakeCapsuleForEntity(OtherEntityView));
+			continue;
+		}
+
+		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntityView))
+		{
+			OutCloseUnhittableEntities.Add(MakeCapsuleForEntity(OtherEntityView));
+			continue;
+		}
+	}
+}
+
+// TODO: Delete unused params.
+bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier)
+{
+	const UWorld* World = EntitySubsystem.GetWorld();
+
+	const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+	const FVector& EntityLocation = EntityTransform.GetLocation();
+	const FVector& EntityForwardVector = EntityTransform.GetRotation().GetForwardVector();
+	
+	const float OffsetMagnitude = bIsEntitySoldier ? 5000.f : 10000.f; // TODO: Don't hard-code, get from data asset.
+	const FVector SearchOffset = EntityForwardVector * OffsetMagnitude;
+	const FVector SearchCenter = EntityLocation + SearchOffset;
+	const FVector SearchOffsetAbs = SearchOffset.GetAbs();
+	const FVector SearchExtent(FMath::Max(SearchOffsetAbs.X, SearchOffsetAbs.Y));
+
+	const FBox SearchBounds(SearchCenter - SearchExtent, SearchCenter + SearchExtent);
+	TArray<FMassNavigationObstacleItem> CloseEntities;
+	AvoidanceObstacleGrid.Query(SearchBounds, CloseEntities);
+
+	if (DrawSearchAreas || UE::Mass::Debug::IsDebuggingEntity(Entity))
+	{
+		AsyncTask(ENamedThreads::GameThread, [SearchCenter, SearchExtent, World, NumCloseEntities = CloseEntities.Num()]()
+		{
+			DrawDebugBox(World, SearchCenter, SearchExtent, FColor::Green, false, 0.1f);
+			DrawDebugString(World, SearchCenter, FString::Printf(TEXT("%d"), NumCloseEntities), nullptr, FColor::Green, 0.1f);
+		});
+	}
+
+	TArray<FCapsule> OutCloseUnhittableEntities;
+	GetCloseUnhittableEntities(CloseEntities, OutCloseUnhittableEntities, IsEntityOnTeam1, Entity, EntitySubsystem, TargetEntityFragment);
+
+	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
+	{
+		// Skip self.
+		if (OtherEntity.Entity == Entity)
+		{
+			continue;
+		}
+
+		// Skip invalid entities.
+		if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
+		{
+			continue;
+		}
+
+		FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity.Entity);
+		FTeamMemberFragment* OtherEntityTeamMemberFragment = OtherEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
+
+		// Skip entities that don't have FTeamMemberFragment.
+		if (!OtherEntityTeamMemberFragment) {
+			continue;
+		}
+
+		// Skip same team.
+		if (IsEntityOnTeam1 == OtherEntityTeamMemberFragment->IsOnTeam1) {
+			continue;
+		}
+
+		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntityView))
+		{
+			continue;
+		}
+
+		bOutIsTargetEntitySoldier = OtherEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
+		const FVector& OtherEntityLocation = OtherEntityView.GetFragmentData<FTransformFragment>().GetTransform().GetLocation();
+		const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, bOutIsTargetEntitySoldier, EntityTransform, OtherEntityLocation);
+
+		if (AreCloseUnhittableEntitiesBlockingTarget(ProjectileTraceCapsule, OutCloseUnhittableEntities, Entity, *World))
+		{
+			continue;
+		}
+
+		if (!IsTargetEntityVisibleViaSphereTrace(*World, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, UE::Mass::Debug::IsDebuggingEntity(Entity)))
+		{
+			continue;
+		}
+
+		OutTargetEntity = OtherEntity.Entity;
+		OutTargetEntityLocation = OtherEntityLocation;
+		return true;
+	}
+
+	OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
+	return false;
+}
+
 bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestValidEnemy);
+
+	if (UMassEnemyTargetFinderProcessor_SearchInSinglePhase)
+	{
+		return GetClosestValidEnemyInSinglePhase(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, OutTargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, SearchBreadth, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier);
+	}
 
 	UWorld& World = *EntitySubsystem.GetWorld();
 	FindCloseObstacles(EntityTransform, AvoidanceObstacleGrid, CloseEntities, 10, FinderPhase, DrawSearchAreas, &World, SearchBreadth, Entity);
