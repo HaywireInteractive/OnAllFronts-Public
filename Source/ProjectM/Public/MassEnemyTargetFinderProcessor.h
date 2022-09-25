@@ -12,7 +12,9 @@
 #include "MassEnemyTargetFinderProcessor.generated.h"
 
 class UMassNavigationSubsystem;
+class UMassTargetFinderSubsystem;
 
+const float UMassEnemyTargetFinder_FinestCellSize = 10000.f; // TODO: Don't hard-code, get from data asset.
 const float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
 
 const uint8 UMassEnemyTargetFinderProcessor_FinderPhaseCountSqrt = 8;
@@ -140,6 +142,7 @@ protected:
 
 private:
 	TObjectPtr<UMassNavigationSubsystem> NavigationSubsystem;
+	TObjectPtr<UMassTargetFinderSubsystem> TargetFinderSubsystem;
 	TObjectPtr<UMassSoundPerceptionSubsystem> SoundPerceptionSubsystem;
 	FMassEntityQuery EntityQuery;
 	uint8 FinderPhase = 0;

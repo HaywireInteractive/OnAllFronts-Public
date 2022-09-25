@@ -84,6 +84,8 @@ FCapsule MakeCapsuleForEntity(const FCollisionCapsuleParametersFragment& Collisi
 
 FCapsule MakeCapsuleForEntity(const FMassEntityView& EntityView)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(MakeCapsuleForEntity);
+
 	FCollisionCapsuleParametersFragment* CollisionCapsuleParametersFragment = EntityView.GetFragmentDataPtr<FCollisionCapsuleParametersFragment>();
 	FTransformFragment* TransformFragment = EntityView.GetFragmentDataPtr<FTransformFragment>();
 	if (!CollisionCapsuleParametersFragment || !TransformFragment)

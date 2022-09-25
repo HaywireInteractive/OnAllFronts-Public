@@ -57,7 +57,6 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 		if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
 		{
 			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Red, false, 1.f); // Red = Not at next point yet
-			UE_LOG(LogTemp, Warning, TEXT("UMassNavMeshMoveProcessor: Distance from next move point=%.1f"), DistanceFromNextMovePoint);
 		}
 
 		// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.

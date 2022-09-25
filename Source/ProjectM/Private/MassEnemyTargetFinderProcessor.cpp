@@ -5,6 +5,7 @@
 
 #include "MassEntityView.h"
 #include "MassNavigationSubsystem.h"
+#include "MassTargetFinderSubsystem.h"
 #include "MassLODTypes.h"
 #include "MassCommonFragments.h"
 #include "MassTrackTargetProcessor.h"
@@ -16,6 +17,7 @@
 #include "MassTrackedVehicleOrientationProcessor.h"
 #include "InvalidTargetFinderProcessor.h"
 #include "MassLookAtViaMoveTargetTask.h"
+#include "MassTargetGridProcessors.h"
 
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
@@ -36,6 +38,7 @@ void UMassNeedsEnemyTargetTrait::BuildTemplate(FMassEntityTemplateBuildContext& 
 	TargetEntityTemplate.SearchBreadth = SearchBreadth;
 
 	BuildContext.AddFragment<FMassMoveForwardCompleteSignalFragment>();
+	BuildContext.AddFragment<FMassTargetGridCellLocationFragment>();
 	BuildContext.AddTag<FMassNeedsEnemyTargetTag>();
 
 	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(&World);
@@ -70,6 +73,7 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 	Super::Initialize(Owner);
 
 	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
+	TargetFinderSubsystem = UWorld::GetSubsystem<UMassTargetFinderSubsystem>(Owner.GetWorld());
 	SoundPerceptionSubsystem = UWorld::GetSubsystem<UMassSoundPerceptionSubsystem>(Owner.GetWorld());
 }
 
@@ -204,6 +208,8 @@ void AddToCachedCloseUnhittableEntities(FTargetEntityFragment& TargetEntityFragm
 
 bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_CanEntityDamageTargetEntity);
+
 	const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment = OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>();
 	return TargetEntityProjectileDamagableFragment && TargetEntityFragment.TargetMinCaliberForDamage >= TargetEntityProjectileDamagableFragment->MinCaliberForDamage;
 }
@@ -240,6 +246,8 @@ bool AreCloseUnhittableEntitiesBlockingTarget(const FCapsule& ProjectileTraceCap
 
 bool AreCloseUnhittableEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const TArray<FCapsule>& CloseUnhittableEntities, const FMassEntityHandle& Entity, const UWorld& World)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AreCloseUnhittableEntitiesBlockingTarget);
+
 	for (const FCapsule& CloseUnhittableCapsule : CloseUnhittableEntities)
 	{
 		if (DidCapsulesCollide(ProjectileTraceCapsule, CloseUnhittableCapsule, Entity, World))
@@ -260,46 +268,94 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	return !bFoundBlockingHit;
 }
 
-void GetCloseUnhittableEntities(const TArray<FMassNavigationObstacleItem> &CloseEntities, TArray<FCapsule>& OutCloseUnhittableEntities, const bool& IsEntityOnTeam1, const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment)
+float GetEntityRange(const bool bIsEntitySoldier)
 {
-	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
-	{
-		// Skip self.
-		if (OtherEntity.Entity == Entity)
+	return bIsEntitySoldier ? UMassEnemyTargetFinder_FinestCellSize : UMassEnemyTargetFinder_FinestCellSize * 2.f; // TODO: Don't hard-code, get from data asset.
+}
+
+bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityView& TargetEntityView)
+{
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityOutOfRange);
+
+	const FTransformFragment& TargetEntityTransformFragment = TargetEntityView.GetFragmentData<FTransformFragment>();
+	const FVector& TargetEntityLocation = TargetEntityTransformFragment.GetTransform().GetLocation();
+	const float DistanceToTarget = (TargetEntityLocation - EntityLocation).Size();
+	return DistanceToTarget > GetEntityRange(bIsEntitySoldier);
+}
+
+void GetCloseUnhittableEntities(const TArray<FMassEntityHandle> &CloseEntities, TArray<FCapsule>& OutCloseUnhittableEntities, const bool& IsEntityOnTeam1, const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector& EntityLocation, const bool bIsEntitySoldier)
+{
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetCloseUnhittableEntities);
+
+	auto AddEntityToCloseUnhittables = [&OutCloseUnhittableEntities](const FMassEntityView& OtherEntityView) {
+		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittables);
+
+		OutCloseUnhittableEntities.Add(MakeCapsuleForEntity(OtherEntityView));
+	};
+
+	auto AddEntityToCloseUnhittablesIfNeeded = [&Entity, &EntitySubsystem, &EntityLocation, &bIsEntitySoldier, &IsEntityOnTeam1, &AddEntityToCloseUnhittables, &TargetEntityFragment](const FMassEntityHandle& OtherEntity) {
+		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded);
+
 		{
-			continue;
+			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded_FirstSkips);
+
+			// Skip self.
+			if (OtherEntity == Entity)
+			{
+				return;
+			}
+
+			// Skip invalid entities.
+			if (!EntitySubsystem.IsEntityValid(OtherEntity))
+			{
+				return;
+			}
 		}
 
-		// Skip invalid entities.
-		if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
+		FMassEntityView OtherEntityView;
 		{
-			continue;
+			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded_CreateEntityView);
+			OtherEntityView = FMassEntityView(EntitySubsystem, OtherEntity);
 		}
 
-		FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity.Entity);
-		FTeamMemberFragment* OtherEntityTeamMemberFragment = OtherEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
+		FTeamMemberFragment* OtherEntityTeamMemberFragment;
+		{
+			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded_GetTeamMemberFragment);
+			OtherEntityTeamMemberFragment = OtherEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
+		}
 
 		// Skip entities that don't have FTeamMemberFragment.
 		if (!OtherEntityTeamMemberFragment) {
-			continue;
+			return;
 		}
 
-		// Skip same team.
+		// Skip entities out of range.
+		if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntityView))
+		{
+			return;
+		}
+
+		// Same team entities are unhittable.
 		if (IsEntityOnTeam1 == OtherEntityTeamMemberFragment->IsOnTeam1) {
-			OutCloseUnhittableEntities.Add(MakeCapsuleForEntity(OtherEntityView));
-			continue;
+			AddEntityToCloseUnhittables(OtherEntityView);
+			return;
 		}
 
+		// Undamagable enemies are unhittable.
 		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntityView))
 		{
-			OutCloseUnhittableEntities.Add(MakeCapsuleForEntity(OtherEntityView));
-			continue;
+			AddEntityToCloseUnhittables(OtherEntityView);
 		}
+	};
+
+	for (const FMassEntityHandle& OtherEntity : CloseEntities)
+	{
+		AddEntityToCloseUnhittablesIfNeeded(OtherEntity);
 	}
 }
 
 // TODO: Delete unused params.
-bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier)
+bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& OutCloseEntities, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier)
 {
 	const UWorld* World = EntitySubsystem.GetWorld();
 
@@ -307,43 +363,50 @@ bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEnt
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	const FVector& EntityForwardVector = EntityTransform.GetRotation().GetForwardVector();
 	
-	const float OffsetMagnitude = bIsEntitySoldier ? 5000.f : 10000.f; // TODO: Don't hard-code, get from data asset.
+	const float OffsetMagnitude = GetEntityRange(bIsEntitySoldier) / 2.f; 
 	const FVector SearchOffset = EntityForwardVector * OffsetMagnitude;
 	const FVector SearchCenter = EntityLocation + SearchOffset;
 	const FVector SearchOffsetAbs = SearchOffset.GetAbs();
 	const FVector SearchExtent(FMath::Max(SearchOffsetAbs.X, SearchOffsetAbs.Y));
 
 	const FBox SearchBounds(SearchCenter - SearchExtent, SearchCenter + SearchExtent);
-	TArray<FMassNavigationObstacleItem> CloseEntities;
-	AvoidanceObstacleGrid.Query(SearchBounds, CloseEntities);
+	TArray<FMassEntityHandle> CloseEntities;
+	CloseEntities.Reserve(300);
+
+	{
+		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestValidEnemyInSinglePhase_TargetGridQuery);
+		TargetGrid.Query(SearchBounds, CloseEntities);
+	}
 
 	if (DrawSearchAreas || UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		AsyncTask(ENamedThreads::GameThread, [SearchCenter, SearchExtent, World, NumCloseEntities = CloseEntities.Num()]()
 		{
-			DrawDebugBox(World, SearchCenter, SearchExtent, FColor::Green, false, 0.1f);
-			DrawDebugString(World, SearchCenter, FString::Printf(TEXT("%d"), NumCloseEntities), nullptr, FColor::Green, 0.1f);
+			DrawDebugBox(World, SearchCenter, SearchExtent, FColor::Green, false, 1.f);
+			DrawDebugString(World, SearchCenter, FString::Printf(TEXT("%d"), NumCloseEntities), nullptr, FColor::Green, 1.f);
 		});
 	}
 
 	TArray<FCapsule> OutCloseUnhittableEntities;
-	GetCloseUnhittableEntities(CloseEntities, OutCloseUnhittableEntities, IsEntityOnTeam1, Entity, EntitySubsystem, TargetEntityFragment);
+	OutCloseUnhittableEntities.Reserve(300);
 
-	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
+	GetCloseUnhittableEntities(CloseEntities, OutCloseUnhittableEntities, IsEntityOnTeam1, Entity, EntitySubsystem, TargetEntityFragment, EntityLocation, bIsEntitySoldier);
+
+	for (const FMassEntityHandle& OtherEntity : CloseEntities)
 	{
 		// Skip self.
-		if (OtherEntity.Entity == Entity)
+		if (OtherEntity == Entity)
 		{
 			continue;
 		}
 
 		// Skip invalid entities.
-		if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
+		if (!EntitySubsystem.IsEntityValid(OtherEntity))
 		{
 			continue;
 		}
 
-		FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity.Entity);
+		FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity);
 		FTeamMemberFragment* OtherEntityTeamMemberFragment = OtherEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
 
 		// Skip entities that don't have FTeamMemberFragment.
@@ -357,6 +420,11 @@ bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEnt
 		}
 
 		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntityView))
+		{
+			continue;
+		}
+
+		if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntityView))
 		{
 			continue;
 		}
@@ -375,7 +443,7 @@ bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEnt
 			continue;
 		}
 
-		OutTargetEntity = OtherEntity.Entity;
+		OutTargetEntity = OtherEntity;
 		OutTargetEntityLocation = OtherEntityLocation;
 		return true;
 	}
@@ -384,13 +452,13 @@ bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEnt
 	return false;
 }
 
-bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier)
+bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransform& EntityTransform, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, const uint8& FinderPhase, const bool& DrawSearchAreas, const uint8& SearchBreadth, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier, const FTargetHashGrid2D& TargetGrid)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestValidEnemy);
 
 	if (UMassEnemyTargetFinderProcessor_SearchInSinglePhase)
 	{
-		return GetClosestValidEnemyInSinglePhase(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, OutTargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, SearchBreadth, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier);
+		return GetClosestValidEnemyInSinglePhase(Entity, EntitySubsystem, TargetGrid, EntityTransform, CloseEntities, OutTargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, SearchBreadth, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier);
 	}
 
 	UWorld& World = *EntitySubsystem.GetWorld();
@@ -488,15 +556,20 @@ float GetVerticalAimOffset(FMassExecutionContext& Context, const bool bIsTargetE
 	return Result;
 }
 
-bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& TranformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas)
+bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& TranformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, TArray<FMassNavigationObstacleItem, TFixedAllocator<10>>& CloseEntities, const uint8& FinderPhase, FMassExecutionContext& Context, const bool& DrawSearchAreas, const FTargetHashGrid2D& TargetGrid)
 {
-	UpdatePhasesLeftOnCachedCloseUnhittableEntities(TargetEntityFragment);
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessEntityForVisualTarget);
+
+	if (!UMassEnemyTargetFinderProcessor_SearchInSinglePhase)
+	{
+		UpdatePhasesLeftOnCachedCloseUnhittableEntities(TargetEntityFragment);
+	}
 
 	const FTransform& EntityTransform = TranformFragment.GetTransform();
 	FMassEntityHandle TargetEntity;
 	FVector OutTargetEntityLocation;
 	bool bOutIsTargetEntitySoldier;
-	auto bFoundTarget = GetClosestValidEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, TargetEntityFragment.SearchBreadth, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier);
+	auto bFoundTarget = GetClosestValidEnemy(Entity, EntitySubsystem, AvoidanceObstacleGrid, EntityTransform, CloseEntities, TargetEntity, IsEntityOnTeam1, FinderPhase, DrawSearchAreas, TargetEntityFragment.SearchBreadth, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier, TargetGrid);
 	if (!bFoundTarget) {
 		return false;
 	}
@@ -514,6 +587,8 @@ FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_DrawTrackedSounds(TE
 
 void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessEntityForAudioTarget);
+
 	UWorld* World = SoundPerceptionSubsystem->GetWorld();
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	FVector OutSoundSource;
@@ -576,7 +651,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	TQueue<FMassEntityHandle> TargetFinderEntityQueue;
 	TQueue<FMassEntityHandle> TrackingSoundWhileNavigatingQueue;
 
-	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase, &TargetFinderEntityQueue, &SoundPerceptionSubsystem = SoundPerceptionSubsystem, &TrackingSoundWhileNavigatingQueue](FMassExecutionContext& Context)
+	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase, &TargetFinderEntityQueue, &SoundPerceptionSubsystem = SoundPerceptionSubsystem, &TrackingSoundWhileNavigatingQueue, &TargetFinderSubsystem = TargetFinderSubsystem](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 
@@ -600,6 +675,8 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		// TODO: We're incorrectly assuming all obstacles can be targets.
 		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGrid();
 
+		const FTargetHashGrid2D& TargetGrid = TargetFinderSubsystem->GetTargetGrid();
+
 		const int32 NumJobs = SharedParameters.ParallelJobCount;
 		const int32 CountPerJob = (NumEntities + NumJobs - 1) / NumJobs; // ceil(NumEntities / NumJobs)
 
@@ -613,7 +690,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 			for (int32 EntityIndex = StartIndex; (EntityIndex < NumEntities) && (EntityIndex < EndIndexExclusive); ++EntityIndex)
 			{
 				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
-				const bool& bFoundVisualTarget = ProcessEntityForVisualTarget(TargetFinderEntityQueue, Entity, EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase, Context, SharedParameters.DrawSearchAreas);
+				const bool& bFoundVisualTarget = ProcessEntityForVisualTarget(TargetFinderEntityQueue, Entity, EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase, Context, SharedParameters.DrawSearchAreas, TargetGrid);
 				if (!bFoundVisualTarget)
 				{
 					ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, StashedMoveTargetList[EntityIndex], EntitySubsystem, Entity, TrackingSoundWhileNavigatingQueue, MoveForwardCompleteSignalList[EntityIndex]);
