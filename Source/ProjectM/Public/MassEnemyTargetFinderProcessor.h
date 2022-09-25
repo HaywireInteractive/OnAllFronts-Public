@@ -76,6 +76,12 @@ public:
 };
 
 USTRUCT()
+struct FMassTrackSoundTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
+USTRUCT()
 struct FMassNeedsEnemyTargetTag : public FMassTag
 {
 	GENERATED_BODY()

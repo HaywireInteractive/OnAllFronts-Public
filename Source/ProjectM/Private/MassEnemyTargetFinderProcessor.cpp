@@ -15,6 +15,7 @@
 #include "MassMoveTargetForwardCompleteProcessor.h"
 #include "MassTrackedVehicleOrientationProcessor.h"
 #include "InvalidTargetFinderProcessor.h"
+#include "MassLookAtViaMoveTargetTask.h"
 
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
@@ -34,6 +35,7 @@ void UMassNeedsEnemyTargetTrait::BuildTemplate(FMassEntityTemplateBuildContext& 
 	TargetEntityTemplate.TargetMinCaliberForDamage = ProjectileCaliber;
 	TargetEntityTemplate.SearchBreadth = SearchBreadth;
 
+	BuildContext.AddFragment<FMassMoveForwardCompleteSignalFragment>();
 	BuildContext.AddTag<FMassNeedsEnemyTargetTag>();
 
 	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(&World);
@@ -57,6 +59,8 @@ void UMassEnemyTargetFinderProcessor::ConfigureQueries()
 	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FMassMoveForwardCompleteSignalFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
 	EntityQuery.AddConstSharedRequirement<FNeedsEnemyTargetSharedParameters>(EMassFragmentPresence::All);
 }
@@ -363,23 +367,31 @@ bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQ
 bool UMassEnemyTargetFinderProcessor_DrawTrackedSounds = false;
 FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_DrawTrackedSounds(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawTrackedSounds"), UMassEnemyTargetFinderProcessor_DrawTrackedSounds, TEXT("UMassEnemyTargetFinderProcessor: Draw Tracked Sounds"));
 
-void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1)
+void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment)
 {
 	UWorld* World = SoundPerceptionSubsystem->GetWorld();
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	FVector OutSoundSource;
 	const bool& bIsFacingMoveTarget = IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward);
-	const bool& bIsCurrentlyStanding = MoveTargetFragment.GetCurrentAction() == EMassMovementAction::Stand ||
-		(MoveTargetFragment.GetCurrentAction() == EMassMovementAction::Move && MoveTargetFragment.GetCurrentActionID() == 0);
-	if (SoundPerceptionSubsystem->HasSoundAtLocation(EntityLocation, OutSoundSource, !bIsEntityOnTeam1) && bIsFacingMoveTarget && bIsCurrentlyStanding)
+	if (SoundPerceptionSubsystem->HasSoundAtLocation(EntityLocation, OutSoundSource, !bIsEntityOnTeam1) && bIsFacingMoveTarget)
 	{
-		const FVector& NewGlobalDirection = (OutSoundSource - EntityLocation).GetSafeNormal();
+		const bool bDidStashCurrentMoveTarget = StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, *World, EntitySubsystem, Entity, false);
+		if (bDidStashCurrentMoveTarget)
+		{
+			TrackingSoundWhileNavigatingQueue.Enqueue(Entity);
+			MoveForwardCompleteSignalFragment.SignalType = EMassMoveForwardCompleteSignalType::TrackSoundComplete;
+		}
 
+		const FVector& NewGlobalDirection = (OutSoundSource - EntityLocation).GetSafeNormal();
 		MoveTargetFragment.CreateNewAction(EMassMovementAction::Stand, *World);
 		MoveTargetFragment.Center = EntityLocation;
 		MoveTargetFragment.Forward = NewGlobalDirection;
+		MoveTargetFragment.DistanceToGoal = 0.f;
+		MoveTargetFragment.bOffBoundaries = true;
+		MoveTargetFragment.DesiredSpeed.Set(0.f);
+		MoveTargetFragment.IntentAtGoal = bDidStashCurrentMoveTarget ? EMassMovementAction::Move : EMassMovementAction::Stand;
 
-		if (UMassEnemyTargetFinderProcessor_DrawTrackedSounds)
+		if (UMassEnemyTargetFinderProcessor_DrawTrackedSounds || UE::Mass::Debug::IsDebuggingEntity(Entity))
 		{
 			AsyncTask(ENamedThreads::GameThread, [World, EntityLocation, OutSoundSource]()
 			{
@@ -417,8 +429,9 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	}
 
 	TQueue<FMassEntityHandle> TargetFinderEntityQueue;
+	TQueue<FMassEntityHandle> TrackingSoundWhileNavigatingQueue;
 
-	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase, &TargetFinderEntityQueue, &SoundPerceptionSubsystem = SoundPerceptionSubsystem](FMassExecutionContext& Context)
+	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &FinderPhase = FinderPhase, &TargetFinderEntityQueue, &SoundPerceptionSubsystem = SoundPerceptionSubsystem, &TrackingSoundWhileNavigatingQueue](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 
@@ -426,6 +439,8 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 		const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
 		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
+		const TArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetMutableFragmentView<FMassStashedMoveTargetFragment>();
+		const TArrayView<FMassMoveForwardCompleteSignalFragment> MoveForwardCompleteSignalList = Context.GetMutableFragmentView<FMassMoveForwardCompleteSignalFragment>();
 		const FNeedsEnemyTargetSharedParameters& SharedParameters = Context.GetConstSharedFragment<FNeedsEnemyTargetSharedParameters>();
 
 		// Used for storing sorted list of nearest entities.
@@ -452,10 +467,11 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 			const int32 EndIndexExclusive = StartIndex + CountPerJob;
 			for (int32 EntityIndex = StartIndex; (EntityIndex < NumEntities) && (EntityIndex < EndIndexExclusive); ++EntityIndex)
 			{
-				const bool& bFoundVisualTarget = ProcessEntityForVisualTarget(TargetFinderEntityQueue, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase, Context, SharedParameters.DrawSearchAreas);
+				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
+				const bool& bFoundVisualTarget = ProcessEntityForVisualTarget(TargetFinderEntityQueue, Entity, EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, CloseEntities, FinderPhase, Context, SharedParameters.DrawSearchAreas);
 				if (!bFoundVisualTarget)
 				{
-					ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1);
+					ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, StashedMoveTargetList[EntityIndex], EntitySubsystem, Entity, TrackingSoundWhileNavigatingQueue, MoveForwardCompleteSignalList[EntityIndex]);
 				}
 				DrawEntitySearchingIfNeeded(EntitySubsystem.GetWorld(), LocationList[EntityIndex].GetTransform().GetLocation(), Context.GetEntity(EntityIndex));
 			}
@@ -470,7 +486,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	}
 
 	{
-		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessQueue);
+		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessQueues);
 		while (!TargetFinderEntityQueue.IsEmpty())
 		{
 			FMassEntityHandle TargetFinderEntity;
@@ -479,6 +495,17 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 
 			Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(TargetFinderEntity);
 			Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(TargetFinderEntity);
+		}
+
+		while (!TrackingSoundWhileNavigatingQueue.IsEmpty())
+		{
+			FMassEntityHandle Entity;
+			bool bSuccess = TrackingSoundWhileNavigatingQueue.Dequeue(Entity);
+			check(bSuccess);
+
+			Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
+			Context.Defer().AddTag<FMassTrackSoundTag>(Entity);
+			Context.Defer().AddTag<FMassNeedsMoveTargetForwardCompleteSignalTag>(Entity);
 		}
 	}
 

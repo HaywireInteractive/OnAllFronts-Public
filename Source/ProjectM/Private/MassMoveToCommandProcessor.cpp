@@ -107,7 +107,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 		return false;
 	}
 
-	if (UMassMoveToCommandProcessor_DrawPathResults)
+	if (UMassMoveToCommandProcessor_DrawPathResults || UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		int32 LineEndIndex = 1;
 		for (const FNavPathPoint& NavPathPoint : Result.Path.Get()->GetPathPoints())

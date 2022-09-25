@@ -8,7 +8,10 @@
 #include "MassNavigationUtils.h"
 #include "MassSignalSubsystem.h"
 #include "MassStateTreeTypes.h"
+#include <MassMoveToCommandProcessor.h>
 #include "MassTrackedVehicleOrientationProcessor.h"
+#include "MassEnemyTargetFinderProcessor.h"
+#include "InvalidTargetFinderProcessor.h"
 
 UMassMoveTargetForwardCompleteProcessor::UMassMoveTargetForwardCompleteProcessor()
 {
@@ -25,12 +28,16 @@ void UMassMoveTargetForwardCompleteProcessor::Initialize(UObject& Owner)
 void UMassMoveTargetForwardCompleteProcessor::ConfigureQueries()
 {
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
+	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FMassMoveForwardCompleteSignalFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FMassNeedsMoveTargetForwardCompleteSignalTag>(EMassFragmentPresence::All);
 }
 
 void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(UMassMoveTargetForwardCompleteProcessor);
+
 	TransientEntitiesToSignal.Reset();
 
 	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &EntitySubsystem](FMassExecutionContext& Context)
@@ -38,7 +45,9 @@ void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& Enti
 		const int32 NumEntities = Context.GetNumEntities();
 
 		const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
-		const TConstArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetFragmentView<FMassMoveTargetFragment>();
+		const TConstArrayView<FMassMoveForwardCompleteSignalFragment> MoveForwardCompleteSignalList = Context.GetFragmentView<FMassMoveForwardCompleteSignalFragment>();
+		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
+		const TConstArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetFragmentView<FMassStashedMoveTargetFragment>();
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
@@ -46,7 +55,19 @@ void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& Enti
 
 			if (bAtMoveTargetForward) {
 				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
-				TransientEntitiesToSignal.Add(Entity);
+
+				const auto SignalType = MoveForwardCompleteSignalList[EntityIndex].SignalType;
+				if (SignalType == EMassMoveForwardCompleteSignalType::NewStateTreeTask)
+				{
+					TransientEntitiesToSignal.Add(Entity);
+				}
+				else if (SignalType == EMassMoveForwardCompleteSignalType::TrackSoundComplete && StashedMoveTargetList.Num() > 0 && MoveTargetList.Num() > 0)
+				{
+					// Unstash move target if needed.
+					CopyMoveTarget(StashedMoveTargetList[EntityIndex], MoveTargetList[EntityIndex], *EntitySubsystem.GetWorld());
+					Context.Defer().RemoveTag<FMassHasStashedMoveTargetTag>(Entity);
+					Context.Defer().RemoveTag<FMassTrackSoundTag>(Entity);
+				}
 				Context.Defer().RemoveTag<FMassNeedsMoveTargetForwardCompleteSignalTag>(Entity);
 			}
 		}

@@ -14,19 +14,27 @@ bool FMassLookAtViaMoveTargetTask::Link(FStateTreeLinker& Linker)
 	Linker.LinkExternalData(MoveTargetHandle);
 	Linker.LinkExternalData(StashedMoveTargetHandle);
 	Linker.LinkExternalData(TransformHandle);
+	Linker.LinkExternalData(MoveForwardCompleteSignalHandle);
 
 	Linker.LinkInstanceDataProperty(TargetEntityHandle, STATETREE_INSTANCEDATA_PROPERTY(FMassLookAtViaMoveTargetTaskInstanceData, TargetEntity));
 
 	return true;
 }
 
-void StashCurrentMoveTargetIfNeeded(FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem&  EntitySubsystem, const FMassEntityHandle& Entity)
+bool StashCurrentMoveTargetIfNeeded(FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem&  EntitySubsystem, const FMassEntityHandle& Entity, const bool AddHasStashTag)
 {
-	if (MoveTargetFragment.GetCurrentAction() == EMassMovementAction::Move && MoveTargetFragment.GetCurrentActionID() > 0)
+	const bool bIsEntityCurrentMoving = MoveTargetFragment.GetCurrentAction() == EMassMovementAction::Move && MoveTargetFragment.GetCurrentActionID() > 0;
+	if (!bIsEntityCurrentMoving)
 	{
-		CopyMoveTarget(MoveTargetFragment, StashedMoveTargetFragment, World);
+		return false;
+	}
+
+	CopyMoveTarget(MoveTargetFragment, StashedMoveTargetFragment, World);
+	if (AddHasStashTag)
+	{
 		EntitySubsystem.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
 	}
+	return true;
 }
 
 EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecutionContext& Context, const EStateTreeStateChangeType ChangeType, const FStateTreeTransitionResult& Transition) const
@@ -35,6 +43,7 @@ EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecution
 	FMassMoveTargetFragment& MoveTargetFragment = MassContext.GetExternalData(MoveTargetHandle);
 	FMassStashedMoveTargetFragment& StashedMoveTargetFragment = MassContext.GetExternalData(StashedMoveTargetHandle);
 	const FTransformFragment& TransformFragment = MassContext.GetExternalData(TransformHandle);
+	FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment = MassContext.GetExternalData(MoveForwardCompleteSignalHandle);
 
 	const FMassEntityHandle* TargetEntity = Context.GetInstanceDataPtr(TargetEntityHandle);
 	if (TargetEntity == nullptr || !TargetEntity->IsSet()) {
@@ -64,6 +73,8 @@ EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecution
 
 	EntitySubsystem.Defer().AddTag<FMassTrackTargetTag>(Entity);
 	EntitySubsystem.Defer().AddTag<FMassNeedsMoveTargetForwardCompleteSignalTag>(Entity);
+	MoveForwardCompleteSignalFragment.SignalType = EMassMoveForwardCompleteSignalType::NewStateTreeTask;
+
 	return EStateTreeRunStatus::Running;
 }
 

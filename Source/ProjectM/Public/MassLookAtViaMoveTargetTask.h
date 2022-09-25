@@ -9,6 +9,14 @@
 #include "MassMoveToCommandProcessor.h"
 #include "MassLookAtViaMoveTargetTask.generated.h"
 
+struct FMassMoveTargetFragment;
+struct FMassStashedMoveTargetFragment;
+struct FMassMoveForwardCompleteSignalFragment;
+class UMassEntitySubsystem;
+
+/** Returns true if stashed move target. */
+bool StashCurrentMoveTargetIfNeeded(FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, const bool AddHasStashTag = true);
+
 USTRUCT()
 struct PROJECTM_API FMassLookAtViaMoveTargetTaskInstanceData
 {
@@ -32,6 +40,7 @@ protected:
 	TStateTreeExternalDataHandle<FMassMoveTargetFragment> MoveTargetHandle;
 	TStateTreeExternalDataHandle<FMassStashedMoveTargetFragment> StashedMoveTargetHandle;
 	TStateTreeExternalDataHandle<FTransformFragment> TransformHandle;
+	TStateTreeExternalDataHandle<FMassMoveForwardCompleteSignalFragment> MoveForwardCompleteSignalHandle;
 
 	TStateTreeInstanceDataPropertyHandle<FMassEntityHandle> TargetEntityHandle;
 };

@@ -36,7 +36,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	const bool& bIsTrackedVehicle = Context.DoesArchetypeHaveTag<FMassTrackedVehicleOrientationTag>();
 
 	// TODO: would it be faster to have two separate entity queries instead of checking tag here?
-	const bool& bUseStashedMoveTarget = Context.DoesArchetypeHaveTag<FMassTrackTargetTag>();
+	const bool& bUseStashedMoveTarget = Context.DoesArchetypeHaveTag<FMassTrackTargetTag>() || Context.DoesArchetypeHaveTag<FMassTrackSoundTag>();
 	FMassMoveTargetFragment& MoveTargetFragmentToModify = bUseStashedMoveTarget ? StashedMoveTargetFragment : MoveTargetFragment;
 
 	const auto& Points = NavMeshMoveFragment.Path.Get()->GetPathPoints();
@@ -54,7 +54,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward) : bAtNextMovePoint;
 	if (!bFinishedNextMovePoint)
 	{
-		if (UMassNavMeshMoveProcessor_DrawPathState)
+		if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
 		{
 			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Red, false, 1.f); // Red = Not at next point yet
 			UE_LOG(LogTemp, Warning, TEXT("UMassNavMeshMoveProcessor: Distance from next move point=%.1f"), DistanceFromNextMovePoint);
@@ -64,7 +64,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 		return;
 	}
 
-	if (UMassNavMeshMoveProcessor_DrawPathState)
+	if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Green, false, 1.f); // Green = Reached next point
 	}
@@ -78,7 +78,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 		MoveTargetFragmentToModify.DistanceToGoal = 0.f;
 		MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
 
-		if (UMassNavMeshMoveProcessor_DrawPathState)
+		if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
 		{
 			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Blue, false, 1.f); // Blue = Reached last point
 		}

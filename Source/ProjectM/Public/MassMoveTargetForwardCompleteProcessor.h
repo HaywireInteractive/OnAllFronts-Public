@@ -11,6 +11,21 @@
 
 class UMassSignalSubsystem;
 
+UENUM()
+enum class EMassMoveForwardCompleteSignalType : uint8
+{
+	NewStateTreeTask,
+	TrackSoundComplete,
+};
+
+USTRUCT()
+struct PROJECTM_API FMassMoveForwardCompleteSignalFragment : public FMassFragment
+{
+	GENERATED_BODY()
+
+	EMassMoveForwardCompleteSignalType SignalType = EMassMoveForwardCompleteSignalType::NewStateTreeTask;
+};
+
 USTRUCT()
 struct FMassNeedsMoveTargetForwardCompleteSignalTag : public FMassTag
 {
