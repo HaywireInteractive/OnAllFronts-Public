@@ -6,8 +6,30 @@
 
 #include "MassTargetFinderSubsystem.generated.h"
 
+struct FMassTargetGridItem
+{
+	FMassTargetGridItem(FMassEntityHandle InEntity, bool bInIsOnTeam1, FVector InLocation, float InMinCaliberForDamage, FCapsule InCapsule, bool bInIsSoldier) 
+		: Entity(InEntity), bIsOnTeam1(bInIsOnTeam1), Location(InLocation), MinCaliberForDamage(InMinCaliberForDamage), Capsule(InCapsule), bIsSoldier(bInIsSoldier)
+	{
+	}
+
+	FMassTargetGridItem() = default;
+
+	bool operator==(const FMassTargetGridItem& Other) const
+	{
+		return Entity == Other.Entity;
+	}
+
+	FMassEntityHandle Entity;
+	bool bIsOnTeam1;
+	FVector Location;
+	float MinCaliberForDamage;
+	FCapsule Capsule;
+	bool bIsSoldier;
+};
+
 // TODO: Constants here may not be optimal for performance.
-typedef THierarchicalHashGrid2D<2, 2, FMassEntityHandle> FTargetHashGrid2D;	// 2 levels of hierarchy, 4 ratio between levels
+typedef THierarchicalHashGrid2D<2, 2, FMassTargetGridItem> FTargetHashGrid2D;
 
 UCLASS()
 class PROJECTM_API UMassTargetFinderSubsystem : public UWorldSubsystem

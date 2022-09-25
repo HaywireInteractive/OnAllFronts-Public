@@ -25,6 +25,9 @@ void UMassTargetGridProcessor::ConfigureQueries()
 	BaseEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	BaseEntityQuery.AddRequirement<FAgentRadiusFragment>(EMassFragmentAccess::ReadOnly);
 	BaseEntityQuery.AddRequirement<FMassTargetGridCellLocationFragment>(EMassFragmentAccess::ReadWrite);
+	BaseEntityQuery.AddRequirement<FCollisionCapsuleParametersFragment>(EMassFragmentAccess::ReadOnly);
+	BaseEntityQuery.AddRequirement<FProjectileDamagableFragment>(EMassFragmentAccess::ReadOnly);
+	BaseEntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 
 	AddToGridEntityQuery = BaseEntityQuery;
 	AddToGridEntityQuery.AddTagRequirement<FMassInTargetGridTag>(EMassFragmentPresence::None);
@@ -55,17 +58,24 @@ void UMassTargetGridProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FM
 		TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
 		TConstArrayView<FAgentRadiusFragment> RadiiList = Context.GetFragmentView<FAgentRadiusFragment>();
 		TArrayView<FMassTargetGridCellLocationFragment> TargetGridCellLocationList = Context.GetMutableFragmentView<FMassTargetGridCellLocationFragment>();
+		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
+		const TConstArrayView<FProjectileDamagableFragment> ProjectileDamagableList = Context.GetFragmentView<FProjectileDamagableFragment>();
+		const TConstArrayView<FCollisionCapsuleParametersFragment> CollisionCapsuleParametersList = Context.GetFragmentView<FCollisionCapsuleParametersFragment>();
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
 			// Add to the grid
-			const FVector NewPos = LocationList[EntityIndex].GetTransform().GetLocation();
+			const FTransform& EntityTransform = LocationList[EntityIndex].GetTransform();
+			const FVector NewPos = EntityTransform.GetLocation();
 			const float Radius = RadiiList[EntityIndex].Radius;
 
 			const FMassEntityHandle& TargetEntity = Context.GetEntity(EntityIndex);
-			
+			const bool& bIsEntitySolder = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+			FCapsule Capsule = MakeCapsuleForEntity(CollisionCapsuleParametersList[EntityIndex], EntityTransform);
+			FMassTargetGridItem TargetGridItem(TargetEntity, TeamMemberList[EntityIndex].IsOnTeam1, NewPos, ProjectileDamagableList[EntityIndex].MinCaliberForDamage, Capsule, bIsEntitySolder);
+
 			const FBox NewBounds(NewPos - FVector(Radius, Radius, 0.f), NewPos + FVector(Radius, Radius, 0.f));
-			TargetGridCellLocationList[EntityIndex].CellLoc = TargetFinderSubsystem->GetTargetGridMutable().Add(TargetEntity, NewBounds);
+			TargetGridCellLocationList[EntityIndex].CellLoc = TargetFinderSubsystem->GetTargetGridMutable().Add(TargetGridItem, NewBounds);
 
 			Context.Defer().AddTag<FMassInTargetGridTag>(TargetEntity);
 		}
@@ -78,16 +88,24 @@ void UMassTargetGridProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FM
 		TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
 		TConstArrayView<FAgentRadiusFragment> RadiiList = Context.GetFragmentView<FAgentRadiusFragment>();
 		TArrayView<FMassTargetGridCellLocationFragment> TargetGridCellLocationList = Context.GetMutableFragmentView<FMassTargetGridCellLocationFragment>();
+		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
+		const TConstArrayView<FProjectileDamagableFragment> ProjectileDamagableList = Context.GetFragmentView<FProjectileDamagableFragment>();
+		const TConstArrayView<FCollisionCapsuleParametersFragment> CollisionCapsuleParametersList = Context.GetFragmentView<FCollisionCapsuleParametersFragment>();
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
 			// Update position in grid
-			const FVector NewPos = LocationList[EntityIndex].GetTransform().GetLocation();
+			const FTransform& EntityTransform = LocationList[EntityIndex].GetTransform();
+			const FVector NewPos = EntityTransform.GetLocation();
 			const float Radius = RadiiList[EntityIndex].Radius;
+			
 			const FMassEntityHandle& TargetEntity = Context.GetEntity(EntityIndex);
+			const bool& bIsEntitySolder = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+			FCapsule Capsule = MakeCapsuleForEntity(CollisionCapsuleParametersList[EntityIndex], EntityTransform);
+			FMassTargetGridItem TargetGridItem(TargetEntity, TeamMemberList[EntityIndex].IsOnTeam1, NewPos, ProjectileDamagableList[EntityIndex].MinCaliberForDamage, Capsule, bIsEntitySolder);
 
 			const FBox NewBounds(NewPos - FVector(Radius, Radius, 0.f), NewPos + FVector(Radius, Radius, 0.f));
-			TargetGridCellLocationList[EntityIndex].CellLoc = TargetFinderSubsystem->GetTargetGridMutable().Move(TargetEntity, TargetGridCellLocationList[EntityIndex].CellLoc, NewBounds);
+			TargetGridCellLocationList[EntityIndex].CellLoc = TargetFinderSubsystem->GetTargetGridMutable().Move(TargetGridItem, TargetGridCellLocationList[EntityIndex].CellLoc, NewBounds);
 		}
 	});
 }
@@ -127,8 +145,9 @@ void UMassTargetRemoverProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
-			const FMassEntityHandle& TargetEntity = Context.GetEntity(i);
-			TargetFinderSubsystem->GetTargetGridMutable().Remove(TargetEntity, TargetGridCellLocationList[i].CellLoc);
+			FMassTargetGridItem TargetGridItem;
+			TargetGridItem.Entity = Context.GetEntity(i);
+			TargetFinderSubsystem->GetTargetGridMutable().Remove(TargetGridItem, TargetGridCellLocationList[i].CellLoc);
 		}
 	});
 }

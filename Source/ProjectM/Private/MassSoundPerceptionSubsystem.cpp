@@ -5,10 +5,10 @@
 
 static int32 GMassSoundPerceptionSubsystemCounter = 0;
 static const float GSecondsTilSoundPerceptionDestruction = 2.f;
+static const float GUMassSoundPerceptionSubsystem_GridCellSize = 100000.f; // TODO: value here may not be optimal for performance.
 
 UMassSoundPerceptionSubsystem::UMassSoundPerceptionSubsystem()
-	// TODO: value of 1000 here may not be optimal for performance.
-	: SoundPerceptionGridForTeam1(1000.f), SoundPerceptionGridForTeam2(1000.f) // 10m grid
+	: SoundPerceptionGridForTeam1(GUMassSoundPerceptionSubsystem_GridCellSize), SoundPerceptionGridForTeam2(GUMassSoundPerceptionSubsystem_GridCellSize)
 {
 }
 
@@ -103,9 +103,11 @@ TStatId UMassSoundPerceptionSubsystem::GetStatId() const
 
 bool UMassSoundPerceptionSubsystem::HasSoundAtLocation(FVector Location, FVector& OutSoundSource, const bool& bFilterToTeam1)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(UMassSoundPerceptionSubsystem_HasSoundAtLocation);
+
 	auto& SoundPerceptionGrid = bFilterToTeam1 ? SoundPerceptionGridForTeam1 : SoundPerceptionGridForTeam2;
 	TArray<FSoundPerceptionHashGrid2D::ItemIDType> NearbySounds;
-	static const float QueryRadius = 100000.f; // TODO: What is a reasonable value? Now it's 1 km.
+	static const float QueryRadius = GUMassSoundPerceptionSubsystem_GridCellSize / 2.f;
 	const FVector Extent(QueryRadius, QueryRadius, QueryRadius);
 	const FBox QueryBox = FBox(Location - Extent, Location + Extent);
 

@@ -114,7 +114,7 @@ static const FBox BoxForPhase(const uint8& FinderPhase, const FTransform& Search
 bool UMassEnemyTargetFinderProcessor_DrawEntitiesSearching = false;
 FAutoConsoleVariableRef CVar_UMassEnemyTargetFinderProcessor_DrawEntitiesSearching(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawEntitiesSearching"), UMassEnemyTargetFinderProcessor_DrawEntitiesSearching, TEXT("UMassEnemyTargetFinderProcessor_DrawEntitiesSearching"));
 
-bool UMassEnemyTargetFinderProcessor_SearchInSinglePhase = false;
+bool UMassEnemyTargetFinderProcessor_SearchInSinglePhase = true;
 FAutoConsoleVariableRef CVar_UMassEnemyTargetFinderProcessor_SearchInSinglePhase(TEXT("pm.UMassEnemyTargetFinderProcessor_SearchInSinglePhase"), UMassEnemyTargetFinderProcessor_SearchInSinglePhase, TEXT("UMassEnemyTargetFinderProcessor_SearchInSinglePhase"));
 
 // TODO: Find out how to not duplicate from MassProjectileDamageProcessor.cpp. Right now only difference is number in template type for TFixedAllocator.
@@ -206,12 +206,17 @@ void AddToCachedCloseUnhittableEntities(FTargetEntityFragment& TargetEntityFragm
 	}
 }
 
+bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const float& MinCaliberForDamage)
+{
+	return TargetEntityFragment.TargetMinCaliberForDamage >= MinCaliberForDamage;
+}
+
 bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_CanEntityDamageTargetEntity);
 
 	const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment = OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>();
-	return TargetEntityProjectileDamagableFragment && TargetEntityFragment.TargetMinCaliberForDamage >= TargetEntityProjectileDamagableFragment->MinCaliberForDamage;
+	return TargetEntityProjectileDamagableFragment && CanEntityDamageTargetEntity(TargetEntityFragment, TargetEntityProjectileDamagableFragment->MinCaliberForDamage);
 }
 
 FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation)
@@ -270,7 +275,13 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 
 float GetEntityRange(const bool bIsEntitySoldier)
 {
-	return bIsEntitySoldier ? UMassEnemyTargetFinder_FinestCellSize : UMassEnemyTargetFinder_FinestCellSize * 2.f; // TODO: Don't hard-code, get from data asset.
+	return UMassEnemyTargetFinder_FinestCellSize * (bIsEntitySoldier ?  2.f : 4.f); // TODO: Don't hard-code, get from data asset.
+}
+
+bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntitySoldier, const FVector& TargetEntityLocation)
+{
+	const float DistanceToTarget = (TargetEntityLocation - EntityLocation).Size();
+	return DistanceToTarget > GetEntityRange(bIsEntitySoldier);
 }
 
 bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityView& TargetEntityView)
@@ -279,76 +290,58 @@ bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntit
 
 	const FTransformFragment& TargetEntityTransformFragment = TargetEntityView.GetFragmentData<FTransformFragment>();
 	const FVector& TargetEntityLocation = TargetEntityTransformFragment.GetTransform().GetLocation();
-	const float DistanceToTarget = (TargetEntityLocation - EntityLocation).Size();
-	return DistanceToTarget > GetEntityRange(bIsEntitySoldier);
+	return IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, TargetEntityLocation);
 }
 
-void GetCloseUnhittableEntities(const TArray<FMassEntityHandle> &CloseEntities, TArray<FCapsule>& OutCloseUnhittableEntities, const bool& IsEntityOnTeam1, const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector& EntityLocation, const bool bIsEntitySoldier)
+void GetCloseUnhittableEntities(const TArray<FMassTargetGridItem> &CloseEntities, TArray<FCapsule>& OutCloseUnhittableEntities, const bool& IsEntityOnTeam1, const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector& EntityLocation, const bool bIsEntitySoldier)
 {
 	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetCloseUnhittableEntities);
 
-	auto AddEntityToCloseUnhittables = [&OutCloseUnhittableEntities](const FMassEntityView& OtherEntityView) {
+	auto AddEntityToCloseUnhittables = [&OutCloseUnhittableEntities](const FCapsule& OtherEntityCapsule) {
 		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittables);
 
-		OutCloseUnhittableEntities.Add(MakeCapsuleForEntity(OtherEntityView));
+		OutCloseUnhittableEntities.Add(OtherEntityCapsule);
 	};
 
-	auto AddEntityToCloseUnhittablesIfNeeded = [&Entity, &EntitySubsystem, &EntityLocation, &bIsEntitySoldier, &IsEntityOnTeam1, &AddEntityToCloseUnhittables, &TargetEntityFragment](const FMassEntityHandle& OtherEntity) {
+	auto AddEntityToCloseUnhittablesIfNeeded = [&Entity, &EntitySubsystem, &EntityLocation, &bIsEntitySoldier, &IsEntityOnTeam1, &AddEntityToCloseUnhittables, &TargetEntityFragment](const FMassTargetGridItem& OtherEntity) {
 		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded);
 
 		{
 			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded_FirstSkips);
 
 			// Skip self.
-			if (OtherEntity == Entity)
+			if (OtherEntity.Entity == Entity)
 			{
 				return;
 			}
 
 			// Skip invalid entities.
-			if (!EntitySubsystem.IsEntityValid(OtherEntity))
+			if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
 			{
 				return;
 			}
 		}
 
-		FMassEntityView OtherEntityView;
-		{
-			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded_CreateEntityView);
-			OtherEntityView = FMassEntityView(EntitySubsystem, OtherEntity);
-		}
-
-		FTeamMemberFragment* OtherEntityTeamMemberFragment;
-		{
-			QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded_GetTeamMemberFragment);
-			OtherEntityTeamMemberFragment = OtherEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
-		}
-
-		// Skip entities that don't have FTeamMemberFragment.
-		if (!OtherEntityTeamMemberFragment) {
-			return;
-		}
-
 		// Skip entities out of range.
-		if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntityView))
+		if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntity.Location))
 		{
 			return;
 		}
 
 		// Same team entities are unhittable.
-		if (IsEntityOnTeam1 == OtherEntityTeamMemberFragment->IsOnTeam1) {
-			AddEntityToCloseUnhittables(OtherEntityView);
+		if (IsEntityOnTeam1 == OtherEntity.bIsOnTeam1) {
+			AddEntityToCloseUnhittables(OtherEntity.Capsule);
 			return;
 		}
 
 		// Undamagable enemies are unhittable.
-		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntityView))
+		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntity.MinCaliberForDamage))
 		{
-			AddEntityToCloseUnhittables(OtherEntityView);
+			AddEntityToCloseUnhittables(OtherEntity.Capsule);
 		}
 	};
 
-	for (const FMassEntityHandle& OtherEntity : CloseEntities)
+	for (const FMassTargetGridItem& OtherEntity : CloseEntities)
 	{
 		AddEntityToCloseUnhittablesIfNeeded(OtherEntity);
 	}
@@ -370,7 +363,7 @@ bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEnt
 	const FVector SearchExtent(FMath::Max(SearchOffsetAbs.X, SearchOffsetAbs.Y));
 
 	const FBox SearchBounds(SearchCenter - SearchExtent, SearchCenter + SearchExtent);
-	TArray<FMassEntityHandle> CloseEntities;
+	TArray<FMassTargetGridItem> CloseEntities;
 	CloseEntities.Reserve(300);
 
 	{
@@ -392,45 +385,37 @@ bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEnt
 
 	GetCloseUnhittableEntities(CloseEntities, OutCloseUnhittableEntities, IsEntityOnTeam1, Entity, EntitySubsystem, TargetEntityFragment, EntityLocation, bIsEntitySoldier);
 
-	for (const FMassEntityHandle& OtherEntity : CloseEntities)
+	for (const FMassTargetGridItem& OtherEntity : CloseEntities)
 	{
 		// Skip self.
-		if (OtherEntity == Entity)
+		if (OtherEntity.Entity == Entity)
 		{
 			continue;
 		}
 
 		// Skip invalid entities.
-		if (!EntitySubsystem.IsEntityValid(OtherEntity))
+		if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
 		{
-			continue;
-		}
-
-		FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity);
-		FTeamMemberFragment* OtherEntityTeamMemberFragment = OtherEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
-
-		// Skip entities that don't have FTeamMemberFragment.
-		if (!OtherEntityTeamMemberFragment) {
 			continue;
 		}
 
 		// Skip same team.
-		if (IsEntityOnTeam1 == OtherEntityTeamMemberFragment->IsOnTeam1) {
+		if (IsEntityOnTeam1 == OtherEntity.bIsOnTeam1) {
 			continue;
 		}
 
-		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntityView))
+		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntity.MinCaliberForDamage))
 		{
 			continue;
 		}
 
-		if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntityView))
+		if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntity.Location))
 		{
 			continue;
 		}
 
-		bOutIsTargetEntitySoldier = OtherEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
-		const FVector& OtherEntityLocation = OtherEntityView.GetFragmentData<FTransformFragment>().GetTransform().GetLocation();
+		bOutIsTargetEntitySoldier = OtherEntity.bIsSoldier;
+		const FVector& OtherEntityLocation = OtherEntity.Location;
 		const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, bOutIsTargetEntitySoldier, EntityTransform, OtherEntityLocation);
 
 		if (AreCloseUnhittableEntitiesBlockingTarget(ProjectileTraceCapsule, OutCloseUnhittableEntities, Entity, *World))
@@ -443,7 +428,7 @@ bool GetClosestValidEnemyInSinglePhase(const FMassEntityHandle& Entity, UMassEnt
 			continue;
 		}
 
-		OutTargetEntity = OtherEntity;
+		OutTargetEntity = OtherEntity.Entity;
 		OutTargetEntityLocation = OtherEntityLocation;
 		return true;
 	}
