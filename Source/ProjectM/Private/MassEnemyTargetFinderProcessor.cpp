@@ -181,7 +181,38 @@ void GetCloseUnhittableEntities(const TArray<FMassTargetGridItem> &CloseEntities
 	}
 }
 
-bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier)
+struct FPotentialTarget
+{
+	FPotentialTarget(FMassEntityHandle InEntity, FVector InLocation) : Entity(InEntity), Location(InLocation) {}
+	FMassEntityHandle Entity;
+	FVector Location;
+};
+
+bool SelectBestTarget(TSortedMap<float, TArray<FPotentialTarget>>& PotentialTargetsByCaliber, FMassEntityHandle& OutTargetEntity, FVector& OutTargetEntityLocation, const FVector& EntityLocation)
+{
+	if (PotentialTargetsByCaliber.Num() == 0)
+	{
+		OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
+		return false;
+	}
+
+	TArray<float> OutKeys;
+	PotentialTargetsByCaliber.GetKeys(OutKeys);
+	TArray<FPotentialTarget> PotentialTargets = PotentialTargetsByCaliber[OutKeys.Last()];
+
+	auto DistanceSqFromEntityToLocation = [&EntityLocation](const FVector& OtherLocation) {
+		return (OtherLocation - EntityLocation).SizeSquared();
+	};
+
+	PotentialTargets.Sort([&DistanceSqFromEntityToLocation](const FPotentialTarget& A, const FPotentialTarget& B) { return DistanceSqFromEntityToLocation(A.Location) < DistanceSqFromEntityToLocation(B.Location); });
+
+	OutTargetEntity = PotentialTargets[0].Entity;
+	OutTargetEntityLocation = PotentialTargets[0].Location;
+
+	return true;
+}
+
+bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier)
 {
 	const UWorld* World = EntitySubsystem.GetWorld();
 
@@ -200,7 +231,7 @@ bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem&
 	CloseEntities.Reserve(300);
 
 	{
-		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetClosestValidEnemy_TargetGridQuery);
+		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetBestTarget_TargetGridQuery);
 		TargetGrid.Query(SearchBounds, CloseEntities);
 	}
 
@@ -217,6 +248,8 @@ bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem&
 	OutCloseUnhittableEntities.Reserve(300);
 
 	GetCloseUnhittableEntities(CloseEntities, OutCloseUnhittableEntities, IsEntityOnTeam1, Entity, EntitySubsystem, TargetEntityFragment, EntityLocation, bIsEntitySoldier);
+
+	TSortedMap<float, TArray<FPotentialTarget>> PotentialTargetsByCaliber;
 
 	for (const FMassTargetGridItem& OtherEntity : CloseEntities)
 	{
@@ -261,13 +294,14 @@ bool GetClosestValidEnemy(const FMassEntityHandle& Entity, UMassEntitySubsystem&
 			continue;
 		}
 
-		OutTargetEntity = OtherEntity.Entity;
-		OutTargetEntityLocation = OtherEntityLocation;
-		return true;
+		if (!PotentialTargetsByCaliber.Contains(OtherEntity.MinCaliberForDamage))
+		{
+			PotentialTargetsByCaliber.Add(OtherEntity.MinCaliberForDamage, TArray<FPotentialTarget>());
+		}
+		PotentialTargetsByCaliber[OtherEntity.MinCaliberForDamage].Add(FPotentialTarget(OtherEntity.Entity, OtherEntity.Location));
 	}
 
-	OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
-	return false;
+	return SelectBestTarget(PotentialTargetsByCaliber, OutTargetEntity, OutTargetEntityLocation, EntityLocation);
 }
 
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
@@ -301,7 +335,7 @@ bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQ
 	FMassEntityHandle TargetEntity;
 	FVector OutTargetEntityLocation;
 	bool bOutIsTargetEntitySoldier;
-	auto bFoundTarget = GetClosestValidEnemy(Entity, EntitySubsystem, TargetGrid, EntityTransform, TargetEntity, IsEntityOnTeam1, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier);
+	auto bFoundTarget = GetBestTarget(Entity, EntitySubsystem, TargetGrid, EntityTransform, TargetEntity, IsEntityOnTeam1, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier);
 	if (!bFoundTarget) {
 		return false;
 	}
