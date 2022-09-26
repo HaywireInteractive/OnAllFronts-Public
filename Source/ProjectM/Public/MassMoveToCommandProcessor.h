@@ -32,6 +32,15 @@ struct PROJECTM_API FMassCommandableMovementSpeedFragment : public FMassFragment
 	float MovementSpeed;
 };
 
+USTRUCT()
+struct PROJECTM_API FNavMeshParamsFragment : public FMassSharedFragment
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = "Movement")
+	float NavMeshRadius = 50.f;
+};
+
 UCLASS(meta = (DisplayName = "Commandable"))
 class PROJECTM_API UMassCommandableTrait : public UMassEntityTraitBase
 {
@@ -42,6 +51,9 @@ protected:
 
 	UPROPERTY(Category = "", EditAnywhere)
 	float MovementSpeed = 500.f;
+
+	UPROPERTY(Category = "", EditAnywhere)
+	FNavMeshParamsFragment NavMeshParams;
 };
 
 USTRUCT()

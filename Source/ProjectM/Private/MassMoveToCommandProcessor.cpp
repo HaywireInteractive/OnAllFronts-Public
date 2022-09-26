@@ -23,6 +23,11 @@ void UMassCommandableTrait::BuildTemplate(FMassEntityTemplateBuildContext& Build
 
 	FMassCommandableMovementSpeedFragment& CommandableMovementSpeedTemplate = BuildContext.AddFragment_GetRef<FMassCommandableMovementSpeedFragment>();
 	CommandableMovementSpeedTemplate.MovementSpeed = MovementSpeed;
+
+	UMassEntitySubsystem* EntitySubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(&World);
+	check(EntitySubsystem);
+	const FConstSharedStruct NavMeshParamsFragment = EntitySubsystem->GetOrCreateConstSharedFragment(UE::StructUtils::GetStructCrc32(FConstStructView::Make(NavMeshParams)), NavMeshParams);
+	BuildContext.AddConstSharedFragment(NavMeshParamsFragment);
 }
 
 //----------------------------------------------------------------------//
@@ -38,9 +43,9 @@ void UMassMoveToCommandProcessor::ConfigureQueries()
 {
 	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FAgentRadiusFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FMassCommandableTag>(EMassFragmentPresence::All);
+	EntityQuery.AddConstSharedRequirement<FNavMeshParamsFragment>(EMassFragmentPresence::All);
 }
 
 void UMassMoveToCommandProcessor::Initialize(UObject& Owner)
@@ -67,7 +72,7 @@ bool IsEntityCommandableByUnit(const FMassEntityHandle& Entity, const UMilitaryU
 bool UMassMoveToCommandProcessor_DrawPathResults = false;
 FAutoConsoleVariableRef CVarUMassMoveToCommandProcessor_DrawPathResults(TEXT("pm.UMassMoveToCommandProcessor_DrawPathResults"), UMassMoveToCommandProcessor_DrawPathResults, TEXT("UMassMoveToCommandProcessor: Draw NavMesh Path Results"));
 
-bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& AgentRadius)
+bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& NavMeshRadius)
 {
 	if (TeamMemberFragment.IsOnTeam1 != IsLastMoveToCommandForTeam1)
 	{
@@ -80,7 +85,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 	}
 
 	static const float AgentHeight = 200.f; // TODO: Don't hardcode
-	const ANavigationData* NavData = NavSys->GetNavDataForProps(FNavAgentProperties(AgentRadius, AgentHeight), EntityLocation);
+	const ANavigationData* NavData = NavSys->GetNavDataForProps(FNavAgentProperties(NavMeshRadius, AgentHeight), EntityLocation);
 
 	if (!NavData)
 	{
@@ -103,7 +108,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 
 	if (!Result.IsSuccessful())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find path to target. Start = %s, End = %s"), *EntityLocation.ToString(), *ClosestValidLocation.Location.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find path to target. NavMeshRadius = %.0f, Start = %s, End = %s"), NavMeshRadius, *EntityLocation.ToString(), *ClosestValidLocation.Location.ToString());
 		return false;
 	}
 
@@ -157,8 +162,8 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 		const int32 NumEntities = Context.GetNumEntities();
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 		const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
-		const TConstArrayView<FAgentRadiusFragment> AgentRadiusList = Context.GetFragmentView<FAgentRadiusFragment>();
 		const TArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetMutableFragmentView<FMassNavMeshMoveFragment>();
+		const FNavMeshParamsFragment& NavMeshParams = Context.GetConstSharedFragment<FNavMeshParamsFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
@@ -167,7 +172,7 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 			FVector MoveToCommandTarget = *LastMoveToCommandTarget;
 			MoveToCommandTarget.Z = EntityLocation.Z;
 
-			const bool& bDidSetMoveTarget = ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntityLocation, Context.GetEntity(i), NavSys, NavMeshMoveList[i], Context, LastMoveToCommandMilitaryUnit, GetWorld(), AgentRadiusList[i].Radius);
+			const bool& bDidSetMoveTarget = ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntityLocation, Context.GetEntity(i), NavSys, NavMeshMoveList[i], Context, LastMoveToCommandMilitaryUnit, GetWorld(), NavMeshParams.NavMeshRadius);
 
 			if (bDidSetMoveTarget)
 			{
