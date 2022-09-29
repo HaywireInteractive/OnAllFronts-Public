@@ -68,12 +68,17 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 	SoundPerceptionSubsystem = UWorld::GetSubsystem<UMassSoundPerceptionSubsystem>(Owner.GetWorld());
 }
 
-bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const float& MinCaliberForDamage)
+inline bool CanEntityDamageTargetEntity(const float TargetMinCaliberForDamage, const float MinCaliberForDamage)
 {
-	return TargetEntityFragment.TargetMinCaliberForDamage >= MinCaliberForDamage;
+	return TargetMinCaliberForDamage >= MinCaliberForDamage;
 }
 
-bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView)
+inline bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const float MinCaliberForDamage)
+{
+	return CanEntityDamageTargetEntity(TargetEntityFragment.TargetMinCaliberForDamage, MinCaliberForDamage);
+}
+
+inline bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_CanEntityDamageTargetEntity");
 
@@ -183,13 +188,16 @@ void GetCloseUnhittableEntities(const TArray<FMassTargetGridItem> &CloseEntities
 
 struct FPotentialTarget
 {
-	FPotentialTarget(FMassEntityHandle InEntity, FVector InLocation) : Entity(InEntity), Location(InLocation) {}
+	FPotentialTarget(FMassEntityHandle InEntity, FVector InLocation, bool bInIsSoldier) : Entity(InEntity), Location(InLocation), bIsSoldier(bInIsSoldier) {}
 	FMassEntityHandle Entity;
 	FVector Location;
+	bool bIsSoldier;
 };
 
-bool SelectBestTarget(TSortedMap<float, TArray<FPotentialTarget>>& PotentialTargetsByCaliber, FMassEntityHandle& OutTargetEntity, FVector& OutTargetEntityLocation, const FVector& EntityLocation)
+bool SelectBestTarget(TSortedMap<float, TArray<FPotentialTarget>>& PotentialTargetsByCaliber, FMassEntityHandle& OutTargetEntity, FVector& OutTargetEntityLocation, const FVector& EntityLocation, bool& bOutIsTargetEntitySoldier)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_SelectBestTarget");
+
 	if (PotentialTargetsByCaliber.Num() == 0)
 	{
 		OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
@@ -208,8 +216,27 @@ bool SelectBestTarget(TSortedMap<float, TArray<FPotentialTarget>>& PotentialTarg
 
 	OutTargetEntity = PotentialTargets[0].Entity;
 	OutTargetEntityLocation = PotentialTargets[0].Location;
+	bOutIsTargetEntitySoldier = PotentialTargets[0].bIsSoldier;
 
 	return true;
+}
+
+void GroupPotentialTargetsByCaliber(TQueue<const FMassTargetGridItem*>& PotentialTargets, TSortedMap<float, TArray<FPotentialTarget>>& PotentialTargetsByCaliber)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_GroupPotentialTargetsByCaliber");
+
+	while (!PotentialTargets.IsEmpty())
+	{
+		const FMassTargetGridItem* PotentialTarget;
+		bool bSuccess = PotentialTargets.Dequeue(PotentialTarget);
+		check(bSuccess);
+
+		if (!PotentialTargetsByCaliber.Contains(PotentialTarget->MinCaliberForDamage))
+		{
+			PotentialTargetsByCaliber.Add(PotentialTarget->MinCaliberForDamage, TArray<FPotentialTarget>());
+		}
+		PotentialTargetsByCaliber[PotentialTarget->MinCaliberForDamage].Add(FPotentialTarget(PotentialTarget->Entity, PotentialTarget->Location, PotentialTarget->bIsSoldier));
+	}
 }
 
 bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier, const bool bIsEntitySoldier)
@@ -243,64 +270,67 @@ bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& Entity
 		});
 	}
 
-	TArray<FCapsule> OutCloseUnhittableEntities;
-	OutCloseUnhittableEntities.Reserve(300);
+	TArray<FCapsule> CloseUnhittableEntities;
+	CloseUnhittableEntities.Reserve(300);
 
-	GetCloseUnhittableEntities(CloseEntities, OutCloseUnhittableEntities, IsEntityOnTeam1, Entity, EntitySubsystem, TargetEntityFragment, EntityLocation, bIsEntitySoldier);
+	GetCloseUnhittableEntities(CloseEntities, CloseUnhittableEntities, IsEntityOnTeam1, Entity, EntitySubsystem, TargetEntityFragment, EntityLocation, bIsEntitySoldier);
 
-	TSortedMap<float, TArray<FPotentialTarget>> PotentialTargetsByCaliber;
+	TQueue<const FMassTargetGridItem*> PotentialTargets;
 
-	for (const FMassTargetGridItem& OtherEntity : CloseEntities)
+	ParallelFor(CloseEntities.Num(), [&PotentialTargets, &CloseEntities, &Entity, &EntitySubsystem, &IsEntityOnTeam1, TargetMinCaliberForDamage = TargetEntityFragment.TargetMinCaliberForDamage, &EntityLocation, &bIsEntitySoldier, &EntityTransform, &CloseUnhittableEntities, World](const int32 JobIndex)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_GetBestTarget_ParallelFor");
+
+		const FMassTargetGridItem& OtherEntity = CloseEntities[JobIndex];
+
 		// Skip self.
 		if (OtherEntity.Entity == Entity)
 		{
-			continue;
+			return;
 		}
 
 		// Skip invalid entities.
 		if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
 		{
-			continue;
+			return;
 		}
 
 		// Skip same team.
 		if (IsEntityOnTeam1 == OtherEntity.bIsOnTeam1) {
-			continue;
+			return;
 		}
 
-		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntity.MinCaliberForDamage))
+		if (!CanEntityDamageTargetEntity(TargetMinCaliberForDamage, OtherEntity.MinCaliberForDamage))
 		{
-			continue;
+			return;
 		}
 
 		if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntity.Location))
 		{
-			continue;
+			return;
 		}
 
-		bOutIsTargetEntitySoldier = OtherEntity.bIsSoldier;
 		const FVector& OtherEntityLocation = OtherEntity.Location;
-		const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, bOutIsTargetEntitySoldier, EntityTransform, OtherEntityLocation);
+		const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, OtherEntity.bIsSoldier, EntityTransform, OtherEntityLocation);
 
-		if (AreCloseUnhittableEntitiesBlockingTarget(ProjectileTraceCapsule, OutCloseUnhittableEntities, Entity, *World))
+		if (AreCloseUnhittableEntitiesBlockingTarget(ProjectileTraceCapsule, CloseUnhittableEntities, Entity, *World))
 		{
-			continue;
+			return;
 		}
 
 		if (!IsTargetEntityVisibleViaSphereTrace(*World, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, UE::Mass::Debug::IsDebuggingEntity(Entity)))
 		{
-			continue;
+			return;
 		}
 
-		if (!PotentialTargetsByCaliber.Contains(OtherEntity.MinCaliberForDamage))
-		{
-			PotentialTargetsByCaliber.Add(OtherEntity.MinCaliberForDamage, TArray<FPotentialTarget>());
-		}
-		PotentialTargetsByCaliber[OtherEntity.MinCaliberForDamage].Add(FPotentialTarget(OtherEntity.Entity, OtherEntity.Location));
-	}
+		PotentialTargets.Enqueue(&OtherEntity);
+	});
 
-	return SelectBestTarget(PotentialTargetsByCaliber, OutTargetEntity, OutTargetEntityLocation, EntityLocation);
+	TSortedMap<float, TArray<FPotentialTarget>> PotentialTargetsByCaliber;
+
+	GroupPotentialTargetsByCaliber(PotentialTargets, PotentialTargetsByCaliber);
+
+	return SelectBestTarget(PotentialTargetsByCaliber, OutTargetEntity, OutTargetEntityLocation, EntityLocation, bOutIsTargetEntitySoldier);
 }
 
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
