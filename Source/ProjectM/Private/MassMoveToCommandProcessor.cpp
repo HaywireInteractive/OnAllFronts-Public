@@ -137,7 +137,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 
 void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassMoveToCommandProcessor_Execute);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassMoveToCommandProcessor_Execute");
 
 	if (!MoveToCommandSubsystem)
 	{

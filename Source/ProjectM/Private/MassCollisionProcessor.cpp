@@ -84,7 +84,7 @@ FCapsule MakeCapsuleForEntity(const FCollisionCapsuleParametersFragment& Collisi
 
 FCapsule MakeCapsuleForEntity(const FMassEntityView& EntityView)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(MakeCapsuleForEntity);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("MakeCapsuleForEntity");
 
 	FCollisionCapsuleParametersFragment* CollisionCapsuleParametersFragment = EntityView.GetFragmentDataPtr<FCollisionCapsuleParametersFragment>();
 	FTransformFragment* TransformFragment = EntityView.GetFragmentDataPtr<FTransformFragment>();
@@ -307,7 +307,7 @@ bool UMassCollisionProcessor_UseParallelForEachEntityChunk = false;
 
 void UMassCollisionProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassCollisionProcessor);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassCollisionProcessor");
 
 	if (!NavigationSubsystem)
 	{

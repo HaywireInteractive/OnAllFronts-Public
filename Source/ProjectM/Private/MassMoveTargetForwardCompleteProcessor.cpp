@@ -36,7 +36,7 @@ void UMassMoveTargetForwardCompleteProcessor::ConfigureQueries()
 
 void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassMoveTargetForwardCompleteProcessor);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassMoveTargetForwardCompleteProcessor");
 
 	TransientEntitiesToSignal.Reset();
 

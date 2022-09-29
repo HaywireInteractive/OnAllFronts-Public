@@ -2,6 +2,7 @@
 
 #include "HAL/IConsoleManager.h"
 #include "DrawDebugHelpers.h"
+#include <MassEnemyTargetFinderProcessor.h>
 
 static int32 GMassSoundPerceptionSubsystemCounter = 0;
 static const float GSecondsTilSoundPerceptionDestruction = 2.f;
@@ -101,9 +102,47 @@ TStatId UMassSoundPerceptionSubsystem::GetStatId() const
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UMassSoundPerceptionSubsystem, STATGROUP_Tickables);
 }
 
-bool UMassSoundPerceptionSubsystem::HasSoundAtLocation(FVector Location, FVector& OutSoundSource, const bool& bFilterToTeam1)
+bool GetBestSound(const FVector& Location, TArray<FSoundPerceptionHashGrid2D::ItemIDType>& NearbySounds, const TMap<uint32, FMassSoundPerceptionItemMetaData>& IdsToMetaData, const bool bIsSoldier, const UWorld& World, FVector& OutBestSoundLocation)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassSoundPerceptionSubsystem_HasSoundAtLocation);
+	TArray<float> NearbySoundsDistanceSquaredWithLineOfSight;
+	TArray<FVector> NearbySoundLocationsWithLineOfSight;
+	const FVector TraceStart = Location + FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsSoldier));
+
+	auto DistanceSqToLocation = [&TraceStart, &IdsToMetaData](const FSoundPerceptionHashGrid2D::ItemIDType& SoundID) {
+		const FVector& SoundSource = IdsToMetaData[SoundID].SoundSource;
+		return (SoundSource - TraceStart).SizeSquared();
+	};
+
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("GetBestSound_Sort");
+		NearbySounds.Sort([&DistanceSqToLocation](const FSoundPerceptionHashGrid2D::ItemIDType& A, const FSoundPerceptionHashGrid2D::ItemIDType& B) { return DistanceSqToLocation(A) < DistanceSqToLocation(B); });
+	}
+
+	// We need this because doing many line traces can be expensive.
+	static const uint8 MaxSoundsToConsider = 3;
+
+	for (int32 i = 0; i < MaxSoundsToConsider && i < NearbySounds.Num(); i++)
+	{
+		FHitResult Result;
+		const FVector& SoundSource = IdsToMetaData[NearbySounds[i]].SoundSource;
+		bool bHasBlockingHit;
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE_STR("GetBestSound_LineTraceSingleByChannel");
+			bHasBlockingHit = World.LineTraceSingleByChannel(Result, TraceStart, SoundSource, ECollisionChannel::ECC_Visibility);
+		}
+		if (!bHasBlockingHit)
+		{
+			OutBestSoundLocation = SoundSource;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool UMassSoundPerceptionSubsystem::GetClosestSoundWithLineOfSightAtLocation(FVector Location, FVector& OutSoundSource, const bool bFilterToTeam1, const bool bIsSoldier)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassSoundPerceptionSubsystem_HasSoundAtLocation");
 
 	auto& SoundPerceptionGrid = bFilterToTeam1 ? SoundPerceptionGridForTeam1 : SoundPerceptionGridForTeam2;
 	TArray<FSoundPerceptionHashGrid2D::ItemIDType> NearbySounds;
@@ -113,12 +152,11 @@ bool UMassSoundPerceptionSubsystem::HasSoundAtLocation(FVector Location, FVector
 
 	SoundPerceptionGrid.Query(QueryBox, NearbySounds);
 
-	if (NearbySounds.Num() > 0)
+	if (NearbySounds.Num() == 0)
 	{
-		auto& IdsToMetaData = bFilterToTeam1 ? IdsToMetaDataForTeam1 : IdsToMetaDataForTeam2;
-		// TODO: OK to always pick first sounds here? No guarantee it's the closest sound.
-		OutSoundSource = IdsToMetaData[NearbySounds[0]].SoundSource;
+		return false;
 	}
 
-	return NearbySounds.Num() > 0;
+	auto& IdsToMetaData = bFilterToTeam1 ? IdsToMetaDataForTeam1 : IdsToMetaDataForTeam2;
+	return GetBestSound(Location, NearbySounds, IdsToMetaData, bIsSoldier, *GetWorld(), OutSoundSource);
 }

@@ -75,7 +75,7 @@ bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragme
 
 bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_CanEntityDamageTargetEntity);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_CanEntityDamageTargetEntity");
 
 	const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment = OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>();
 	return TargetEntityProjectileDamagableFragment && CanEntityDamageTargetEntity(TargetEntityFragment, TargetEntityProjectileDamagableFragment->MinCaliberForDamage);
@@ -95,7 +95,7 @@ FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bo
 
 bool AreCloseUnhittableEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const TArray<FCapsule>& CloseUnhittableEntities, const FMassEntityHandle& Entity, const UWorld& World)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AreCloseUnhittableEntitiesBlockingTarget);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_AreCloseUnhittableEntitiesBlockingTarget");
 
 	for (const FCapsule& CloseUnhittableCapsule : CloseUnhittableEntities)
 	{
@@ -110,7 +110,7 @@ bool AreCloseUnhittableEntitiesBlockingTarget(const FCapsule& ProjectileTraceCap
 
 bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation, const bool DrawTrace)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace");
 	FHitResult Result;
 	static const float Radius = 20.f; // TODO: don't hard-code
 	bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), DrawTrace ? EDrawDebugTrace::Type::ForDuration : EDrawDebugTrace::Type::None, Result, false, FLinearColor::Red, FLinearColor::Green, 2.f);
@@ -130,7 +130,7 @@ bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntit
 
 bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityView& TargetEntityView)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_IsTargetEntityOutOfRange);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_IsTargetEntityOutOfRange");
 
 	const FTransformFragment& TargetEntityTransformFragment = TargetEntityView.GetFragmentData<FTransformFragment>();
 	const FVector& TargetEntityLocation = TargetEntityTransformFragment.GetTransform().GetLocation();
@@ -139,10 +139,10 @@ bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntit
 
 void GetCloseUnhittableEntities(const TArray<FMassTargetGridItem> &CloseEntities, TArray<FCapsule>& OutCloseUnhittableEntities, const bool& IsEntityOnTeam1, const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector& EntityLocation, const bool bIsEntitySoldier)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetCloseUnhittableEntities);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_GetCloseUnhittableEntities");
 
 	auto AddEntityToCloseUnhittablesIfNeeded = [&Entity, &EntitySubsystem, &EntityLocation, &bIsEntitySoldier, &IsEntityOnTeam1, &OutCloseUnhittableEntities, &TargetEntityFragment](const FMassTargetGridItem& OtherEntity) {
-		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded);
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded");
 
 		// Skip self.
 		if (OtherEntity.Entity == Entity)
@@ -212,11 +212,10 @@ bool SelectBestTarget(TSortedMap<float, TArray<FPotentialTarget>>& PotentialTarg
 	return true;
 }
 
-bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier)
+bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier, const bool bIsEntitySoldier)
 {
 	const UWorld* World = EntitySubsystem.GetWorld();
 
-	const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	const FVector& EntityForwardVector = EntityTransform.GetRotation().GetForwardVector();
 	
@@ -231,7 +230,7 @@ bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& Entity
 	CloseEntities.Reserve(300);
 
 	{
-		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_GetBestTarget_TargetGridQuery);
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_GetBestTarget_TargetGridQuery");
 		TargetGrid.Query(SearchBounds, CloseEntities);
 	}
 
@@ -327,15 +326,15 @@ float GetVerticalAimOffset(FMassExecutionContext& Context, const bool bIsTargetE
 	return Result;
 }
 
-bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TranformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, FMassExecutionContext& Context, const FTargetHashGrid2D& TargetGrid)
+bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TranformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, FMassExecutionContext& Context, const FTargetHashGrid2D& TargetGrid, const bool bIsEntitySoldier)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessEntityForVisualTarget);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_ProcessEntityForVisualTarget");
 
 	const FTransform& EntityTransform = TranformFragment.GetTransform();
 	FMassEntityHandle TargetEntity;
 	FVector OutTargetEntityLocation;
 	bool bOutIsTargetEntitySoldier;
-	auto bFoundTarget = GetBestTarget(Entity, EntitySubsystem, TargetGrid, EntityTransform, TargetEntity, IsEntityOnTeam1, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier);
+	auto bFoundTarget = GetBestTarget(Entity, EntitySubsystem, TargetGrid, EntityTransform, TargetEntity, IsEntityOnTeam1, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier, bIsEntitySoldier);
 	if (!bFoundTarget) {
 		return false;
 	}
@@ -351,15 +350,15 @@ bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQ
 bool UMassEnemyTargetFinderProcessor_DrawTrackedSounds = false;
 FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_DrawTrackedSounds(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawTrackedSounds"), UMassEnemyTargetFinderProcessor_DrawTrackedSounds, TEXT("UMassEnemyTargetFinderProcessor: Draw Tracked Sounds"));
 
-void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment)
+void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment, const bool bIsEntitySoldier)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessEntityForAudioTarget);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_ProcessEntityForAudioTarget");
 
 	UWorld* World = SoundPerceptionSubsystem->GetWorld();
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	FVector OutSoundSource;
 	const bool& bIsFacingMoveTarget = IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward);
-	if (SoundPerceptionSubsystem->HasSoundAtLocation(EntityLocation, OutSoundSource, !bIsEntityOnTeam1) && bIsFacingMoveTarget)
+	if (SoundPerceptionSubsystem->GetClosestSoundWithLineOfSightAtLocation(EntityLocation, OutSoundSource, !bIsEntityOnTeam1, bIsEntitySoldier) && bIsFacingMoveTarget)
 	{
 		const bool bDidStashCurrentMoveTarget = StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, *World, EntitySubsystem, Entity, false);
 		if (bDidStashCurrentMoveTarget)
@@ -407,7 +406,7 @@ void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location, const F
 
 void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor");
 
 	if (UMassEnemyTargetFinderProcessor_SkipFindingTargets)
 	{
@@ -433,10 +432,11 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
 			const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
-			const bool& bFoundVisualTarget = ProcessEntityForVisualTarget(TargetFinderEntityQueue, Entity, EntitySubsystem, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, Context, TargetGrid);
+			const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+			const bool& bFoundVisualTarget = ProcessEntityForVisualTarget(TargetFinderEntityQueue, Entity, EntitySubsystem, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, Context, TargetGrid, bIsEntitySoldier);
 			if (!bFoundVisualTarget)
 			{
-				ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, StashedMoveTargetList[EntityIndex], EntitySubsystem, Entity, TrackingSoundWhileNavigatingQueue, MoveForwardCompleteSignalList[EntityIndex]);
+				ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, StashedMoveTargetList[EntityIndex], EntitySubsystem, Entity, TrackingSoundWhileNavigatingQueue, MoveForwardCompleteSignalList[EntityIndex], bIsEntitySoldier);
 			}
 			DrawEntitySearchingIfNeeded(EntitySubsystem.GetWorld(), LocationList[EntityIndex].GetTransform().GetLocation(), Context.GetEntity(EntityIndex));
 		}
@@ -450,7 +450,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	}
 
 	{
-		QUICK_SCOPE_CYCLE_COUNTER(UMassEnemyTargetFinderProcessor_ProcessQueues);
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_ProcessQueues");
 		while (!TargetFinderEntityQueue.IsEmpty())
 		{
 			FMassEntityHandle TargetFinderEntity;

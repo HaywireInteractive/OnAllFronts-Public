@@ -156,7 +156,7 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 // Returns true if found at least one close entity that is not Entity. Note that OutCloseEntities may include Entity if it is a navigation obstacle.
 bool GetClosestEntities(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, const float Radius, TProjectileDamageObstacleItemArray& OutCloseEntities)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_GetClosestEntity);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor_GetClosestEntity");
 
 	FindCloseObstacles(Location, Radius, AvoidanceObstacleGrid, OutCloseEntities);
 
@@ -181,7 +181,7 @@ bool GetClosestEntities(const FMassEntityHandle& Entity, UMassEntitySubsystem& E
 
 bool DidCollideViaLineTrace(const UWorld &World, const FVector& StartLocation, const FVector &EndLocation, const bool& DrawLineTraces, TQueue<FHitResult>& DebugLinesToDrawQueue)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_DidCollideViaLineTrace);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor_DidCollideViaLineTrace");
 
 	FHitResult Result;
 	bool const bSuccess = World.LineTraceSingleByChannel(Result, StartLocation, EndLocation, ECollisionChannel::ECC_Visibility);
@@ -198,7 +198,7 @@ FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_DrawCapsules(TEXT("pm
 
 bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, const bool& DrawCapsules, const UWorld& World, TQueue<TPair<FCapsule, FLinearColor>>& DebugCapsulesToDrawQueue, const FMassEntityView& OtherEntityView)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_DidCollideWithEntity);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor_DidCollideWithEntity");
 
 	FCapsule ProjectileCapsule(StartLocation, EndLocation, Radius);
 	const FCapsule& OtherEntityCapsule = MakeCapsuleForEntity(OtherEntityView);
@@ -423,7 +423,7 @@ FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_UseParallelForEachEnt
 
 void ProcessQueues(TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMassEntityHandle>& SoldiersToDestroy, TQueue<FMassEntityHandle>& PlayersToDestroy, TQueue<FHitResult>& DebugLinesToDrawQueue, TQueue<TPair<FCapsule, FLinearColor>>& DebugCapsulesToDrawQueue, UWorld* World, FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor_ProcessQueues);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor_ProcessQueues");
 
 	// Destroy projectiles.
 	while (!ProjectilesToDestroy.IsEmpty())
@@ -500,7 +500,7 @@ void ProcessQueues(TQueue<FMassEntityHandle>& ProjectilesToDestroy, TQueue<FMass
 
 void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassProjectileDamageProcessor);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor");
 
 	if (!NavigationSubsystem)
 	{

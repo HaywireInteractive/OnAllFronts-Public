@@ -69,7 +69,7 @@ bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector
 
 bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, const FMassEntityHandle& Entity, const UWorld& World)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(DidCapsulesCollide);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("DidCapsulesCollide");
 
 	const bool& Result = TestCapsuleCapsule(Capsule1, Capsule2);
 
@@ -186,7 +186,7 @@ void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle
 
 void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UInvalidTargetFinderProcessor);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UInvalidTargetFinderProcessor");
 
 	if (!NavigationSubsystem)
 	{

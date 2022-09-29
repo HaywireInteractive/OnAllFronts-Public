@@ -106,7 +106,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 
 void UMassNavMeshMoveProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassNavMeshMoveProcessor_Execute);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassNavMeshMoveProcessor_Execute");
 
 	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &EntitySubsystem](FMassExecutionContext& Context)
 	{

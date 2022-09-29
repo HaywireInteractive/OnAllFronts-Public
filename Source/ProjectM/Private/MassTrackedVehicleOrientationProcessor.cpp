@@ -109,7 +109,7 @@ struct FProcessEntityContext
 void UMassTrackedVehicleOrientationProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 	FMassExecutionContext& Context)
 {
-	QUICK_SCOPE_CYCLE_COUNTER(UMassTrackedVehicleOrientationProcessor_Execute);
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassTrackedVehicleOrientationProcessor_Execute");
 
 	// Clamp max delta time to avoid large values during initialization.
 	const float DeltaTime = FMath::Min(0.1f, Context.GetDeltaTimeSeconds());
