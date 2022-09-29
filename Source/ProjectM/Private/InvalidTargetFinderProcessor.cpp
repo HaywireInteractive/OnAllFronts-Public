@@ -71,7 +71,7 @@ bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, cons
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("DidCapsulesCollide");
 
-	const bool& Result = TestCapsuleCapsule(Capsule1, Capsule2);
+	const bool Result = TestCapsuleCapsule(Capsule1, Capsule2);
 
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
