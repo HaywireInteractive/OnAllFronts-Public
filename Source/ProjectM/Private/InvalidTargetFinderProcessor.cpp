@@ -11,7 +11,6 @@
 #include "MassNavigationSubsystem.h"
 #include "MassEntityView.h"
 #include "MassProjectileDamageProcessor.h"
-#include "MassEnemyTargetFinderProcessor.h"
 
 void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World)
 {
@@ -149,7 +148,7 @@ bool IsTargetValid(const FMassEntityHandle& Entity, FMassEntityHandle& TargetEnt
 		return false;
 	}
 
-	FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
+  const FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
 	const FVector& TargetEntityLocation = TargetEntityView.GetFragmentData<FTransformFragment>().GetTransform().GetLocation();
 	if (IsTargetEntityOutOfRange(TargetEntityLocation, EntityLocation, EntitySubsystem, TargetEntityFragment, Entity, Context))
 	{
@@ -164,22 +163,19 @@ bool IsTargetValid(const FMassEntityHandle& Entity, FMassEntityHandle& TargetEnt
 	return true;
 }
 
-void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector &EntityLocation, const FMassStashedMoveTargetFragment* StashedMoveTargetFragment, FMassMoveTargetFragment* MoveTargetFragment, TArray<FMassEntityHandle>& TransientEntitiesToSignal, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1, const FTransform& EntityTransform)
+void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector &EntityLocation, const FMassStashedMoveTargetFragment* StashedMoveTargetFragment, FMassMoveTargetFragment* MoveTargetFragment, TQueue<FMassEntityHandle>& EntitiesWithInvalidTargetQueue, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1, const FTransform& EntityTransform, TQueue<FMassEntityHandle>& EntitiesWithUnstashedMovedTargetQueue)
 {
 	FMassEntityHandle& TargetEntity = TargetEntityFragment.Entity;
 	if (!IsTargetValid(Entity, TargetEntity, EntitySubsystem, EntityLocation, TargetEntityFragment, AvoidanceObstacleGrid, IsEntityOnTeam1, Context, EntityTransform))
 	{
 		TargetEntity.Reset();
-		TransientEntitiesToSignal.Add(Entity);
-		Context.Defer().AddTag<FMassNeedsEnemyTargetTag>(Entity);
-		Context.Defer().RemoveTag<FMassWillNeedEnemyTargetTag>(Entity);
-		Context.Defer().RemoveTag<FMassTrackTargetTag>(Entity);
+		EntitiesWithInvalidTargetQueue.Enqueue(Entity);
 
 		// Unstash move target if needed.
 		if (Context.DoesArchetypeHaveTag<FMassHasStashedMoveTargetTag>() && StashedMoveTargetFragment && MoveTargetFragment)
 		{
 			CopyMoveTarget(*StashedMoveTargetFragment, *MoveTargetFragment, *EntitySubsystem.GetWorld());
-			Context.Defer().RemoveTag<FMassHasStashedMoveTargetTag>(Entity);
+			EntitiesWithUnstashedMovedTargetQueue.Enqueue(Entity);
 		}
 	}
 }
@@ -193,29 +189,62 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 		return;
 	}
 
-	TransientEntitiesToSignal.Reset();
+	TQueue<FMassEntityHandle> EntitiesWithInvalidTargetQueue;
+	TQueue<FMassEntityHandle> EntitiesWithUnstashedMovedTargetQueue;
 
-	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &TransientEntitiesToSignal = TransientEntitiesToSignal, &NavigationSubsystem = NavigationSubsystem](FMassExecutionContext& Context)
+  {
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UInvalidTargetFinderProcessor.Execute.ForEachEntityChunk");
+
+		// This is not ParallelForEachEntityChunk because there are few chunks. Instead we ParallelFor within the chunk.
+	  EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &EntitiesWithInvalidTargetQueue, &EntitiesWithUnstashedMovedTargetQueue](FMassExecutionContext& Context)
+    {
+      const int32 NumEntities = Context.GetNumEntities();
+
+      const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
+      const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
+      const TConstArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetFragmentView<FMassStashedMoveTargetFragment>();
+      const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
+      const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
+
+      // TODO: We're incorrectly assuming all obstacles can be targets.
+      const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGrid();
+
+			ParallelFor(NumEntities, [&](const int32 EntityIndex) {
+				ProcessEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, TargetEntityList[EntityIndex], TransformList[EntityIndex].GetTransform().GetLocation(), StashedMoveTargetList.Num() > 0 ? &StashedMoveTargetList[EntityIndex] : nullptr, MoveTargetList.Num() > 0 ? &MoveTargetList[EntityIndex] : nullptr, EntitiesWithInvalidTargetQueue, AvoidanceObstacleGrid, TeamMemberList[EntityIndex].IsOnTeam1, TransformList[EntityIndex].GetTransform(), EntitiesWithUnstashedMovedTargetQueue);
+			});
+    });
+  }
+
+
 	{
-		const int32 NumEntities = Context.GetNumEntities();
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UInvalidTargetFinderProcessor.Execute.ProcessQueues");
 
-		const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
-		const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
-		const TConstArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetFragmentView<FMassStashedMoveTargetFragment>();
-		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
-		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
+		TransientEntitiesToSignal.Reset();
 
-		// TODO: We're incorrectly assuming all obstacles can be targets.
-		const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGrid();
-
-		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+		while (!EntitiesWithInvalidTargetQueue.IsEmpty())
 		{
-			ProcessEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, TargetEntityList[EntityIndex], TransformList[EntityIndex].GetTransform().GetLocation(), StashedMoveTargetList.Num() > 0 ? &StashedMoveTargetList[EntityIndex] : nullptr, MoveTargetList.Num() > 0 ? &MoveTargetList[EntityIndex] : nullptr, TransientEntitiesToSignal, AvoidanceObstacleGrid, TeamMemberList[EntityIndex].IsOnTeam1, TransformList[EntityIndex].GetTransform());
-		}
-	});
+			FMassEntityHandle Entity;
+			const bool bSuccess = EntitiesWithInvalidTargetQueue.Dequeue(Entity);
+			check(bSuccess);
 
-	if (TransientEntitiesToSignal.Num())
-	{
-		SignalSubsystem->SignalEntities(UE::Mass::Signals::NewStateTreeTaskRequired, TransientEntitiesToSignal);
+			Context.Defer().AddTag<FMassNeedsEnemyTargetTag>(Entity);
+			Context.Defer().RemoveTag<FMassWillNeedEnemyTargetTag>(Entity);
+			Context.Defer().RemoveTag<FMassTrackTargetTag>(Entity);
+			TransientEntitiesToSignal.Add(Entity);
+		}
+
+	  while (!EntitiesWithUnstashedMovedTargetQueue.IsEmpty())
+		{
+			FMassEntityHandle Entity;
+			const bool bSuccess = EntitiesWithUnstashedMovedTargetQueue.Dequeue(Entity);
+			check(bSuccess);
+
+			Context.Defer().RemoveTag<FMassHasStashedMoveTargetTag>(Entity);
+		}
+
+		if (TransientEntitiesToSignal.Num())
+		{
+			SignalSubsystem->SignalEntities(UE::Mass::Signals::NewStateTreeTaskRequired, TransientEntitiesToSignal);
+		}
 	}
 }
