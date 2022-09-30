@@ -391,7 +391,7 @@ private:
 struct FSelectBestTargetProcessEntityContext
 {
 	FSelectBestTargetProcessEntityContext(UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle>& TargetFinderEntityQueue, const FMassEntityHandle& Entity, const FTransform& EntityTransform, FTargetEntityFragment& TargetEntityFragment, TArray<FPotentialTarget>& PotentialTargets, const bool bIsEntitySoldier)
-		: EntitySubsystem(EntitySubsystem), TargetFinderEntityQueue(TargetFinderEntityQueue), Entity(Entity), EntityLocation(EntityTransform.GetLocation()), EntityTransform(EntityTransform), TargetEntityFragment(TargetEntityFragment), PotentialTargets(PotentialTargets), bIsEntitySoldier(bIsEntitySoldier)
+		: EntitySubsystem(EntitySubsystem), TargetFinderEntityQueue(TargetFinderEntityQueue), Entity(Entity), EntityLocation(EntityTransform.GetLocation()), EntityTransform(EntityTransform), bIsEntitySoldier(bIsEntitySoldier), TargetEntityFragment(TargetEntityFragment), PotentialTargets(PotentialTargets)
 	{
 	}
 

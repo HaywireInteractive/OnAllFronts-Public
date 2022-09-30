@@ -7,6 +7,7 @@
 #include "MassProjectileDamageProcessor.h"
 #include "MassRepresentationTypes.h"
 #include "MassTrackedVehicleOrientationProcessor.h"
+#include "Containers/BinaryHeap.h"
 
 UMassAudioPerceptionProcessor::UMassAudioPerceptionProcessor()
 {
@@ -53,17 +54,21 @@ void EnqueueClosestSoundsToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoun
 
   const FVector TraceStart = EntityLocation + FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
 
-  {
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue.Sort");
-		auto DistanceSqToLocation = [&TraceStart](const FVector& SoundSource) {
-      return (SoundSource - TraceStart).SizeSquared();
-    };
-		CloseSounds.Sort([&DistanceSqToLocation](const FVector& A, const FVector& B) { return DistanceSqToLocation(A) < DistanceSqToLocation(B); });
-	}
+	FBinaryHeap<float> CloseSoundsHeap;
 
-	if (CloseSounds.IsEmpty())
-	{
-		return;
+  {
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue.Heapify");
+
+		auto DistanceSqToLocation = [&TraceStart](const FVector& SoundSource) {
+			return (SoundSource - TraceStart).SizeSquared();
+		};
+
+		int32 i = 0;
+		for (const FVector& SoundSource : CloseSounds)
+		{
+			CloseSoundsHeap.Add(DistanceSqToLocation(SoundSource), i);
+			i++;
+		}
 	}
 
 	FSoundTraceData SoundTraceData(Entity, TraceStart);
@@ -71,9 +76,10 @@ void EnqueueClosestSoundsToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoun
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue.SoundLocations.Add");
 
 	  static constexpr uint8 MaxSoundsToConsider = 3;
-    for (int i = 0; i < MaxSoundsToConsider && i < CloseSounds.Num(); i++)
+    for (uint32 i = 0; i < MaxSoundsToConsider && i < CloseSoundsHeap.Num(); i++)
     {
-      SoundTraceData.SoundLocations.Add(CloseSounds[i]);
+			CloseSoundsHeap.Pop();
+      SoundTraceData.SoundLocations.Add(CloseSounds[CloseSoundsHeap.Top()]);
     }
   }
 
