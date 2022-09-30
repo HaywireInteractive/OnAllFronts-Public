@@ -382,10 +382,10 @@ private:
 	}
 
 	TQueue<FPotentialTargetSphereTraceData>& PotentialTargetsNeedingSphereTraceQueue;
+	UWorld& World;
+	TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities;
 	TArray<FPotentialTargetSphereTraceData> PotentialTargetsNeedingSphereTrace;
 	TQueue<FPotentialTargetSphereTraceData> PotentialVisibleTargets;
-	TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities;
-	UWorld& World;
 };
 
 struct FSelectBestTargetProcessEntityContext

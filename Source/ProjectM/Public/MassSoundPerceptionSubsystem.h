@@ -27,9 +27,9 @@ public:
 	UMassSoundPerceptionSubsystem();
 
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-	void AddSoundPerception(FVector Location, const bool& bIsSourceFromTeam1, const bool SkipDebugDraw = false);
-	void AddSoundPerception(FVector Location); // Use this overload for sounds that are not specific to a team.
-	bool GetClosestSoundWithLineOfSightAtLocation(FVector Location, FVector& OutSoundSource, const bool bFilterToTeam1, const bool bIsSoldier);
+	void AddSoundPerception(const FVector Location, const bool& bIsSourceFromTeam1, const bool SkipDebugDraw = false);
+	void AddSoundPerception(const FVector Location); // Use this overload for sounds that are not specific to a team.
+	bool GetSoundsNearLocation(const FVector& Location, TArray<FVector>& OutCloseSounds, const bool bFilterToTeam1);
 
 protected:
 	virtual void Tick(float DeltaTime) override;

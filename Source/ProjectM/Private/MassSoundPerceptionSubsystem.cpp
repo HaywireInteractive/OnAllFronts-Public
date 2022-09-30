@@ -5,8 +5,8 @@
 #include <MassEnemyTargetFinderProcessor.h>
 
 static int32 GMassSoundPerceptionSubsystemCounter = 0;
-static const float GSecondsTilSoundPerceptionDestruction = 2.f;
-static const float GUMassSoundPerceptionSubsystem_GridCellSize = 100000.f; // TODO: value here may not be optimal for performance.
+static constexpr float GSecondsTilSoundPerceptionDestruction = 2.f;
+static constexpr float GUMassSoundPerceptionSubsystem_GridCellSize = 100000.f; // TODO: value here may not be optimal for performance.
 
 UMassSoundPerceptionSubsystem::UMassSoundPerceptionSubsystem()
 	: SoundPerceptionGridForTeam1(GUMassSoundPerceptionSubsystem_GridCellSize), SoundPerceptionGridForTeam2(GUMassSoundPerceptionSubsystem_GridCellSize)
@@ -58,7 +58,7 @@ void UMassSoundPerceptionSubsystem::Tick(float DeltaTime)
 bool UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception = false;
 FAutoConsoleVariableRef CVarUMassSoundPerceptionSubsystem_DrawOnAddSoundPerception(TEXT("pm.UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception"), UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception, TEXT("UMassSoundPerceptionSubsystem: Draw On AddSoundPerception"));
 
-void UMassSoundPerceptionSubsystem::AddSoundPerception(FVector Location, const bool& bIsSourceFromTeam1, const bool SkipDebugDraw)
+void UMassSoundPerceptionSubsystem::AddSoundPerception(const FVector Location, const bool& bIsSourceFromTeam1, const bool SkipDebugDraw)
 {
 	auto& SoundPerceptionGrid = bIsSourceFromTeam1 ? SoundPerceptionGridForTeam1 : SoundPerceptionGridForTeam2;
 	uint32 ItemID = GMassSoundPerceptionSubsystemCounter++;
@@ -67,7 +67,7 @@ void UMassSoundPerceptionSubsystem::AddSoundPerception(FVector Location, const b
 	const FSoundPerceptionHashGrid2D::FCellLocation& CellLocation = SoundPerceptionGrid.Add(ItemID, Bounds);
 
 
-	FMassSoundPerceptionItemMetaData ItemMetaData(GSecondsTilSoundPerceptionDestruction, CellLocation, Location);
+  const FMassSoundPerceptionItemMetaData ItemMetaData(GSecondsTilSoundPerceptionDestruction, CellLocation, Location);
 	auto& IdsToMetaData = bIsSourceFromTeam1 ? IdsToMetaDataForTeam1 : IdsToMetaDataForTeam2;
 	IdsToMetaData.Add(ItemID, ItemMetaData);
 
@@ -81,7 +81,7 @@ void UMassSoundPerceptionSubsystem::AddSoundPerception(FVector Location, const b
 bool UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds = false;
 FAutoConsoleVariableRef CVar_UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds(TEXT("pm.UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds"), UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds, TEXT("UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds"));
 
-void UMassSoundPerceptionSubsystem::AddSoundPerception(FVector Location)
+void UMassSoundPerceptionSubsystem::AddSoundPerception(const FVector Location)
 {
 	if (!UMassSoundPerceptionSubsystem_AddEnvironmentImpactSounds)
 	{
@@ -102,49 +102,11 @@ TStatId UMassSoundPerceptionSubsystem::GetStatId() const
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UMassSoundPerceptionSubsystem, STATGROUP_Tickables);
 }
 
-bool GetBestSound(const FVector& Location, TArray<FSoundPerceptionHashGrid2D::ItemIDType>& NearbySounds, const TMap<uint32, FMassSoundPerceptionItemMetaData>& IdsToMetaData, const bool bIsSoldier, const UWorld& World, FVector& OutBestSoundLocation)
+bool UMassSoundPerceptionSubsystem::GetSoundsNearLocation(const FVector& Location, TArray<FVector>& OutCloseSounds, const bool bFilterToTeam1)
 {
-	TArray<float> NearbySoundsDistanceSquaredWithLineOfSight;
-	TArray<FVector> NearbySoundLocationsWithLineOfSight;
-	const FVector TraceStart = Location + FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsSoldier));
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassSoundPerceptionSubsystem.GetSoundsNearLocation");
 
-	auto DistanceSqToLocation = [&TraceStart, &IdsToMetaData](const FSoundPerceptionHashGrid2D::ItemIDType& SoundID) {
-		const FVector& SoundSource = IdsToMetaData[SoundID].SoundSource;
-		return (SoundSource - TraceStart).SizeSquared();
-	};
-
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("GetBestSound_Sort");
-		NearbySounds.Sort([&DistanceSqToLocation](const FSoundPerceptionHashGrid2D::ItemIDType& A, const FSoundPerceptionHashGrid2D::ItemIDType& B) { return DistanceSqToLocation(A) < DistanceSqToLocation(B); });
-	}
-
-	// We need this because doing many line traces can be expensive.
-	static const uint8 MaxSoundsToConsider = 3;
-
-	for (int32 i = 0; i < MaxSoundsToConsider && i < NearbySounds.Num(); i++)
-	{
-		FHitResult Result;
-		const FVector& SoundSource = IdsToMetaData[NearbySounds[i]].SoundSource;
-		bool bHasBlockingHit;
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE_STR("GetBestSound_LineTraceSingleByChannel");
-			bHasBlockingHit = World.LineTraceSingleByChannel(Result, TraceStart, SoundSource, ECollisionChannel::ECC_Visibility);
-		}
-		if (!bHasBlockingHit)
-		{
-			OutBestSoundLocation = SoundSource;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool UMassSoundPerceptionSubsystem::GetClosestSoundWithLineOfSightAtLocation(FVector Location, FVector& OutSoundSource, const bool bFilterToTeam1, const bool bIsSoldier)
-{
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassSoundPerceptionSubsystem_HasSoundAtLocation");
-
-	auto& SoundPerceptionGrid = bFilterToTeam1 ? SoundPerceptionGridForTeam1 : SoundPerceptionGridForTeam2;
+  const auto& SoundPerceptionGrid = bFilterToTeam1 ? SoundPerceptionGridForTeam1 : SoundPerceptionGridForTeam2;
 	TArray<FSoundPerceptionHashGrid2D::ItemIDType> NearbySounds;
 	static const float QueryRadius = GUMassSoundPerceptionSubsystem_GridCellSize / 2.f;
 	const FVector Extent(QueryRadius, QueryRadius, QueryRadius);
@@ -152,11 +114,12 @@ bool UMassSoundPerceptionSubsystem::GetClosestSoundWithLineOfSightAtLocation(FVe
 
 	SoundPerceptionGrid.Query(QueryBox, NearbySounds);
 
-	if (NearbySounds.Num() == 0)
-	{
-		return false;
-	}
-
 	auto& IdsToMetaData = bFilterToTeam1 ? IdsToMetaDataForTeam1 : IdsToMetaDataForTeam2;
-	return GetBestSound(Location, NearbySounds, IdsToMetaData, bIsSoldier, *GetWorld(), OutSoundSource);
+
+	for (const FSoundPerceptionHashGrid2D::ItemIDType& SoundID : NearbySounds)
+	{
+		OutCloseSounds.Add(IdsToMetaData[SoundID].SoundSource);
+	};
+
+	return !OutCloseSounds.IsEmpty();
 }

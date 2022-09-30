@@ -22,50 +22,156 @@ void UMassAudioPerceptionProcessor::Initialize(UObject& Owner)
 
 void UMassAudioPerceptionProcessor::ConfigureQueries()
 {
-	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FMassMoveForwardCompleteSignalFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
+	PreLineTracesEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	PreLineTracesEntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadOnly);
+	PreLineTracesEntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
+	PreLineTracesEntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
+
+	PostLineTracesEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	PostLineTracesEntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
+	PostLineTracesEntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
+	PostLineTracesEntityQuery.AddRequirement<FMassMoveForwardCompleteSignalFragment>(EMassFragmentAccess::ReadWrite);
+	PostLineTracesEntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
 }
 
-void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment, const bool bIsEntitySoldier)
+struct FSoundTraceData
+{
+	FSoundTraceData() = default;
+	FSoundTraceData(const FMassEntityHandle& Entity, const FVector& TraceStart)
+		: Entity(Entity), TraceStart(TraceStart)
+	{
+	  
+	}
+	FMassEntityHandle Entity;
+	FVector TraceStart;
+	TArray<FVector> SoundLocations;
+};
+
+void EnqueueClosestSoundsToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoundTraceData>& SoundTraceQueue, const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityHandle& Entity)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue");
+
+  const FVector TraceStart = EntityLocation + FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
+
+  {
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue.Sort");
+		auto DistanceSqToLocation = [&TraceStart](const FVector& SoundSource) {
+      return (SoundSource - TraceStart).SizeSquared();
+    };
+		CloseSounds.Sort([&DistanceSqToLocation](const FVector& A, const FVector& B) { return DistanceSqToLocation(A) < DistanceSqToLocation(B); });
+	}
+
+	if (CloseSounds.IsEmpty())
+	{
+		return;
+	}
+
+	FSoundTraceData SoundTraceData(Entity, TraceStart);
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue.SoundLocations.Add");
+
+	  static constexpr uint8 MaxSoundsToConsider = 3;
+    for (int i = 0; i < MaxSoundsToConsider && i < CloseSounds.Num(); i++)
+    {
+      SoundTraceData.SoundLocations.Add(CloseSounds[i]);
+    }
+  }
+
+  {
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue.Enqueue");
+		SoundTraceQueue.Enqueue(SoundTraceData);
+  }
+}
+
+void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, const FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, const FMassEntityHandle& Entity, const bool bIsEntitySoldier, TQueue<FSoundTraceData>& SoundTraceQueue)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.ProcessEntityForAudioTarget");
 
-	UWorld* World = SoundPerceptionSubsystem->GetWorld();
 	const FVector& EntityLocation = EntityTransform.GetLocation();
-	FVector OutSoundSource;
 	const bool& bIsFacingMoveTarget = IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward);
-	if (SoundPerceptionSubsystem->GetClosestSoundWithLineOfSightAtLocation(EntityLocation, OutSoundSource, !bIsEntityOnTeam1, bIsEntitySoldier) && bIsFacingMoveTarget)
+	if (!bIsFacingMoveTarget)
 	{
-		const bool bDidStashCurrentMoveTarget = StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, *World, EntitySubsystem, Entity, false);
-		if (bDidStashCurrentMoveTarget)
-		{
-			TrackingSoundWhileNavigatingQueue.Enqueue(Entity);
-			MoveForwardCompleteSignalFragment.SignalType = EMassMoveForwardCompleteSignalType::TrackSoundComplete;
-		}
-
-		const FVector& NewGlobalDirection = (OutSoundSource - EntityLocation).GetSafeNormal();
-		MoveTargetFragment.CreateNewAction(EMassMovementAction::Stand, *World);
-		MoveTargetFragment.Center = EntityLocation;
-		MoveTargetFragment.Forward = NewGlobalDirection;
-		MoveTargetFragment.DistanceToGoal = 0.f;
-		MoveTargetFragment.bOffBoundaries = true;
-		MoveTargetFragment.DesiredSpeed.Set(0.f);
-		MoveTargetFragment.IntentAtGoal = bDidStashCurrentMoveTarget ? EMassMovementAction::Move : EMassMovementAction::Stand;
-
-		if (UE::Mass::Debug::IsDebuggingEntity(Entity))
-		{
-			AsyncTask(ENamedThreads::GameThread, [World, EntityLocation, OutSoundSource]()
-				{
-					FVector VerticalOffset(0.f, 0.f, 400.f);
-					DrawDebugDirectionalArrow(World, EntityLocation + VerticalOffset, OutSoundSource + VerticalOffset, 100.f, FColor::Green, false, 5.f);
-				});
-		}
+		return;
 	}
+	TArray<FVector> CloseSounds;
+	if (SoundPerceptionSubsystem->GetSoundsNearLocation(EntityLocation, CloseSounds, !bIsEntityOnTeam1))
+	{
+		EnqueueClosestSoundsToTraceQueue(CloseSounds, SoundTraceQueue, EntityLocation, bIsEntitySoldier, Entity);
+	}
+}
+
+struct FSoundTraceResult
+{
+	FMassEntityHandle Entity;
+	FVector BestSoundLocation;
+	FSoundTraceResult(const FMassEntityHandle& Entity, const FVector& BestSoundLocation)
+		: Entity(Entity), BestSoundLocation(BestSoundLocation)
+	{
+	}
+	FSoundTraceResult() = default;
+};
+
+void DoLineTraces(TQueue<FSoundTraceData>& SoundTraceQueue, const UWorld& World, TMap<FMassEntityHandle, FVector>& OutEntityToBestSoundLocation)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.DoLineTraces");
+
+	TArray<FSoundTraceData> SoundTraces;
+	while (!SoundTraceQueue.IsEmpty())
+	{
+		FSoundTraceData SoundTraceData;
+		const bool bSuccess = SoundTraceQueue.Dequeue(SoundTraceData);
+		check(bSuccess);
+		SoundTraces.Add(SoundTraceData);
+	}
+
+	TQueue<FSoundTraceResult> BestSoundLocations;
+
+	ParallelFor(SoundTraces.Num(), [&](const int32 JobIndex)
+	{
+	  FSoundTraceData SoundTrace = SoundTraces[JobIndex];
+		for (int32 i = 0; i < SoundTrace.SoundLocations.Num(); i++)
+		{
+			const FVector& SoundLocation = SoundTrace.SoundLocations[i];
+			bool bHasBlockingHit;
+			{
+        FHitResult Result;
+        TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.DoLineTraces.LineTraceSingleByChannel");
+				bHasBlockingHit = World.LineTraceSingleByChannel(Result, SoundTrace.TraceStart, SoundLocation, ECollisionChannel::ECC_Visibility);
+			}
+			if (!bHasBlockingHit)
+			{
+				BestSoundLocations.Enqueue(FSoundTraceResult(SoundTrace.Entity, SoundLocation));
+				break;
+			}
+		}
+	});
+
+	while (!BestSoundLocations.IsEmpty())
+	{
+		FSoundTraceResult SoundTraceResult;
+		const bool bSuccess = BestSoundLocations.Dequeue(SoundTraceResult);
+		check(bSuccess);
+		OutEntityToBestSoundLocation.Add(SoundTraceResult.Entity, SoundTraceResult.BestSoundLocation);
+	}
+}
+
+void PostLineTracesProcessEntity(const FVector& BestSoundLocation, FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment, const FVector& EntityLocation)
+{
+	const bool bDidStashCurrentMoveTarget = StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, World, EntitySubsystem, Entity, false);
+	if (bDidStashCurrentMoveTarget)
+	{
+		TrackingSoundWhileNavigatingQueue.Enqueue(Entity);
+		MoveForwardCompleteSignalFragment.SignalType = EMassMoveForwardCompleteSignalType::TrackSoundComplete;
+	}
+
+	const FVector& NewGlobalDirection = (BestSoundLocation - EntityLocation).GetSafeNormal();
+	MoveTargetFragment.CreateNewAction(EMassMovementAction::Stand, World);
+	MoveTargetFragment.Center = EntityLocation;
+	MoveTargetFragment.Forward = NewGlobalDirection;
+	MoveTargetFragment.DistanceToGoal = 0.f;
+	MoveTargetFragment.bOffBoundaries = true;
+	MoveTargetFragment.DesiredSpeed.Set(0.f);
+	MoveTargetFragment.IntentAtGoal = bDidStashCurrentMoveTarget ? EMassMovementAction::Move : EMassMovementAction::Stand;
 }
 
 void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
@@ -77,27 +183,63 @@ void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 		return;
 	}
 
+	TQueue<FSoundTraceData> SoundTraceQueue;
+
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.Execute.PreLineTracesEntityQuery.ParallelForEachEntityChunk");
+		PreLineTracesEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&SoundPerceptionSubsystem = SoundPerceptionSubsystem, &SoundTraceQueue = SoundTraceQueue](FMassExecutionContext& Context)
+		{
+			const int32 NumEntities = Context.GetNumEntities();
+
+			const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
+			const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
+			const TConstArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetFragmentView<FMassMoveTargetFragment>();
+
+			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+			{
+				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
+				const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+				ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, Entity, bIsEntitySoldier, SoundTraceQueue);
+			}
+		});
+	}
+
+	if (SoundTraceQueue.IsEmpty())
+	{
+		return;
+	}
+
+	TMap<FMassEntityHandle, FVector> EntityToBestSoundLocation;
+	DoLineTraces(SoundTraceQueue, *EntitySubsystem.GetWorld(), EntityToBestSoundLocation);
+
+	if (EntityToBestSoundLocation.IsEmpty())
+	{
+		return;
+	}
+
 	TQueue<FMassEntityHandle> TrackingSoundWhileNavigatingQueue;
 
-	auto ExecuteFunction = [&EntitySubsystem, &SoundPerceptionSubsystem = SoundPerceptionSubsystem, &TrackingSoundWhileNavigatingQueue](FMassExecutionContext& Context)
 	{
-		const int32 NumEntities = Context.GetNumEntities();
-
-		const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
-		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
-		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
-		const TArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetMutableFragmentView<FMassStashedMoveTargetFragment>();
-		const TArrayView<FMassMoveForwardCompleteSignalFragment> MoveForwardCompleteSignalList = Context.GetMutableFragmentView<FMassMoveForwardCompleteSignalFragment>();
-
-		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.Execute.PostLineTracesEntityQuery.ParallelForEachEntityChunk");
+		PostLineTracesEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&EntityToBestSoundLocation, &EntitySubsystem, &TrackingSoundWhileNavigatingQueue](FMassExecutionContext& Context)
 		{
-			const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
-			const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-			ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, StashedMoveTargetList[EntityIndex], EntitySubsystem, Entity, TrackingSoundWhileNavigatingQueue, MoveForwardCompleteSignalList[EntityIndex], bIsEntitySoldier);
-		}
-	};
+			const int32 NumEntities = Context.GetNumEntities();
 
-  EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
+			const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
+			const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
+			const TArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetMutableFragmentView<FMassStashedMoveTargetFragment>();
+			const TArrayView<FMassMoveForwardCompleteSignalFragment> MoveForwardCompleteSignalList = Context.GetMutableFragmentView<FMassMoveForwardCompleteSignalFragment>();
+
+			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+			{
+				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
+				if (EntityToBestSoundLocation.Contains(Entity))
+				{
+					PostLineTracesProcessEntity(EntityToBestSoundLocation[Entity], MoveTargetList[EntityIndex], StashedMoveTargetList[EntityIndex], *EntitySubsystem.GetWorld(), EntitySubsystem, Entity, TrackingSoundWhileNavigatingQueue, MoveForwardCompleteSignalList[EntityIndex], LocationList[EntityIndex].GetTransform().GetLocation());
+				}
+			}
+		});
+	}
 
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.Execute.ProcessQueues");

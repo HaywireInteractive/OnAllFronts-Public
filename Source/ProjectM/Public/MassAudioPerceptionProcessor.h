@@ -20,6 +20,7 @@ protected:
 	virtual void Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context) override;
 
 private:
-	FMassEntityQuery EntityQuery;
+	FMassEntityQuery PreLineTracesEntityQuery;
+	FMassEntityQuery PostLineTracesEntityQuery;
 	TObjectPtr<UMassSoundPerceptionSubsystem> SoundPerceptionSubsystem;
 };
