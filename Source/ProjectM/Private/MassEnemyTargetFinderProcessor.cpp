@@ -11,12 +11,28 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "MassProjectileDamageProcessor.h"
 #include <MassNavigationTypes.h>
-#include "MassNavigationFragments.h"
 #include "MassMoveTargetForwardCompleteProcessor.h"
-#include "MassTrackedVehicleOrientationProcessor.h"
 #include "InvalidTargetFinderProcessor.h"
-#include "MassLookAtViaMoveTargetTask.h"
+#include "MassRepresentationTypes.h"
 #include "MassTargetGridProcessors.h"
+
+struct FPotentialTargetSphereTraceData
+{
+  FPotentialTargetSphereTraceData(FMassEntityHandle InEntity, FMassEntityHandle InTargetEntity, FVector InTraceStart, FVector InTraceEnd, float InMinCaliberForDamage, FVector InLocation, bool bInIsSoldier)
+    : Entity(InEntity), TargetEntity(InTargetEntity), TraceStart(InTraceStart), TraceEnd(InTraceEnd), MinCaliberForDamage(InMinCaliberForDamage), Location(InLocation), bIsSoldier(bInIsSoldier)
+  {
+  }
+
+	FPotentialTargetSphereTraceData() = default;
+
+  FMassEntityHandle Entity;
+  FMassEntityHandle TargetEntity;
+	FVector TraceStart;
+	FVector TraceEnd;
+  float MinCaliberForDamage;
+  FVector Location;
+	bool bIsSoldier;
+};
 
 //----------------------------------------------------------------------//
 //  UMassTeamMemberTrait
@@ -51,13 +67,16 @@ UMassEnemyTargetFinderProcessor::UMassEnemyTargetFinderProcessor()
 
 void UMassEnemyTargetFinderProcessor::ConfigureQueries()
 {
-	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FMassMoveForwardCompleteSignalFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
+	FMassEntityQuery BaseEntityQuery;
+
+  BaseEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	BaseEntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
+	BaseEntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
+
+	PreSphereTraceEntityQuery = BaseEntityQuery;
+	PreSphereTraceEntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
+
+  PostSphereTraceEntityQuery = BaseEntityQuery;
 }
 
 void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
@@ -65,7 +84,6 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 	Super::Initialize(Owner);
 
 	TargetFinderSubsystem = UWorld::GetSubsystem<UMassTargetFinderSubsystem>(Owner.GetWorld());
-	SoundPerceptionSubsystem = UWorld::GetSubsystem<UMassSoundPerceptionSubsystem>(Owner.GetWorld());
 }
 
 bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const float& MinCaliberForDamage)
@@ -88,8 +106,8 @@ FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bo
 	const FVector ProjectileSpawnLocation = EntityLocation + UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(EntityTransform, bIsEntitySoldier);
 
 	const bool bShouldAimAtFeet = !bIsEntitySoldier && bIsTargetEntitySoldier;
-	static const float VerticalBuffer = 50.f; // This is needed because otherwise for tanks we always hit the ground when doing trace. TODO: Come up with a better way to handle this.
-	FVector ProjectileTargetLocation = bShouldAimAtFeet ? TargetEntityLocation + FVector(0.f, 0.f, ProjectileRadius + VerticalBuffer) : TargetEntityLocation + ProjectileZOffset;
+	static constexpr float VerticalBuffer = 50.f; // This is needed because otherwise for tanks we always hit the ground when doing trace. TODO: Come up with a better way to handle this.
+  const FVector ProjectileTargetLocation = bShouldAimAtFeet ? TargetEntityLocation + FVector(0.f, 0.f, ProjectileRadius + VerticalBuffer) : TargetEntityLocation + ProjectileZOffset;
 	return FCapsule(ProjectileSpawnLocation, ProjectileTargetLocation, ProjectileRadius);
 }
 
@@ -112,8 +130,8 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace");
 	FHitResult Result;
-	static const float Radius = 20.f; // TODO: don't hard-code
-	bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), DrawTrace ? EDrawDebugTrace::Type::ForDuration : EDrawDebugTrace::Type::None, Result, false, FLinearColor::Red, FLinearColor::Green, 2.f);
+	static constexpr float Radius = 20.f; // TODO: don't hard-code
+  const bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), DrawTrace ? EDrawDebugTrace::Type::ForDuration : EDrawDebugTrace::Type::None, Result, false, FLinearColor::Red, FLinearColor::Green, 2.f);
 	return !bFoundBlockingHit;
 }
 
@@ -183,36 +201,18 @@ void GetCloseUnhittableEntities(const TArray<FMassTargetGridItem> &CloseEntities
 
 struct FPotentialTarget
 {
-	FPotentialTarget(FMassEntityHandle InEntity, FVector InLocation) : Entity(InEntity), Location(InLocation) {}
+	FPotentialTarget(FMassEntityHandle InEntity, FVector InLocation, float InMinCaliberForDamage, bool bIsSoldier)
+    : Entity(InEntity), Location(InLocation), MinCaliberForDamage(InMinCaliberForDamage), bIsSoldier(bIsSoldier)
+  {
+  }
+
 	FMassEntityHandle Entity;
 	FVector Location;
+	float MinCaliberForDamage;
+	bool bIsSoldier;
 };
 
-bool SelectBestTarget(TSortedMap<float, TArray<FPotentialTarget>>& PotentialTargetsByCaliber, FMassEntityHandle& OutTargetEntity, FVector& OutTargetEntityLocation, const FVector& EntityLocation)
-{
-	if (PotentialTargetsByCaliber.Num() == 0)
-	{
-		OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
-		return false;
-	}
-
-	TArray<float> OutKeys;
-	PotentialTargetsByCaliber.GetKeys(OutKeys);
-	TArray<FPotentialTarget> PotentialTargets = PotentialTargetsByCaliber[OutKeys.Last()];
-
-	auto DistanceSqFromEntityToLocation = [&EntityLocation](const FVector& OtherLocation) {
-		return (OtherLocation - EntityLocation).SizeSquared();
-	};
-
-	PotentialTargets.Sort([&DistanceSqFromEntityToLocation](const FPotentialTarget& A, const FPotentialTarget& B) { return DistanceSqFromEntityToLocation(A.Location) < DistanceSqFromEntityToLocation(B.Location); });
-
-	OutTargetEntity = PotentialTargets[0].Entity;
-	OutTargetEntityLocation = PotentialTargets[0].Location;
-
-	return true;
-}
-
-bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier, const bool bIsEntitySoldier)
+void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData>& OutPotentialTargetsNeedingSphereTrace)
 {
 	const UWorld* World = EntitySubsystem.GetWorld();
 
@@ -230,7 +230,7 @@ bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& Entity
 	CloseEntities.Reserve(300);
 
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_GetBestTarget_TargetGridQuery");
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_GetPotentialTargets_TargetGridQuery");
 		TargetGrid.Query(SearchBounds, CloseEntities);
 	}
 
@@ -247,8 +247,6 @@ bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& Entity
 	OutCloseUnhittableEntities.Reserve(300);
 
 	GetCloseUnhittableEntities(CloseEntities, OutCloseUnhittableEntities, IsEntityOnTeam1, Entity, EntitySubsystem, TargetEntityFragment, EntityLocation, bIsEntitySoldier);
-
-	TSortedMap<float, TArray<FPotentialTarget>> PotentialTargetsByCaliber;
 
 	for (const FMassTargetGridItem& OtherEntity : CloseEntities)
 	{
@@ -288,19 +286,8 @@ bool GetBestTarget(const FMassEntityHandle& Entity, UMassEntitySubsystem& Entity
 			continue;
 		}
 
-		if (!IsTargetEntityVisibleViaSphereTrace(*World, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, UE::Mass::Debug::IsDebuggingEntity(Entity)))
-		{
-			continue;
-		}
-
-		if (!PotentialTargetsByCaliber.Contains(OtherEntity.MinCaliberForDamage))
-		{
-			PotentialTargetsByCaliber.Add(OtherEntity.MinCaliberForDamage, TArray<FPotentialTarget>());
-		}
-		PotentialTargetsByCaliber[OtherEntity.MinCaliberForDamage].Add(FPotentialTarget(OtherEntity.Entity, OtherEntity.Location));
+		OutPotentialTargetsNeedingSphereTrace.Enqueue(FPotentialTargetSphereTraceData(Entity, OtherEntity.Entity, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, OtherEntity.MinCaliberForDamage, OtherEntityLocation, OtherEntity.bIsSoldier));
 	}
-
-	return SelectBestTarget(PotentialTargetsByCaliber, OutTargetEntity, OutTargetEntityLocation, EntityLocation);
 }
 
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
@@ -308,25 +295,7 @@ float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
 	return bIsEntitySoldier ? 6000.f : 10000.f; // TODO: make this configurable in data asset and get from there?
 }
 
-float GetVerticalAimOffset(FMassExecutionContext& Context, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation, UMassEntitySubsystem& EntitySubsystem)
-{
-	const FVector& EntityLocation = EntityTransform.GetLocation();
-	const bool bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-	const bool bShouldAimAtFeet = !bIsEntitySoldier && bIsTargetEntitySoldier;
-	const FVector ProjectileSpawnLocation = EntityLocation + UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(EntityTransform, bIsEntitySoldier);
-	const FVector ProjectileTargetLocation = bShouldAimAtFeet ? TargetEntityLocation : FVector(TargetEntityLocation.X, TargetEntityLocation.Y, ProjectileSpawnLocation.Z);
-	const float XYDistanceToTarget = (FVector2D(ProjectileTargetLocation) - FVector2D(ProjectileSpawnLocation)).Size();
-	const float ProjectileInitialXYVelocityMagnitude = GetProjectileInitialXYVelocityMagnitude(bIsEntitySoldier);
-	const float TimeToTarget = XYDistanceToTarget / ProjectileInitialXYVelocityMagnitude;
-	const float VerticalDistanceToTravel = ProjectileTargetLocation.Z - UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier);
-	const float& GravityZ = EntitySubsystem.GetWorld()->GetGravityZ();
-	const float VerticalDistanceTraveledDueToGravity = (1.f / 2.f) * GravityZ * TimeToTarget * TimeToTarget;
-	const float Result = (VerticalDistanceToTravel - VerticalDistanceTraveledDueToGravity) / TimeToTarget;
-
-	return Result;
-}
-
-bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TranformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, FMassExecutionContext& Context, const FTargetHashGrid2D& TargetGrid, const bool bIsEntitySoldier)
+void ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQueue, FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TranformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, FMassExecutionContext& Context, const FTargetHashGrid2D& TargetGrid, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData>& PotentialTargetsNeedingSphereTrace)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_ProcessEntityForVisualTarget");
 
@@ -334,64 +303,11 @@ bool ProcessEntityForVisualTarget(TQueue<FMassEntityHandle>& TargetFinderEntityQ
 	FMassEntityHandle TargetEntity;
 	FVector OutTargetEntityLocation;
 	bool bOutIsTargetEntitySoldier;
-	auto bFoundTarget = GetBestTarget(Entity, EntitySubsystem, TargetGrid, EntityTransform, TargetEntity, IsEntityOnTeam1, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier, bIsEntitySoldier);
-	if (!bFoundTarget) {
-		return false;
-	}
-
-	TargetEntityFragment.Entity = TargetEntity;
-
-	TargetEntityFragment.VerticalAimOffset = GetVerticalAimOffset(Context, bOutIsTargetEntitySoldier, EntityTransform, OutTargetEntityLocation, EntitySubsystem);
-	TargetFinderEntityQueue.Enqueue(Entity);
-
-	return true;
-}
-
-bool UMassEnemyTargetFinderProcessor_DrawTrackedSounds = false;
-FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_DrawTrackedSounds(TEXT("pm.UMassEnemyTargetFinderProcessor_DrawTrackedSounds"), UMassEnemyTargetFinderProcessor_DrawTrackedSounds, TEXT("UMassEnemyTargetFinderProcessor: Draw Tracked Sounds"));
-
-void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment, const bool bIsEntitySoldier)
-{
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_ProcessEntityForAudioTarget");
-
-	UWorld* World = SoundPerceptionSubsystem->GetWorld();
-	const FVector& EntityLocation = EntityTransform.GetLocation();
-	FVector OutSoundSource;
-	const bool& bIsFacingMoveTarget = IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward);
-	if (SoundPerceptionSubsystem->GetClosestSoundWithLineOfSightAtLocation(EntityLocation, OutSoundSource, !bIsEntityOnTeam1, bIsEntitySoldier) && bIsFacingMoveTarget)
-	{
-		const bool bDidStashCurrentMoveTarget = StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, *World, EntitySubsystem, Entity, false);
-		if (bDidStashCurrentMoveTarget)
-		{
-			TrackingSoundWhileNavigatingQueue.Enqueue(Entity);
-			MoveForwardCompleteSignalFragment.SignalType = EMassMoveForwardCompleteSignalType::TrackSoundComplete;
-		}
-
-		const FVector& NewGlobalDirection = (OutSoundSource - EntityLocation).GetSafeNormal();
-		MoveTargetFragment.CreateNewAction(EMassMovementAction::Stand, *World);
-		MoveTargetFragment.Center = EntityLocation;
-		MoveTargetFragment.Forward = NewGlobalDirection;
-		MoveTargetFragment.DistanceToGoal = 0.f;
-		MoveTargetFragment.bOffBoundaries = true;
-		MoveTargetFragment.DesiredSpeed.Set(0.f);
-		MoveTargetFragment.IntentAtGoal = bDidStashCurrentMoveTarget ? EMassMovementAction::Move : EMassMovementAction::Stand;
-
-		if (UMassEnemyTargetFinderProcessor_DrawTrackedSounds || UE::Mass::Debug::IsDebuggingEntity(Entity))
-		{
-			AsyncTask(ENamedThreads::GameThread, [World, EntityLocation, OutSoundSource]()
-			{
-				FVector VerticalOffset(0.f, 0.f, 400.f);
-				DrawDebugDirectionalArrow(World, EntityLocation + VerticalOffset, OutSoundSource + VerticalOffset, 100.f, FColor::Green, false, 5.f);
-			});
-		}
-	}
+	GetPotentialTargetSphereTraces(Entity, EntitySubsystem, TargetGrid, EntityTransform, TargetEntity, IsEntityOnTeam1, TargetEntityFragment, Context, OutTargetEntityLocation, bOutIsTargetEntitySoldier, bIsEntitySoldier, PotentialTargetsNeedingSphereTrace);
 }
 
 bool UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk = true;
-FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk(TEXT("pm.UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk"), UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassEnemyTargetFinderProcessor::Execute to improve performance"));
-
-bool UMassEnemyTargetFinderProcessor_SkipFindingTargets = false;
-FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_SkipFindingTargets(TEXT("pm.UMassEnemyTargetFinderProcessor_SkipFindingTargets"), UMassEnemyTargetFinderProcessor_SkipFindingTargets, TEXT("UMassEnemyTargetFinderProcessor: Skip Finding Targets"));
+FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk(TEXT("pm.UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk"), UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassEnemyTargetFinderProcessor to improve performance"));
 
 void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location, const FMassEntityHandle& Entity)
 {
@@ -404,6 +320,201 @@ void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location, const F
 	}
 }
 
+struct FProcessSphereTracesContext
+{
+  FProcessSphereTracesContext(TQueue<FPotentialTargetSphereTraceData>& PotentialTargetsNeedingSphereTraceQueue, UWorld& World, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& OutEntityToPotentialTargetEntities)
+    : PotentialTargetsNeedingSphereTraceQueue(PotentialTargetsNeedingSphereTraceQueue), World(World), EntityToPotentialTargetEntities(OutEntityToPotentialTargetEntities)
+  {
+  }
+
+	void Execute()
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FProcessSphereTracesContext.Execute");
+
+		ConvertSphereTraceQueueToArray();
+		ProcessSphereTraces();
+		ConvertPotentialVisibleTargetsQueueToMap();
+	}
+
+private:
+
+	void ConvertSphereTraceQueueToArray()
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FProcessSphereTracesContext.ConvertSphereTraceQueueToArray");
+
+		while (!PotentialTargetsNeedingSphereTraceQueue.IsEmpty())
+		{
+			FPotentialTargetSphereTraceData PotentialTarget;
+      const bool bSuccess = PotentialTargetsNeedingSphereTraceQueue.Dequeue(PotentialTarget);
+			check(bSuccess);
+			PotentialTargetsNeedingSphereTrace.Add(PotentialTarget);
+		}
+	}
+
+	void ProcessSphereTraces()
+  {
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FProcessSphereTracesContext.ProcessSphereTraces");
+
+	  ParallelFor(PotentialTargetsNeedingSphereTrace.Num(), [&](const int32 JobIndex)
+		{
+			if (IsTargetEntityVisibleViaSphereTrace(World, PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, false))
+			{
+				PotentialVisibleTargets.Enqueue(PotentialTargetsNeedingSphereTrace[JobIndex]);
+			}
+		});
+  }
+
+	void ConvertPotentialVisibleTargetsQueueToMap()
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FProcessSphereTracesContext.ConvertPotentialVisibleTargetsQueueToMap");
+
+		while (!PotentialVisibleTargets.IsEmpty())
+		{
+			FPotentialTargetSphereTraceData PotentialTarget;
+			const bool bSuccess = PotentialVisibleTargets.Dequeue(PotentialTarget);
+			check(bSuccess);
+			if (!EntityToPotentialTargetEntities.Contains(PotentialTarget.Entity))
+			{
+				EntityToPotentialTargetEntities.Add(PotentialTarget.Entity, TArray<FPotentialTarget>());
+			}
+			EntityToPotentialTargetEntities[PotentialTarget.Entity].Add(FPotentialTarget(PotentialTarget.TargetEntity, PotentialTarget.Location, PotentialTarget.MinCaliberForDamage, PotentialTarget.bIsSoldier));
+		}
+	}
+
+	TQueue<FPotentialTargetSphereTraceData>& PotentialTargetsNeedingSphereTraceQueue;
+	TArray<FPotentialTargetSphereTraceData> PotentialTargetsNeedingSphereTrace;
+	TQueue<FPotentialTargetSphereTraceData> PotentialVisibleTargets;
+	TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities;
+	UWorld& World;
+};
+
+struct FSelectBestTargetProcessEntityContext
+{
+	FSelectBestTargetProcessEntityContext(UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle>& TargetFinderEntityQueue, const FMassEntityHandle& Entity, const FTransform& EntityTransform, FTargetEntityFragment& TargetEntityFragment, TArray<FPotentialTarget>& PotentialTargets, const bool bIsEntitySoldier)
+		: EntitySubsystem(EntitySubsystem), TargetFinderEntityQueue(TargetFinderEntityQueue), Entity(Entity), EntityLocation(EntityTransform.GetLocation()), EntityTransform(EntityTransform), TargetEntityFragment(TargetEntityFragment), PotentialTargets(PotentialTargets), bIsEntitySoldier(bIsEntitySoldier)
+	{
+	}
+
+	void ProcessEntity() const
+  {
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FSelectBestTargetProcessEntityContext.ProcessEntity");
+
+		TSortedMap<float, TArray<FPotentialTarget>> PotentialTargetsByCaliber;
+		GroupByCaliber(PotentialTargetsByCaliber);
+
+		FMassEntityHandle TargetEntity;
+		FVector TargetEntityLocation;
+		bool bIsTargetEntitySoldier;
+		if (SelectBestTarget(PotentialTargetsByCaliber, TargetEntity, TargetEntityLocation, bIsTargetEntitySoldier))
+		{
+			TargetEntityFragment.Entity = TargetEntity;
+			TargetEntityFragment.VerticalAimOffset = GetVerticalAimOffset(TargetEntityLocation, bIsTargetEntitySoldier);
+			TargetFinderEntityQueue.Enqueue(Entity);
+		}
+	}
+
+	void GroupByCaliber(TSortedMap<float, TArray<FPotentialTarget>>& OutPotentialTargetsByCaliber) const
+  {
+		for (FPotentialTarget& PotentialTarget : PotentialTargets)
+		{
+			if (!OutPotentialTargetsByCaliber.Contains(PotentialTarget.MinCaliberForDamage))
+			{
+				OutPotentialTargetsByCaliber.Add(PotentialTarget.MinCaliberForDamage, TArray<FPotentialTarget>());
+			}
+			OutPotentialTargetsByCaliber[PotentialTarget.MinCaliberForDamage].Add(PotentialTarget);
+		}
+	}
+
+	bool SelectBestTarget(TSortedMap<float, TArray<FPotentialTarget>>& PotentialTargetsByCaliber, FMassEntityHandle& OutTargetEntity, FVector& OutTargetEntityLocation, bool& bIsTargetEntitySoldier) const
+  {
+		if (PotentialTargetsByCaliber.Num() == 0)
+		{
+			OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
+			return false;
+		}
+
+		TArray<float> OutKeys;
+		PotentialTargetsByCaliber.GetKeys(OutKeys);
+		TArray<FPotentialTarget> PotentialTargetsWithBestCaliber = PotentialTargetsByCaliber[OutKeys.Last()];
+
+		auto DistanceSqFromEntityToLocation = [&EntityLocation = EntityLocation](const FVector& OtherLocation) {
+			return (OtherLocation - EntityLocation).SizeSquared();
+		};
+
+		PotentialTargetsWithBestCaliber.Sort([&DistanceSqFromEntityToLocation](const FPotentialTarget& A, const FPotentialTarget& B) { return DistanceSqFromEntityToLocation(A.Location) < DistanceSqFromEntityToLocation(B.Location); });
+
+		OutTargetEntity = PotentialTargetsWithBestCaliber[0].Entity;
+		OutTargetEntityLocation = PotentialTargetsWithBestCaliber[0].Location;
+		bIsTargetEntitySoldier = PotentialTargetsWithBestCaliber[0].bIsSoldier;
+
+		return true;
+	}
+
+	float GetVerticalAimOffset(const FVector& TargetEntityLocation, const bool bIsTargetEntitySoldier) const
+  {
+		const bool bShouldAimAtFeet = !bIsEntitySoldier && bIsTargetEntitySoldier;
+		const FVector ProjectileSpawnLocation = EntityLocation + UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(EntityTransform, bIsEntitySoldier);
+		const FVector ProjectileTargetLocation = bShouldAimAtFeet ? TargetEntityLocation : FVector(TargetEntityLocation.X, TargetEntityLocation.Y, ProjectileSpawnLocation.Z);
+		const float XYDistanceToTarget = (FVector2D(ProjectileTargetLocation) - FVector2D(ProjectileSpawnLocation)).Size();
+		const float ProjectileInitialXYVelocityMagnitude = GetProjectileInitialXYVelocityMagnitude(bIsEntitySoldier);
+		const float TimeToTarget = XYDistanceToTarget / ProjectileInitialXYVelocityMagnitude;
+		const float VerticalDistanceToTravel = ProjectileTargetLocation.Z - UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier);
+		const float& GravityZ = EntitySubsystem.GetWorld()->GetGravityZ();
+		const float VerticalDistanceTraveledDueToGravity = (1.f / 2.f) * GravityZ * TimeToTarget * TimeToTarget;
+		const float Result = (VerticalDistanceToTravel - VerticalDistanceTraveledDueToGravity) / TimeToTarget;
+
+		return Result;
+	}
+
+private:
+	UMassEntitySubsystem& EntitySubsystem;
+	TQueue<FMassEntityHandle>& TargetFinderEntityQueue;
+	const FMassEntityHandle& Entity;
+	const FVector EntityLocation;
+	const FTransform& EntityTransform;
+	const bool bIsEntitySoldier;
+	FTargetEntityFragment& TargetEntityFragment;
+	TArray<FPotentialTarget>& PotentialTargets;
+};
+
+struct FSelectBestTargetContext
+{
+	FSelectBestTargetContext(FMassEntityQuery& EntityQuery, UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities, TQueue<FMassEntityHandle>& TargetFinderEntityQueue)
+    : EntityQuery(EntityQuery), EntitySubsystem(EntitySubsystem), Context(Context), EntityToPotentialTargetEntities(EntityToPotentialTargetEntities), TargetFinderEntityQueue(TargetFinderEntityQueue)
+  {
+  }
+
+	void Execute() const
+  {
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FSelectBestTargetContext.Execute");
+
+	  EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [this](FMassExecutionContext& Context)
+		{
+			const int32 NumEntities = Context.GetNumEntities();
+
+			const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
+			const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
+
+			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+			{
+				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
+				if (EntityToPotentialTargetEntities.Contains(Entity))
+				{
+					const bool bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+					FSelectBestTargetProcessEntityContext(EntitySubsystem, TargetFinderEntityQueue, Entity, LocationList[EntityIndex].GetTransform(), TargetEntityList[EntityIndex], EntityToPotentialTargetEntities[Entity], bIsEntitySoldier).ProcessEntity();
+				}
+			}
+		});
+	}
+
+private:
+  FMassEntityQuery& EntityQuery;
+	UMassEntitySubsystem& EntitySubsystem;
+	FMassExecutionContext& Context;
+	TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities;
+	TQueue<FMassEntityHandle>& TargetFinderEntityQueue;
+};
+
 void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor");
@@ -414,18 +525,15 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	}
 
 	TQueue<FMassEntityHandle> TargetFinderEntityQueue;
-	TQueue<FMassEntityHandle> TrackingSoundWhileNavigatingQueue;
+	TQueue<FPotentialTargetSphereTraceData> PotentialTargetsNeedingSphereTrace;
 
-	auto ExecuteFunction = [&EntitySubsystem, &TargetFinderEntityQueue, &SoundPerceptionSubsystem = SoundPerceptionSubsystem, &TrackingSoundWhileNavigatingQueue, &TargetFinderSubsystem = TargetFinderSubsystem](FMassExecutionContext& Context)
+	auto ExecuteFunction = [&EntitySubsystem, &TargetFinderEntityQueue, &TargetFinderSubsystem = TargetFinderSubsystem, &PotentialTargetsNeedingSphereTrace](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 
 		const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 		const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
-		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
-		const TArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetMutableFragmentView<FMassStashedMoveTargetFragment>();
-		const TArrayView<FMassMoveForwardCompleteSignalFragment> MoveForwardCompleteSignalList = Context.GetMutableFragmentView<FMassMoveForwardCompleteSignalFragment>();
 
 		const FTargetHashGrid2D& TargetGrid = TargetFinderSubsystem->GetTargetGrid();
 
@@ -433,53 +541,49 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		{
 			const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
 			const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-			const bool& bFoundVisualTarget = ProcessEntityForVisualTarget(TargetFinderEntityQueue, Entity, EntitySubsystem, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, Context, TargetGrid, bIsEntitySoldier);
-			if (!bFoundVisualTarget)
-			{
-				ProcessEntityForAudioTarget(SoundPerceptionSubsystem, LocationList[EntityIndex].GetTransform(), MoveTargetList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, StashedMoveTargetList[EntityIndex], EntitySubsystem, Entity, TrackingSoundWhileNavigatingQueue, MoveForwardCompleteSignalList[EntityIndex], bIsEntitySoldier);
-			}
+			ProcessEntityForVisualTarget(TargetFinderEntityQueue, Entity, EntitySubsystem, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, Context, TargetGrid, bIsEntitySoldier, PotentialTargetsNeedingSphereTrace);
 			DrawEntitySearchingIfNeeded(EntitySubsystem.GetWorld(), LocationList[EntityIndex].GetTransform().GetLocation(), Context.GetEntity(EntityIndex));
 		}
 	};
 
 	if (UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk)
 	{
-		EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.ParallelForEachEntityChunk");
+
+	  PreSphereTraceEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
 	} else {
-		EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
+		PreSphereTraceEntityQuery.ForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
 	}
 
+	if (PotentialTargetsNeedingSphereTrace.IsEmpty())
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_ProcessQueues");
+		return;
+	}
+
+	TMap<FMassEntityHandle, TArray<FPotentialTarget>> EntityToPotentialTargetEntities;
+	FProcessSphereTracesContext(PotentialTargetsNeedingSphereTrace, *EntitySubsystem.GetWorld(), EntityToPotentialTargetEntities).Execute();
+	FSelectBestTargetContext(PostSphereTraceEntityQuery, EntitySubsystem, Context, EntityToPotentialTargetEntities, TargetFinderEntityQueue).Execute();
+
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.ProcessQueues");
 		while (!TargetFinderEntityQueue.IsEmpty())
 		{
 			FMassEntityHandle TargetFinderEntity;
-			bool bSuccess = TargetFinderEntityQueue.Dequeue(TargetFinderEntity);
+      const bool bSuccess = TargetFinderEntityQueue.Dequeue(TargetFinderEntity);
 			check(bSuccess);
 
 			Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(TargetFinderEntity);
 			Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(TargetFinderEntity);
 		}
-
-		while (!TrackingSoundWhileNavigatingQueue.IsEmpty())
-		{
-			FMassEntityHandle Entity;
-			bool bSuccess = TrackingSoundWhileNavigatingQueue.Dequeue(Entity);
-			check(bSuccess);
-
-			Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
-			Context.Defer().AddTag<FMassTrackSoundTag>(Entity);
-			Context.Defer().AddTag<FMassNeedsMoveTargetForwardCompleteSignalTag>(Entity);
-		}
 	}
 }
 
-/*static*/ const float UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(const bool& bIsSoldier)
+/*static*/ float UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(const bool& bIsSoldier)
 {
 	return bIsSoldier ? 150.f : 180.f; // TODO: don't hard-code
 }
 
-/*static*/ const FVector UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(const FTransform& EntityTransform, const bool& bIsSoldier)
+/*static*/ FVector UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(const FTransform& EntityTransform, const bool& bIsSoldier)
 {
 	const float ForwardVectorMagnitude = bIsSoldier ? 300.f : 800.f; // TODO: don't hard-code
 	const FVector& ProjectileZOffset = FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsSoldier));

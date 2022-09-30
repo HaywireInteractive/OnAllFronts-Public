@@ -6,16 +6,20 @@
 #include "MassProcessor.h"
 #include "MassEntityTraitBase.h"
 #include "MassEntityTemplateRegistry.h"
-#include <MassSoundPerceptionSubsystem.h>
-#include <MassCollisionProcessor.h>
+#include "MassSoundPerceptionSubsystem.h"
+#include "MassCollisionProcessor.h"
 
 #include "MassEnemyTargetFinderProcessor.generated.h"
 
+struct FTargetEntityFragment;
 class UMassNavigationSubsystem;
 class UMassTargetFinderSubsystem;
 
-const float UMassEnemyTargetFinder_FinestCellSize = 5000.f; // TODO: Don't hard-code, get from data asset.
-const float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
+inline bool UMassEnemyTargetFinderProcessor_SkipFindingTargets = false;
+inline FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_SkipFindingTargets(TEXT("pm.UMassEnemyTargetFinderProcessor_SkipFindingTargets"), UMassEnemyTargetFinderProcessor_SkipFindingTargets, TEXT("UMassEnemyTargetFinderProcessor: Skip Finding Targets"));
+
+constexpr float UMassEnemyTargetFinder_FinestCellSize = 5000.f; // TODO: Don't hard-code, get from data asset.
+constexpr float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
 
 bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView);
 FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation);
@@ -92,8 +96,8 @@ class PROJECTM_API UMassEnemyTargetFinderProcessor : public UMassProcessor
 	GENERATED_BODY()
 public:
 	UMassEnemyTargetFinderProcessor();
-	static const float GetProjectileSpawnLocationZOffset(const bool& bIsSoldier);
-	static const FVector GetProjectileSpawnLocationOffset(const FTransform& EntityTransform, const bool& bIsSoldier);
+	static float GetProjectileSpawnLocationZOffset(const bool& bIsSoldier);
+	static FVector GetProjectileSpawnLocationOffset(const FTransform& EntityTransform, const bool& bIsSoldier);
 
 protected:
 	virtual void ConfigureQueries() override;
@@ -102,6 +106,6 @@ protected:
 
 private:
 	TObjectPtr<UMassTargetFinderSubsystem> TargetFinderSubsystem;
-	TObjectPtr<UMassSoundPerceptionSubsystem> SoundPerceptionSubsystem;
-	FMassEntityQuery EntityQuery;
+	FMassEntityQuery PreSphereTraceEntityQuery;
+	FMassEntityQuery PostSphereTraceEntityQuery;
 };
