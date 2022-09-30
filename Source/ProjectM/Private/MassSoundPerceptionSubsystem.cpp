@@ -108,7 +108,7 @@ bool UMassSoundPerceptionSubsystem::GetSoundsNearLocation(const FVector& Locatio
 
   const auto& SoundPerceptionGrid = bFilterToTeam1 ? SoundPerceptionGridForTeam1 : SoundPerceptionGridForTeam2;
 	TArray<FSoundPerceptionHashGrid2D::ItemIDType> NearbySounds;
-	static const float QueryRadius = GUMassSoundPerceptionSubsystem_GridCellSize / 2.f;
+	static constexpr float QueryRadius = GUMassSoundPerceptionSubsystem_GridCellSize / 2.f;
 	const FVector Extent(QueryRadius, QueryRadius, QueryRadius);
 	const FBox QueryBox = FBox(Location - Extent, Location + Extent);
 
