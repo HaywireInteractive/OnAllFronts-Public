@@ -131,8 +131,20 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace");
 	FHitResult Result;
 	static constexpr float Radius = 20.f; // TODO: don't hard-code
-  const bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), DrawTrace ? EDrawDebugTrace::Type::ForDuration : EDrawDebugTrace::Type::None, Result, false, FLinearColor::Red, FLinearColor::Green, 2.f);
-	return !bFoundBlockingHit;
+  const bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
+
+	// We can't use SphereTraceSingle's ability to draw trace because this function may run in a background thread which isn't allowed to draw. So we do it ourselves async.
+	if (DrawTrace)
+	{
+		AsyncTask(ENamedThreads::GameThread, [StartLocation, EndLocation, Radius = Radius, &World, bFoundBlockingHit]()
+		{
+			const FLinearColor& Color = bFoundBlockingHit ? FLinearColor::Red : FLinearColor::Green;
+			FCapsule Capsule(StartLocation, EndLocation, Radius);
+			DrawCapsule(Capsule, World, Color, false, 0.1f);
+		});
+	}
+
+  return !bFoundBlockingHit;
 }
 
 float GetEntityRange(const bool bIsEntitySoldier)
@@ -359,7 +371,7 @@ private:
 
 	  ParallelFor(PotentialTargetsNeedingSphereTrace.Num(), [&](const int32 JobIndex)
 		{
-			if (IsTargetEntityVisibleViaSphereTrace(World, PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, false))
+			if (IsTargetEntityVisibleViaSphereTrace(World, PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, UE::Mass::Debug::IsDebuggingEntity(PotentialTargetsNeedingSphereTrace[JobIndex].Entity)))
 			{
 				PotentialVisibleTargets.Enqueue(PotentialTargetsNeedingSphereTrace[JobIndex]);
 			}
