@@ -49,7 +49,7 @@ void UMassTargetGridProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FM
 		return;
 	}
 
-	// can't be ParallelFor due to Move() not being thread-safe
+	// can't be ParallelFor due to GetTargetGridMutable().Add() not being thread-safe
 	AddToGridEntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &EntitySubsystem](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
