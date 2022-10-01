@@ -85,9 +85,9 @@ bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, cons
 	return Result;
 }
 
-bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context, FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& TargetEntityView, const FTransform& EntityTransform)
+bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context, const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& TargetEntityView, const FTransform& EntityTransform)
 {
-	FVector Buffer(10.f, 10.f, 10.f); // We keep a buffer in case EntityLocation and TargetEntityLocation are same value on any axis.
+  const FVector Buffer(10.f, 10.f, 10.f); // We keep a buffer in case EntityLocation and TargetEntityLocation are same value on any axis.
 	FBox QueryBounds(EntityLocation.ComponentMin(TargetEntityLocation) - Buffer, EntityLocation.ComponentMax(TargetEntityLocation) + Buffer);
 	TArray<FMassNavigationObstacleItem> CloseEntities;
 	AvoidanceObstacleGrid.Query(QueryBounds, CloseEntities);
@@ -121,7 +121,7 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 		}
 
 		FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity.Entity);
-		FTeamMemberFragment* OtherEntityTeamMemberFragment = OtherEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
+    const FTeamMemberFragment* OtherEntityTeamMemberFragment = OtherEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
 
 		// Skip entities that don't have FTeamMemberFragment.
 		if (!OtherEntityTeamMemberFragment) {
@@ -138,7 +138,7 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 		}
 	}
 
-	return false;
+  return !IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, false);
 }
 
 bool UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets = false;

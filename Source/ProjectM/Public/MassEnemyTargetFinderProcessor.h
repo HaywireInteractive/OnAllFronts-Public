@@ -25,6 +25,7 @@ bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragme
 FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation);
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier);
 float GetEntityRange(const bool bIsEntitySoldier);
+bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation, const bool DrawTrace);
 
 USTRUCT()
 struct PROJECTM_API FTargetEntityFragment : public FMassFragment
