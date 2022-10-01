@@ -424,6 +424,14 @@ struct FSelectBestTargetProcessEntityContext
 			TargetEntityFragment.Entity = TargetEntity;
 			TargetEntityFragment.VerticalAimOffset = GetVerticalAimOffset(TargetEntityLocation, bIsTargetEntitySoldier);
 			TargetFinderEntityQueue.Enqueue(Entity);
+
+			if (UE::Mass::Debug::IsDebuggingEntity(Entity))
+			{
+				AsyncTask(ENamedThreads::GameThread, [World = EntitySubsystem.GetWorld(), EntityLocation = EntityLocation, TargetEntityLocation]()
+				{
+					DrawDebugDirectionalArrow(World, EntityLocation, TargetEntityLocation, 10.f, FColor::Blue, false, 0.1f);
+				});
+			}
 		}
 	}
 
