@@ -50,7 +50,9 @@ void UInvalidTargetFinderProcessor::ConfigureQueries()
 
 bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FMassEntityHandle Entity, const FMassExecutionContext& Context)
 {
-	const double& DistanceBetweenEntities = (TargetEntityLocation - EntityLocation).Size();
+	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetEntityOutOfRange);
+
+  const double& DistanceBetweenEntities = (TargetEntityLocation - EntityLocation).Size();
 
 	const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
 	const float MaxRange = GetEntityRange(bIsEntitySoldier);
@@ -87,6 +89,8 @@ bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, cons
 
 bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context, const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& TargetEntityView, const FTransform& EntityTransform)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetEntityObstructed);
+
   const FVector Buffer(10.f, 10.f, 10.f); // We keep a buffer in case EntityLocation and TargetEntityLocation are same value on any axis.
 	FBox QueryBounds(EntityLocation.ComponentMin(TargetEntityLocation) - Buffer, EntityLocation.ComponentMax(TargetEntityLocation) + Buffer);
 	TArray<FMassNavigationObstacleItem> CloseEntities;
@@ -108,7 +112,9 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 
 	for (const FMassNavigationObstacleItem& OtherEntity : CloseEntities)
 	{
-		// Skip self.
+		TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetEntityObstructed.ProcessCloseEntity);
+
+	  // Skip self.
 		if (OtherEntity.Entity == Entity)
 		{
 			continue;
@@ -138,7 +144,12 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 		}
 	}
 
-  return !IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, false);
+	bool bIsTargetEntityVisibleViaSphereTrace;
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetEntityObstructed.IsTargetEntityVisibleViaSphereTrace);
+		bIsTargetEntityVisibleViaSphereTrace = IsTargetEntityVisibleViaSphereTrace(*EntitySubsystem.GetWorld(), ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, false);
+	}
+  return !bIsTargetEntityVisibleViaSphereTrace;
 }
 
 bool UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets = false;
@@ -156,7 +167,9 @@ static FAutoConsoleCommand InvalidateAllTargetsCmd(
 
 bool IsTargetValid(const FMassEntityHandle& Entity, FMassEntityHandle& TargetEntity, const UMassEntitySubsystem& EntitySubsystem, const FVector& EntityLocation, FTargetEntityFragment& TargetEntityFragment, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context, const FTransform& EntityTransform, const bool bInvalidateAllTargets)
 {
-	if (bInvalidateAllTargets)
+	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetValid);
+
+  if (bInvalidateAllTargets)
 	{
 		return false;
 	}
@@ -183,6 +196,8 @@ bool IsTargetValid(const FMassEntityHandle& Entity, FMassEntityHandle& TargetEnt
 
 void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector &EntityLocation, const FMassStashedMoveTargetFragment* StashedMoveTargetFragment, FMassMoveTargetFragment* MoveTargetFragment, TQueue<FMassEntityHandle>& EntitiesWithInvalidTargetQueue, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1, const FTransform& EntityTransform, TQueue<FMassEntityHandle>& EntitiesWithUnstashedMovedTargetQueue, const bool bInvalidateAllTargets)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.ProcessEntity);
+
 	FMassEntityHandle& TargetEntity = TargetEntityFragment.Entity;
 	if (!IsTargetValid(Entity, TargetEntity, EntitySubsystem, EntityLocation, TargetEntityFragment, AvoidanceObstacleGrid, IsEntityOnTeam1, Context, EntityTransform, bInvalidateAllTargets))
 	{
@@ -200,7 +215,7 @@ void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle
 
 void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UInvalidTargetFinderProcessor");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute);
 
 	if (!NavigationSubsystem)
 	{
@@ -210,13 +225,12 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 	TQueue<FMassEntityHandle> EntitiesWithInvalidTargetQueue;
 	TQueue<FMassEntityHandle> EntitiesWithUnstashedMovedTargetQueue;
 
-	const bool bInvalidateAllTargets = UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets;
-
   {
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UInvalidTargetFinderProcessor.Execute.ForEachEntityChunk");
+    TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.ParallelForEachEntityChunk);
 
-		// This is not ParallelForEachEntityChunk because there are few chunks. Instead we ParallelFor within the chunk.
-	  EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &EntitiesWithInvalidTargetQueue, &EntitiesWithUnstashedMovedTargetQueue, &bInvalidateAllTargets](FMassExecutionContext& Context)
+		const bool bInvalidateAllTargets = UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets;
+
+		EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &EntitiesWithInvalidTargetQueue, &EntitiesWithUnstashedMovedTargetQueue, &bInvalidateAllTargets](FMassExecutionContext& Context)
     {
       const int32 NumEntities = Context.GetNumEntities();
 
