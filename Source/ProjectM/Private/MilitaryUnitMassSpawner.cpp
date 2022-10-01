@@ -46,6 +46,9 @@ void AMilitaryUnitMassSpawner::BeginPlay()
 bool AMilitaryUnitMassSpawner_SpawnVehiclesOnly = false;
 FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnVehiclesOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnVehiclesOnly"), AMilitaryUnitMassSpawner_SpawnVehiclesOnly, TEXT("AMilitaryUnitMassSpawner_SpawnVehiclesOnly"));
 
+bool AMilitaryUnitMassSpawner_SpawnSoldiersOnly = false;
+FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnSoldiersOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnSoldiersOnly"), AMilitaryUnitMassSpawner_SpawnSoldiersOnly, TEXT("AMilitaryUnitMassSpawner_SpawnSoldiersOnly"));
+
 bool AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly = false;
 FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"), AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly, TEXT("AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"));
 
@@ -110,7 +113,7 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 		}
 	}
 
-	bDidSpawnSoldiersOnly = bIsTeam1 && AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly;
+	bDidSpawnSoldiersOnly = AMilitaryUnitMassSpawner_SpawnSoldiersOnly || (bIsTeam1 && AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly);
 	bDidSpawnVehiclesOnly = bSpawnVehiclesOnly || AMilitaryUnitMassSpawner_SpawnVehiclesOnly;
 
 	auto GenerateSpawningPoints = [this, UnitCounts]()
