@@ -148,7 +148,7 @@ bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntit
 
 bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityView& TargetEntityView)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_IsTargetEntityOutOfRange");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.IsTargetEntityOutOfRange);
 
 	const FTransformFragment& TargetEntityTransformFragment = TargetEntityView.GetFragmentData<FTransformFragment>();
 	const FVector& TargetEntityLocation = TargetEntityTransformFragment.GetTransform().GetLocation();
@@ -157,10 +157,10 @@ bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntit
 
 void GetCloseUnhittableEntities(const TArray<FMassTargetGridItem> &CloseEntities, TArray<FCapsule>& OutCloseUnhittableEntities, const bool& IsEntityOnTeam1, const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector& EntityLocation, const bool bIsEntitySoldier)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_GetCloseUnhittableEntities");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.GetCloseUnhittableEntities);
 
 	auto AddEntityToCloseUnhittablesIfNeeded = [&Entity, &EntitySubsystem, &EntityLocation, &bIsEntitySoldier, &IsEntityOnTeam1, &OutCloseUnhittableEntities, &TargetEntityFragment](const FMassTargetGridItem& OtherEntity) {
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_AddEntityToCloseUnhittablesIfNeeded");
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AddEntityToCloseUnhittablesIfNeeded);
 
 		// Skip self.
 		if (OtherEntity.Entity == Entity)
@@ -214,7 +214,9 @@ struct FPotentialTarget
 
 void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, FMassEntityHandle& OutTargetEntity, const bool& IsEntityOnTeam1, FTargetEntityFragment& TargetEntityFragment, FMassExecutionContext& Context, FVector& OutTargetEntityLocation, bool& bOutIsTargetEntitySoldier, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData>& OutPotentialTargetsNeedingSphereTrace)
 {
-	const UWorld* World = EntitySubsystem.GetWorld();
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces");
+
+  const UWorld* World = EntitySubsystem.GetWorld();
 
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	const FVector& EntityForwardVector = EntityTransform.GetRotation().GetForwardVector();
@@ -230,7 +232,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, UMassEntity
 	CloseEntities.Reserve(300);
 
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_GetPotentialTargets_TargetGridQuery");
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces.TargetGridQuery");
 		TargetGrid.Query(SearchBounds, CloseEntities);
 	}
 
@@ -248,45 +250,49 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, UMassEntity
 
 	GetCloseUnhittableEntities(CloseEntities, OutCloseUnhittableEntities, IsEntityOnTeam1, Entity, EntitySubsystem, TargetEntityFragment, EntityLocation, bIsEntitySoldier);
 
-	for (const FMassTargetGridItem& OtherEntity : CloseEntities)
 	{
-		// Skip self.
-		if (OtherEntity.Entity == Entity)
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces.ProcessCloseEntities);
+
+	  for (const FMassTargetGridItem& OtherEntity : CloseEntities)
 		{
-			continue;
+			// Skip self.
+			if (OtherEntity.Entity == Entity)
+			{
+				continue;
+			}
+
+			// Skip invalid entities.
+			if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
+			{
+				continue;
+			}
+
+			// Skip same team.
+			if (IsEntityOnTeam1 == OtherEntity.bIsOnTeam1) {
+				continue;
+			}
+
+			if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntity.MinCaliberForDamage))
+			{
+				continue;
+			}
+
+			if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntity.Location))
+			{
+				continue;
+			}
+
+			bOutIsTargetEntitySoldier = OtherEntity.bIsSoldier;
+			const FVector& OtherEntityLocation = OtherEntity.Location;
+			const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, bOutIsTargetEntitySoldier, EntityTransform, OtherEntityLocation);
+
+			if (AreCloseUnhittableEntitiesBlockingTarget(ProjectileTraceCapsule, OutCloseUnhittableEntities, Entity, *World))
+			{
+				continue;
+			}
+
+			OutPotentialTargetsNeedingSphereTrace.Enqueue(FPotentialTargetSphereTraceData(Entity, OtherEntity.Entity, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, OtherEntity.MinCaliberForDamage, OtherEntityLocation, OtherEntity.bIsSoldier));
 		}
-
-		// Skip invalid entities.
-		if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
-		{
-			continue;
-		}
-
-		// Skip same team.
-		if (IsEntityOnTeam1 == OtherEntity.bIsOnTeam1) {
-			continue;
-		}
-
-		if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntity.MinCaliberForDamage))
-		{
-			continue;
-		}
-
-		if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntity.Location))
-		{
-			continue;
-		}
-
-		bOutIsTargetEntitySoldier = OtherEntity.bIsSoldier;
-		const FVector& OtherEntityLocation = OtherEntity.Location;
-		const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, bOutIsTargetEntitySoldier, EntityTransform, OtherEntityLocation);
-
-		if (AreCloseUnhittableEntitiesBlockingTarget(ProjectileTraceCapsule, OutCloseUnhittableEntities, Entity, *World))
-		{
-			continue;
-		}
-
-		OutPotentialTargetsNeedingSphereTrace.Enqueue(FPotentialTargetSphereTraceData(Entity, OtherEntity.Entity, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, OtherEntity.MinCaliberForDamage, OtherEntityLocation, OtherEntity.bIsSoldier));
 	}
 }
 
