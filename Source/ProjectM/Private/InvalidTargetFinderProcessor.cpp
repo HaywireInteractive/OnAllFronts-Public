@@ -70,7 +70,7 @@ bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector
 
 bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, const FMassEntityHandle& Entity, const UWorld& World)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("DidCapsulesCollide");
+	TRACE_CPUPROFILER_EVENT_SCOPE(DidCapsulesCollide);
 
 	const bool Result = TestCapsuleCapsule(Capsule1, Capsule2);
 
@@ -243,7 +243,8 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
       // TODO: We're incorrectly assuming all obstacles can be targets.
       const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid = NavigationSubsystem->GetObstacleGrid();
 
-			ParallelFor(NumEntities, [&](const int32 EntityIndex) {
+			ParallelFor(NumEntities, [&](const int32 EntityIndex)
+			{
 				ProcessEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, TargetEntityList[EntityIndex], TransformList[EntityIndex].GetTransform().GetLocation(), StashedMoveTargetList.Num() > 0 ? &StashedMoveTargetList[EntityIndex] : nullptr, MoveTargetList.Num() > 0 ? &MoveTargetList[EntityIndex] : nullptr, EntitiesWithInvalidTargetQueue, AvoidanceObstacleGrid, TeamMemberList[EntityIndex].IsOnTeam1, TransformList[EntityIndex].GetTransform(), EntitiesWithUnstashedMovedTargetQueue, bInvalidateAllTargets);
 			});
     });
