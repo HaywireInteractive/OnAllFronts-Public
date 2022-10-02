@@ -6,6 +6,7 @@
 #include "MassEntitySubsystem.h"
 #include "MassMoveTargetForwardCompleteProcessor.h"
 #include "InvalidTargetFinderProcessor.h"
+#include "MassEnemyTargetFinderProcessor.h"
 #include "MassTrackTargetProcessor.h"
 #include "MassNavigationTypes.h"
 
@@ -21,12 +22,17 @@ bool FMassLookAtViaMoveTargetTask::Link(FStateTreeLinker& Linker)
 	return true;
 }
 
-bool StashCurrentMoveTargetIfNeeded(const FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem&  EntitySubsystem, const FMassEntityHandle& Entity, const bool AddHasStashTag)
+bool StashCurrentMoveTargetIfNeeded(const FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem&  EntitySubsystem, const FMassEntityHandle& Entity, const FMassExecutionContext& Context, const bool AddHasStashTag)
 {
 	const bool bIsEntityCurrentMoving = MoveTargetFragment.GetCurrentAction() == EMassMovementAction::Move && MoveTargetFragment.GetCurrentActionID() > 0;
-	if (!bIsEntityCurrentMoving)
+	if (!bIsEntityCurrentMoving || Context.DoesArchetypeHaveTag<FMassTrackSoundTag>())
 	{
 		return false;
+	}
+
+	if(Context.DoesArchetypeHaveTag<FMassHasStashedMoveTargetTag>())
+	{
+	  UE_LOG(LogTemp, Error, TEXT("Stashing move target when entity (idx=%d,sn=%d) already has stashed move target"), Entity.Index, Entity.SerialNumber);
 	}
 
 	CopyMoveTarget(MoveTargetFragment, StashedMoveTargetFragment, World);
@@ -65,7 +71,7 @@ EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecution
 	const UWorld* World = Context.GetWorld();
 
 	const FMassEntityHandle& Entity = MassContext.GetEntity();
-	StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, *World, EntitySubsystem, Entity);
+	StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, *World, EntitySubsystem, Entity, MassContext.GetEntitySubsystemExecutionContext());
 
 	MoveTargetFragment.CreateNewAction(EMassMovementAction::Stand, *World);
 	MoveTargetFragment.Center = EntityLocation;

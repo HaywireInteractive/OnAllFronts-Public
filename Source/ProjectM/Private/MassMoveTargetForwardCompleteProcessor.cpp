@@ -63,7 +63,7 @@ void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& Enti
 				}
 				else if (SignalType == EMassMoveForwardCompleteSignalType::TrackSoundComplete && StashedMoveTargetList.Num() > 0 && MoveTargetList.Num() > 0)
 				{
-					// Unstash move target if needed.
+					// Unstash move target.
 					CopyMoveTarget(StashedMoveTargetList[EntityIndex], MoveTargetList[EntityIndex], *EntitySubsystem.GetWorld());
 					Context.Defer().RemoveTag<FMassHasStashedMoveTargetTag>(Entity);
 					Context.Defer().RemoveTag<FMassTrackSoundTag>(Entity);

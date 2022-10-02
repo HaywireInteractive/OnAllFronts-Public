@@ -180,6 +180,14 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
     });
   }
 
+	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
+	{
+		const bool bIsBlocked = bDidAnyCapsulesCollide;
+		AsyncTask(ENamedThreads::GameThread, [&World, Location = ProjectileTraceCapsule.b, bIsBlocked]()
+		{
+		  ::DrawDebugSphere(&World, Location + FVector(0.f, 0.f, 300.f), 100.f, 10, bIsBlocked ? FColor::Red : FColor::Green, false, 0.1f);
+		});
+	}
 	return bDidAnyCapsulesCollide;
 }
 
@@ -237,7 +245,7 @@ struct FPotentialTarget
 	bool bIsSoldier;
 };
 
-void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, const bool& IsEntityOnTeam1, const FTargetEntityFragment& TargetEntityFragment, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData>& OutPotentialTargetsNeedingSphereTrace)
+void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, const bool& IsEntityOnTeam1, const FTargetEntityFragment& TargetEntityFragment, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& OutPotentialTargetsNeedingSphereTrace)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces");
 
@@ -261,14 +269,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 		TargetGrid.Query(SearchBounds, CloseEntities);
 	}
 
-	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
-	{
-		AsyncTask(ENamedThreads::GameThread, [SearchCenter, SearchExtent, World, NumCloseEntities = CloseEntities.Num()]()
-		{
-			DrawDebugBox(World, SearchCenter, SearchExtent, FColor::Green, false, 1.f);
-			DrawDebugString(World, SearchCenter, FString::Printf(TEXT("%d"), NumCloseEntities), nullptr, FColor::Green, 1.f);
-		});
-	}
+	int32 NumPotentialTargetsNeedingSphereTraceEnqueued = 0;
 
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces.ProcessCloseEntities);
@@ -306,7 +307,17 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 			const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, OtherEntity.bIsSoldier, EntityTransform, OtherEntityLocation);
 
 			OutPotentialTargetsNeedingSphereTrace.Enqueue(FPotentialTargetSphereTraceData(Entity, OtherEntity.Entity, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, OtherEntity.MinCaliberForDamage, OtherEntityLocation, OtherEntity.bIsSoldier));
+			NumPotentialTargetsNeedingSphereTraceEnqueued++;
 		}
+	}
+
+	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
+	{
+		AsyncTask(ENamedThreads::GameThread, [SearchCenter, SearchExtent, World, NumCloseEntities = CloseEntities.Num(), NumPotentialTargetsNeedingSphereTraceEnqueued]()
+		{
+			DrawDebugBox(World, SearchCenter, SearchExtent, FColor::Green, false, 1.f);
+			DrawDebugString(World, SearchCenter, FString::Printf(TEXT("%d (%d)"), NumCloseEntities, NumPotentialTargetsNeedingSphereTraceEnqueued), nullptr, FColor::Green, 1.f);
+		});
 	}
 }
 
@@ -315,7 +326,7 @@ float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
 	return bIsEntitySoldier ? 6000.f : 10000.f; // TODO: make this configurable in data asset and get from there?
 }
 
-void ProcessEntityForVisualTarget(FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TransformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, const FTargetHashGrid2D& TargetGrid, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData>& PotentialTargetsNeedingSphereTrace)
+void ProcessEntityForVisualTarget(FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TransformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, const FTargetHashGrid2D& TargetGrid, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTrace)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_ProcessEntityForVisualTarget");
 
@@ -339,7 +350,7 @@ void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location, const F
 
 struct FProcessSphereTracesContext
 {
-  FProcessSphereTracesContext(TQueue<FPotentialTargetSphereTraceData>& PotentialTargetsNeedingSphereTraceQueue, UWorld& World, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& OutEntityToPotentialTargetEntities, const FTargetHashGrid2D& TargetGrid)
+  FProcessSphereTracesContext(TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTraceQueue, UWorld& World, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& OutEntityToPotentialTargetEntities, const FTargetHashGrid2D& TargetGrid)
     : PotentialTargetsNeedingSphereTraceQueue(PotentialTargetsNeedingSphereTraceQueue), World(World), EntityToPotentialTargetEntities(OutEntityToPotentialTargetEntities), TargetGrid(TargetGrid)
   {
   }
@@ -400,7 +411,7 @@ private:
 		}
 	}
 
-	TQueue<FPotentialTargetSphereTraceData>& PotentialTargetsNeedingSphereTraceQueue;
+	TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTraceQueue;
 	UWorld& World;
 	TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities;
 	TArray<FPotentialTargetSphereTraceData> PotentialTargetsNeedingSphereTrace;
@@ -552,7 +563,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		return;
 	}
 
-	TQueue<FPotentialTargetSphereTraceData> PotentialTargetsNeedingSphereTrace;
+	TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc> PotentialTargetsNeedingSphereTrace;
 	const FTargetHashGrid2D& TargetGrid = TargetFinderSubsystem->GetTargetGrid();
 
 	auto ExecuteFunction = [&EntitySubsystem, &PotentialTargetsNeedingSphereTrace, &TargetGrid](FMassExecutionContext& Context)

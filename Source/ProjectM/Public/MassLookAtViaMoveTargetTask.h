@@ -15,7 +15,7 @@ struct FMassMoveForwardCompleteSignalFragment;
 class UMassEntitySubsystem;
 
 /** Returns true if stashed move target. */
-bool StashCurrentMoveTargetIfNeeded(const FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, const bool AddHasStashTag = true);
+bool StashCurrentMoveTargetIfNeeded(const FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, const FMassExecutionContext& Context, const bool AddHasStashTag = true);
 
 USTRUCT()
 struct PROJECTM_API FMassLookAtViaMoveTargetTaskInstanceData

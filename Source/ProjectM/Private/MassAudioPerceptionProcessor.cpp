@@ -161,9 +161,9 @@ void DoLineTraces(TQueue<FSoundTraceData>& SoundTraceQueue, const UWorld& World,
 	}
 }
 
-void PostLineTracesProcessEntity(const FVector& BestSoundLocation, FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment, const FVector& EntityLocation)
+void PostLineTracesProcessEntity(const FVector& BestSoundLocation, FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment, const FVector& EntityLocation, const FMassExecutionContext& Context)
 {
-	const bool bDidStashCurrentMoveTarget = StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, World, EntitySubsystem, Entity, false);
+	const bool bDidStashCurrentMoveTarget = StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, World, EntitySubsystem, Entity, Context, false);
 	if (bDidStashCurrentMoveTarget)
 	{
 		TrackingSoundWhileNavigatingQueue.Enqueue(Entity);
@@ -241,7 +241,7 @@ void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
 				if (EntityToBestSoundLocation.Contains(Entity))
 				{
-					PostLineTracesProcessEntity(EntityToBestSoundLocation[Entity], MoveTargetList[EntityIndex], StashedMoveTargetList[EntityIndex], *EntitySubsystem.GetWorld(), EntitySubsystem, Entity, TrackingSoundWhileNavigatingQueue, MoveForwardCompleteSignalList[EntityIndex], LocationList[EntityIndex].GetTransform().GetLocation());
+					PostLineTracesProcessEntity(EntityToBestSoundLocation[Entity], MoveTargetList[EntityIndex], StashedMoveTargetList[EntityIndex], *EntitySubsystem.GetWorld(), EntitySubsystem, Entity, TrackingSoundWhileNavigatingQueue, MoveForwardCompleteSignalList[EntityIndex], LocationList[EntityIndex].GetTransform().GetLocation(), Context);
 				}
 			}
 		});
