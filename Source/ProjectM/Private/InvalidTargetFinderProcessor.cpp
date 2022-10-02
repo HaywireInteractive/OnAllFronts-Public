@@ -221,7 +221,8 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 
 		const bool bInvalidateAllTargets = UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets;
 
-		EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &TargetFinderSubsystem = TargetFinderSubsystem, &EntitiesWithInvalidTargetQueue, &EntitiesWithUnstashedMoveTargetQueue, &bInvalidateAllTargets](FMassExecutionContext& Context)
+		// NOTE: We don't use ParallelForEachEntityChunk here because in aggregate it hurts both max and avg time for this processor.
+		EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &TargetFinderSubsystem = TargetFinderSubsystem, &EntitiesWithInvalidTargetQueue, &EntitiesWithUnstashedMoveTargetQueue, &bInvalidateAllTargets](FMassExecutionContext& Context)
     {
       const int32 NumEntities = Context.GetNumEntities();
 
