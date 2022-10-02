@@ -137,38 +137,50 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
 
 	TArray<FCapsule> CloseCapsules;
 
-	TArray<FMassTargetGridItem> EntitiesInSearchBox;
-	EntitiesInSearchBox.Reserve(5);
+	std::atomic<bool> bDidAnyCapsulesCollide(false);
+  {
+    TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ParallelFor);
+	  ParallelFor(SearchPoints.Num() - 1, [&](const int32 JobIndex)
+    {
+      TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ParallelForBody);
 
-	for (int32 i = 0; i < SearchPoints.Num() - 1; i++)
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.For);
-
-	  const FVector& SearchBoxStart = SearchPoints[i];
-		const FVector& SearchBoxEnd = SearchPoints[i + 1];
-		const FBox SearchBounds(SearchBoxStart.ComponentMin(SearchBoxEnd), SearchBoxStart.ComponentMax(SearchBoxEnd));
-
-		EntitiesInSearchBox.Reset();
-
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.For.TargetGridQuery);
-			TargetGrid.Query(SearchBounds, EntitiesInSearchBox);
-		}
-
-		for (const FMassTargetGridItem& TargetGridItem : EntitiesInSearchBox)
-		{
-			if (TargetGridItem.Entity == Entity || TargetGridItem.Entity == TargetEntity)
+			if (bDidAnyCapsulesCollide)
 			{
-				continue;
+				return;
 			}
-			if (DidCapsulesCollide(ProjectileTraceCapsule, TargetGridItem.Capsule, Entity, World))
-			{
-				return true;
-			}
-		}
-	}
 
-	return false;
+      const FVector& SearchBoxStart = SearchPoints[JobIndex];
+      const FVector& SearchBoxEnd = SearchPoints[JobIndex + 1];
+      const FBox SearchBounds(SearchBoxStart.ComponentMin(SearchBoxEnd), SearchBoxStart.ComponentMax(SearchBoxEnd));
+
+			TArray<FMassTargetGridItem> EntitiesInSearchBox;
+			EntitiesInSearchBox.Reserve(5);
+
+      {
+        TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ParallelForBody.TargetGridQuery);
+        TargetGrid.Query(SearchBounds, EntitiesInSearchBox);
+      }
+
+      for (const FMassTargetGridItem& TargetGridItem : EntitiesInSearchBox)
+      {
+				if (bDidAnyCapsulesCollide)
+				{
+					break;
+				}
+        if (TargetGridItem.Entity == Entity || TargetGridItem.Entity == TargetEntity)
+        {
+          continue;
+        }
+        if (DidCapsulesCollide(ProjectileTraceCapsule, TargetGridItem.Capsule, Entity, World))
+        {
+					bDidAnyCapsulesCollide = true;
+					break;
+        }
+      }
+    });
+  }
+
+	return bDidAnyCapsulesCollide;
 }
 
 bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation, const bool DrawTrace)
