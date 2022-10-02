@@ -194,7 +194,7 @@ bool IsTargetValid(const FMassEntityHandle& Entity, FMassEntityHandle& TargetEnt
 	return true;
 }
 
-void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector &EntityLocation, const FMassStashedMoveTargetFragment* StashedMoveTargetFragment, FMassMoveTargetFragment* MoveTargetFragment, TQueue<FMassEntityHandle>& EntitiesWithInvalidTargetQueue, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1, const FTransform& EntityTransform, TQueue<FMassEntityHandle>& EntitiesWithUnstashedMoveTargetQueue, const bool bInvalidateAllTargets)
+void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector &EntityLocation, const FMassStashedMoveTargetFragment* StashedMoveTargetFragment, FMassMoveTargetFragment* MoveTargetFragment, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& EntitiesWithInvalidTargetQueue, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const bool& IsEntityOnTeam1, const FTransform& EntityTransform, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& EntitiesWithUnstashedMoveTargetQueue, const bool bInvalidateAllTargets)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.ProcessEntity);
 
@@ -222,8 +222,8 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 		return;
 	}
 
-	TQueue<FMassEntityHandle> EntitiesWithInvalidTargetQueue;
-	TQueue<FMassEntityHandle> EntitiesWithUnstashedMoveTargetQueue;
+	TQueue<FMassEntityHandle, EQueueMode::Mpsc> EntitiesWithInvalidTargetQueue;
+	TQueue<FMassEntityHandle, EQueueMode::Mpsc> EntitiesWithUnstashedMoveTargetQueue;
 
   {
     TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.ParallelForEachEntityChunk);

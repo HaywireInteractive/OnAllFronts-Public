@@ -48,7 +48,7 @@ struct FSoundTraceData
 	TArray<FVector> SoundLocations;
 };
 
-void EnqueueClosestSoundsToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoundTraceData>& SoundTraceQueue, const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityHandle& Entity)
+void EnqueueClosestSoundsToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityHandle& Entity)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue");
 
@@ -89,7 +89,7 @@ void EnqueueClosestSoundsToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoun
   }
 }
 
-void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, const FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, const FMassEntityHandle& Entity, const bool bIsEntitySoldier, TQueue<FSoundTraceData>& SoundTraceQueue)
+void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, const FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, const FMassEntityHandle& Entity, const bool bIsEntitySoldier, TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.ProcessEntityForAudioTarget");
 
@@ -117,7 +117,7 @@ struct FSoundTraceResult
 	FSoundTraceResult() = default;
 };
 
-void DoLineTraces(TQueue<FSoundTraceData>& SoundTraceQueue, const UWorld& World, TMap<FMassEntityHandle, FVector>& OutEntityToBestSoundLocation)
+void DoLineTraces(TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, const UWorld& World, TMap<FMassEntityHandle, FVector>& OutEntityToBestSoundLocation)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.DoLineTraces");
 
@@ -130,7 +130,7 @@ void DoLineTraces(TQueue<FSoundTraceData>& SoundTraceQueue, const UWorld& World,
 		SoundTraces.Add(SoundTraceData);
 	}
 
-	TQueue<FSoundTraceResult> BestSoundLocations;
+	TQueue<FSoundTraceResult, EQueueMode::Mpsc> BestSoundLocations;
 
 	ParallelFor(SoundTraces.Num(), [&](const int32 JobIndex)
 	{
@@ -161,7 +161,7 @@ void DoLineTraces(TQueue<FSoundTraceData>& SoundTraceQueue, const UWorld& World,
 	}
 }
 
-void PostLineTracesProcessEntity(const FVector& BestSoundLocation, FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment, const FVector& EntityLocation, const FMassExecutionContext& Context)
+void PostLineTracesProcessEntity(const FVector& BestSoundLocation, FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle& Entity, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& TrackingSoundWhileNavigatingQueue, FMassMoveForwardCompleteSignalFragment& MoveForwardCompleteSignalFragment, const FVector& EntityLocation, const FMassExecutionContext& Context)
 {
 	const bool bDidStashCurrentMoveTarget = StashCurrentMoveTargetIfNeeded(MoveTargetFragment, StashedMoveTargetFragment, World, EntitySubsystem, Entity, Context, false);
 	if (bDidStashCurrentMoveTarget)
@@ -189,7 +189,7 @@ void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 		return;
 	}
 
-	TQueue<FSoundTraceData> SoundTraceQueue;
+	TQueue<FSoundTraceData, EQueueMode::Mpsc> SoundTraceQueue;
 
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.Execute.PreLineTracesEntityQuery.ParallelForEachEntityChunk");
@@ -223,7 +223,7 @@ void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 		return;
 	}
 
-	TQueue<FMassEntityHandle> TrackingSoundWhileNavigatingQueue;
+	TQueue<FMassEntityHandle, EQueueMode::Mpsc> TrackingSoundWhileNavigatingQueue;
 
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.Execute.PostLineTracesEntityQuery.ParallelForEachEntityChunk");

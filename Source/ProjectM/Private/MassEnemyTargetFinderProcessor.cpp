@@ -415,13 +415,13 @@ private:
 	UWorld& World;
 	TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities;
 	TArray<FPotentialTargetSphereTraceData> PotentialTargetsNeedingSphereTrace;
-	TQueue<FPotentialTargetSphereTraceData> PotentialVisibleTargets;
+	TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc> PotentialVisibleTargets;
 	const FTargetHashGrid2D& TargetGrid;
 };
 
 struct FSelectBestTargetProcessEntityContext
 {
-	FSelectBestTargetProcessEntityContext(UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle>& TargetFinderEntityQueue, const FMassEntityHandle& Entity, const FTransform& EntityTransform, FTargetEntityFragment& TargetEntityFragment, TArray<FPotentialTarget>& PotentialTargets, const bool bIsEntitySoldier)
+	FSelectBestTargetProcessEntityContext(UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& TargetFinderEntityQueue, const FMassEntityHandle& Entity, const FTransform& EntityTransform, FTargetEntityFragment& TargetEntityFragment, TArray<FPotentialTarget>& PotentialTargets, const bool bIsEntitySoldier)
 		: EntitySubsystem(EntitySubsystem), TargetFinderEntityQueue(TargetFinderEntityQueue), Entity(Entity), EntityLocation(EntityTransform.GetLocation()), EntityTransform(EntityTransform), bIsEntitySoldier(bIsEntitySoldier), TargetEntityFragment(TargetEntityFragment), PotentialTargets(PotentialTargets)
 	{
 	}
@@ -507,7 +507,7 @@ struct FSelectBestTargetProcessEntityContext
 
 private:
 	UMassEntitySubsystem& EntitySubsystem;
-	TQueue<FMassEntityHandle>& TargetFinderEntityQueue;
+	TQueue<FMassEntityHandle, EQueueMode::Mpsc>& TargetFinderEntityQueue;
 	const FMassEntityHandle& Entity;
 	const FVector EntityLocation;
 	const FTransform& EntityTransform;
@@ -518,7 +518,7 @@ private:
 
 struct FSelectBestTargetContext
 {
-	FSelectBestTargetContext(FMassEntityQuery& EntityQuery, UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities, TQueue<FMassEntityHandle>& TargetFinderEntityQueue)
+	FSelectBestTargetContext(FMassEntityQuery& EntityQuery, UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& TargetFinderEntityQueue)
     : EntityQuery(EntityQuery), EntitySubsystem(EntitySubsystem), Context(Context), EntityToPotentialTargetEntities(EntityToPotentialTargetEntities), TargetFinderEntityQueue(TargetFinderEntityQueue)
   {
   }
@@ -551,7 +551,7 @@ private:
 	UMassEntitySubsystem& EntitySubsystem;
 	FMassExecutionContext& Context;
 	TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities;
-	TQueue<FMassEntityHandle>& TargetFinderEntityQueue;
+	TQueue<FMassEntityHandle, EQueueMode::Mpsc>& TargetFinderEntityQueue;
 };
 
 void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
@@ -598,7 +598,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	}
 
 	TMap<FMassEntityHandle, TArray<FPotentialTarget>> EntityToPotentialTargetEntities;
-	TQueue<FMassEntityHandle> TargetFinderEntityQueue;
+	TQueue<FMassEntityHandle, EQueueMode::Mpsc> TargetFinderEntityQueue;
 	FProcessSphereTracesContext(PotentialTargetsNeedingSphereTrace, *EntitySubsystem.GetWorld(), EntityToPotentialTargetEntities, TargetGrid).Execute();
 	FSelectBestTargetContext(PostSphereTraceEntityQuery, EntitySubsystem, Context, EntityToPotentialTargetEntities, TargetFinderEntityQueue).Execute();
 
