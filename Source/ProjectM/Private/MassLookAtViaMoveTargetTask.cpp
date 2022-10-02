@@ -21,7 +21,7 @@ bool FMassLookAtViaMoveTargetTask::Link(FStateTreeLinker& Linker)
 	return true;
 }
 
-bool StashCurrentMoveTargetIfNeeded(FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem&  EntitySubsystem, const FMassEntityHandle& Entity, const bool AddHasStashTag)
+bool StashCurrentMoveTargetIfNeeded(const FMassMoveTargetFragment& MoveTargetFragment, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const UWorld& World, const UMassEntitySubsystem&  EntitySubsystem, const FMassEntityHandle& Entity, const bool AddHasStashTag)
 {
 	const bool bIsEntityCurrentMoving = MoveTargetFragment.GetCurrentAction() == EMassMovementAction::Move && MoveTargetFragment.GetCurrentActionID() > 0;
 	if (!bIsEntityCurrentMoving)
@@ -49,7 +49,7 @@ EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecution
 	if (TargetEntity == nullptr || !TargetEntity->IsSet()) {
 		return EStateTreeRunStatus::Failed;
 	}
-	UMassEntitySubsystem& EntitySubsystem = MassContext.GetEntitySubsystem();
+  const UMassEntitySubsystem& EntitySubsystem = MassContext.GetEntitySubsystem();
 	if (!EntitySubsystem.IsEntityValid(*TargetEntity)) {
 		return EStateTreeRunStatus::Failed;
 	}
