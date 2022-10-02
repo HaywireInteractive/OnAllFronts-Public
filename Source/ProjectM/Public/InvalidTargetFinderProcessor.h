@@ -7,8 +7,8 @@
 #include "MassNavigationFragments.h"
 #include "InvalidTargetFinderProcessor.generated.h"
 
+class UMassTargetFinderSubsystem;
 class UMassSignalSubsystem;
-class UMassNavigationSubsystem;
 struct FCapsule;
 
 void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World);
@@ -27,7 +27,7 @@ protected:
 	virtual void Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context) override;
 
 	TObjectPtr<UMassSignalSubsystem> SignalSubsystem;
-	TObjectPtr<UMassNavigationSubsystem> NavigationSubsystem;
+	TObjectPtr<UMassTargetFinderSubsystem> TargetFinderSubsystem;
 
 private:
 	FMassEntityQuery EntityQuery;

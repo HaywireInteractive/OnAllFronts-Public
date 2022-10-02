@@ -91,14 +91,6 @@ bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragme
 	return TargetEntityFragment.TargetMinCaliberForDamage >= MinCaliberForDamage;
 }
 
-bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& OtherEntityView)
-{
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_CanEntityDamageTargetEntity");
-
-	const FProjectileDamagableFragment* TargetEntityProjectileDamagableFragment = OtherEntityView.GetFragmentDataPtr<FProjectileDamagableFragment>();
-	return TargetEntityProjectileDamagableFragment && CanEntityDamageTargetEntity(TargetEntityFragment, TargetEntityProjectileDamagableFragment->MinCaliberForDamage);
-}
-
 FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation)
 {
 	const FVector& EntityLocation = EntityTransform.GetLocation();
