@@ -142,9 +142,8 @@ void DoLineTraces(TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, co
 			const FVector& SoundLocation = SoundTrace.SoundLocations[i];
 			bool bHasBlockingHit;
 			{
-        FHitResult Result;
-				TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces.LineTraceSingleByChannel);
-				bHasBlockingHit = World.LineTraceSingleByChannel(Result, SoundTrace.TraceStart, SoundLocation, ECollisionChannel::ECC_Visibility);
+				TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces.LineTraceTestByChannel);
+				bHasBlockingHit = World.LineTraceTestByChannel(SoundTrace.TraceStart, SoundLocation, ECollisionChannel::ECC_Visibility);
 			}
 			if (!bHasBlockingHit)
 			{
