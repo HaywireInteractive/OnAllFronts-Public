@@ -50,48 +50,50 @@ struct FSoundTraceData
 
 void EnqueueClosestSoundsToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityHandle& Entity)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue");
+	TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundsToTraceQueue);
 
-  const FVector TraceStart = EntityLocation + FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
-
-	FBinaryHeap<float> CloseSoundsHeap;
+	check(CloseSounds.Num() > 0);
+	const FVector TraceStart = EntityLocation + FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
+	int32 MinIndex = -1;
 
   {
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue.Heapify");
+		TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundsToTraceQueue.FindMin);
 
 		auto DistanceSqToLocation = [&TraceStart](const FVector& SoundSource) {
 			return (SoundSource - TraceStart).SizeSquared();
 		};
 
 		int32 i = 0;
+		float MinDistanceSq = BIG_NUMBER;
 		for (const FVector& SoundSource : CloseSounds)
 		{
-			CloseSoundsHeap.Add(DistanceSqToLocation(SoundSource), i);
+			const float& DistanceSq = DistanceSqToLocation(SoundSource);
+			if (DistanceSq < MinDistanceSq)
+			{
+				MinIndex = i;
+				MinDistanceSq = DistanceSq;
+			}
 			i++;
 		}
+		check(MinIndex != -1);
 	}
 
 	FSoundTraceData SoundTraceData(Entity, TraceStart);
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue.SoundLocations.Add");
+		TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundsToTraceQueue.SoundLocations.Add);
 
-	  static constexpr uint8 MaxSoundsToConsider = 3;
-    for (uint32 i = 0; i < MaxSoundsToConsider && i < CloseSoundsHeap.Num(); i++)
-    {
-			CloseSoundsHeap.Pop();
-      SoundTraceData.SoundLocations.Add(CloseSounds[CloseSoundsHeap.Top()]);
-    }
+    SoundTraceData.SoundLocations.Add(CloseSounds[MinIndex]);
   }
 
   {
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EnqueueClosestSoundsToTraceQueue.Enqueue");
+		TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundsToTraceQueue.Enqueue);
 		SoundTraceQueue.Enqueue(SoundTraceData);
   }
 }
 
 void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionSubsystem, const FTransform& EntityTransform, const FMassMoveTargetFragment& MoveTargetFragment, const bool& bIsEntityOnTeam1, const FMassEntityHandle& Entity, const bool bIsEntitySoldier, TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.ProcessEntityForAudioTarget");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.ProcessEntityForAudioTarget);
 
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	const bool& bIsFacingMoveTarget = IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward);
@@ -119,7 +121,7 @@ struct FSoundTraceResult
 
 void DoLineTraces(TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, const UWorld& World, TMap<FMassEntityHandle, FVector>& OutEntityToBestSoundLocation)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.DoLineTraces");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces);
 
 	TArray<FSoundTraceData> SoundTraces;
 	while (!SoundTraceQueue.IsEmpty())
@@ -141,7 +143,7 @@ void DoLineTraces(TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, co
 			bool bHasBlockingHit;
 			{
         FHitResult Result;
-        TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.DoLineTraces.LineTraceSingleByChannel");
+				TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces.LineTraceSingleByChannel);
 				bHasBlockingHit = World.LineTraceSingleByChannel(Result, SoundTrace.TraceStart, SoundLocation, ECollisionChannel::ECC_Visibility);
 			}
 			if (!bHasBlockingHit)
@@ -182,7 +184,7 @@ void PostLineTracesProcessEntity(const FVector& BestSoundLocation, FMassMoveTarg
 
 void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor);
 
 	if (UMassEnemyTargetFinderProcessor_SkipFindingTargets)
 	{
@@ -192,7 +194,7 @@ void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 	TQueue<FSoundTraceData, EQueueMode::Mpsc> SoundTraceQueue;
 
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.Execute.PreLineTracesEntityQuery.ParallelForEachEntityChunk");
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.Execute.PreLineTracesEntityQuery.ParallelForEachEntityChunk);
 		PreLineTracesEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&SoundPerceptionSubsystem = SoundPerceptionSubsystem, &SoundTraceQueue = SoundTraceQueue](FMassExecutionContext& Context)
 		{
 			const int32 NumEntities = Context.GetNumEntities();
@@ -226,7 +228,7 @@ void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 	TQueue<FMassEntityHandle, EQueueMode::Mpsc> TrackingSoundWhileNavigatingQueue;
 
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.Execute.PostLineTracesEntityQuery.ParallelForEachEntityChunk");
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.Execute.PostLineTracesEntityQuery.ParallelForEachEntityChunk);
 		PostLineTracesEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&EntityToBestSoundLocation, &EntitySubsystem, &TrackingSoundWhileNavigatingQueue](FMassExecutionContext& Context)
 		{
 			const int32 NumEntities = Context.GetNumEntities();
@@ -248,7 +250,7 @@ void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 	}
 
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassAudioPerceptionProcessor.Execute.ProcessQueues");
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.Execute.ProcessQueues);
 		while (!TrackingSoundWhileNavigatingQueue.IsEmpty())
 		{
 			FMassEntityHandle Entity;
