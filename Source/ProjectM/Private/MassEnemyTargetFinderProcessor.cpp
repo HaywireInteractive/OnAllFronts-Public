@@ -86,9 +86,9 @@ void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
 	TargetFinderSubsystem = UWorld::GetSubsystem<UMassTargetFinderSubsystem>(Owner.GetWorld());
 }
 
-bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const float& MinCaliberForDamage)
+bool CanEntityDamageTargetEntity(const float TargetMinCaliberForDamage, const float MinCaliberForDamage)
 {
-	return TargetEntityFragment.TargetMinCaliberForDamage >= MinCaliberForDamage;
+	return TargetMinCaliberForDamage >= MinCaliberForDamage;
 }
 
 FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation)
@@ -185,7 +185,7 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
 
 bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation, const bool DrawTrace)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace);
 	FHitResult Result;
 	static constexpr float Radius = 20.f; // TODO: don't hard-code
   const bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
@@ -285,7 +285,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 				continue;
 			}
 
-			if (!CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntity.MinCaliberForDamage))
+			if (!CanEntityDamageTargetEntity(TargetEntityFragment.TargetMinCaliberForDamage, OtherEntity.MinCaliberForDamage))
 			{
 				continue;
 			}

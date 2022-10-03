@@ -30,7 +30,8 @@ protected:
 	TObjectPtr<UMassTargetFinderSubsystem> TargetFinderSubsystem;
 
 private:
-	FMassEntityQuery EntityQuery;
+	FMassEntityQuery BuildQueueEntityQuery;
+	FMassEntityQuery InvalidateTargetsEntityQuery;
 
 	// Frame buffer, it gets reset every frame.
 	TArray<FMassEntityHandle> TransientEntitiesToSignal;

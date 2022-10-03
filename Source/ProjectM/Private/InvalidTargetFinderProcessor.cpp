@@ -40,21 +40,23 @@ void UInvalidTargetFinderProcessor::Initialize(UObject& Owner)
 
 void UInvalidTargetFinderProcessor::ConfigureQueries()
 {
-	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
-	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
-	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
-	EntityQuery.AddTagRequirement<FMassWillNeedEnemyTargetTag>(EMassFragmentPresence::All);
+	BuildQueueEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	BuildQueueEntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
+	BuildQueueEntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
+	BuildQueueEntityQuery.AddTagRequirement<FMassWillNeedEnemyTargetTag>(EMassFragmentPresence::All);
+
+	InvalidateTargetsEntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
+	InvalidateTargetsEntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
+	InvalidateTargetsEntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
+	InvalidateTargetsEntityQuery.AddTagRequirement<FMassWillNeedEnemyTargetTag>(EMassFragmentPresence::All);
 }
 
-bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FMassEntityHandle Entity, const FMassExecutionContext& Context)
+bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle Entity, const bool bIsEntitySoldier)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetEntityOutOfRange);
 
   const double& DistanceBetweenEntities = (TargetEntityLocation - EntityLocation).Size();
 
-	const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
 	const float MaxRange = GetEntityRange(bIsEntitySoldier);
 
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
@@ -87,7 +89,7 @@ bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, cons
 	return Result;
 }
 
-bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const FTargetHashGrid2D& TargetGrid, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context, const FTargetEntityFragment& TargetEntityFragment, const FMassEntityView& TargetEntityView, const FTransform& EntityTransform)
+bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const FTargetHashGrid2D& TargetGrid, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const bool bIsEntitySoldier, const float TargetMinCaliberForDamage, const FMassEntityView& TargetEntityView, const FTransform& EntityTransform)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetEntityObstructed);
 
@@ -106,7 +108,6 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 		});
 	}
 
-	const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
 	const bool& bIsTargetEntitySoldier = TargetEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
 	const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, bIsTargetEntitySoldier, EntityTransform, TargetEntityLocation);
 
@@ -126,8 +127,8 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 			continue;
 		}
 
-		// If same team or undamagable, check for collision.
-		if (IsEntityOnTeam1 == OtherEntity.bIsOnTeam1 || !CanEntityDamageTargetEntity(TargetEntityFragment, OtherEntity.MinCaliberForDamage)) {
+		// If same team or undamageable, check for collision.
+		if (IsEntityOnTeam1 == OtherEntity.bIsOnTeam1 || !CanEntityDamageTargetEntity(TargetMinCaliberForDamage, OtherEntity.MinCaliberForDamage)) {
 			if (DidCapsulesCollide(ProjectileTraceCapsule, OtherEntity.Capsule, Entity, *EntitySubsystem.GetWorld()))
 			{
 				return true;
@@ -156,9 +157,11 @@ static FAutoConsoleCommand InvalidateAllTargetsCmd(
 	FConsoleCommandDelegate::CreateStatic(InvalidateAllTargets)
 );
 
-bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& TargetEntity, const UMassEntitySubsystem& EntitySubsystem, const FVector& EntityLocation, FTargetEntityFragment& TargetEntityFragment, const FTargetHashGrid2D& TargetGrid, const bool& IsEntityOnTeam1, const FMassExecutionContext& Context, const FTransform& EntityTransform, const bool bInvalidateAllTargets)
+bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& TargetEntity, const UMassEntitySubsystem& EntitySubsystem, const float TargetMinCaliberForDamage, const FTargetHashGrid2D& TargetGrid, const bool& IsEntityOnTeam1, const bool bIsEntitySoldier, const FTransform& EntityTransform, const bool bInvalidateAllTargets)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetValid);
+
+	const FVector& EntityLocation = EntityTransform.GetLocation();
 
   if (bInvalidateAllTargets)
 	{
@@ -172,12 +175,12 @@ bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& Tar
 
   const FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
 	const FVector& TargetEntityLocation = TargetEntityView.GetFragmentData<FTransformFragment>().GetTransform().GetLocation();
-	if (IsTargetEntityOutOfRange(TargetEntityLocation, EntityLocation, EntitySubsystem, TargetEntityFragment, Entity, Context))
+	if (IsTargetEntityOutOfRange(TargetEntityLocation, EntityLocation, EntitySubsystem, Entity, bIsEntitySoldier))
 	{
 		return false;
 	}
 
-	if (IsTargetEntityObstructed(EntityLocation, TargetEntityLocation, TargetGrid, Entity, EntitySubsystem, IsEntityOnTeam1, Context, TargetEntityFragment, TargetEntityView, EntityTransform))
+	if (IsTargetEntityObstructed(EntityLocation, TargetEntityLocation, TargetGrid, Entity, EntitySubsystem, IsEntityOnTeam1, bIsEntitySoldier, TargetMinCaliberForDamage, TargetEntityView, EntityTransform))
 	{
 		return false;
 	}
@@ -185,23 +188,28 @@ bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& Tar
 	return true;
 }
 
-void ProcessEntity(const FMassExecutionContext& Context, const FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, FTargetEntityFragment& TargetEntityFragment, const FVector &EntityLocation, const FMassStashedMoveTargetFragment* StashedMoveTargetFragment, FMassMoveTargetFragment* MoveTargetFragment, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& EntitiesWithInvalidTargetQueue, const FTargetHashGrid2D& TargetGrid, const bool& IsEntityOnTeam1, const FTransform& EntityTransform, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& EntitiesWithUnstashedMoveTargetQueue, const bool bInvalidateAllTargets)
+struct FProcessEntityData
+{
+	FMassEntityHandle Entity;
+	FMassEntityHandle TargetEntity;
+	float TargetMinCaliberForDamage;
+	FTransform EntityTransform;
+	bool bIsEntityOnTeam1;
+	bool bIsEntitySoldier;
+};
+
+/** Returns true if entity has invalid target. */
+bool ProcessEntity(const FProcessEntityData& ProcessEntityData, const bool bInvalidateAllTargets, const UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& EntitiesWithInvalidTargetQueue)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.ProcessEntity);
 
-	FMassEntityHandle& TargetEntity = TargetEntityFragment.Entity;
-	if (!IsTargetValid(Entity, TargetEntity, EntitySubsystem, EntityLocation, TargetEntityFragment, TargetGrid, IsEntityOnTeam1, Context, EntityTransform, bInvalidateAllTargets))
+	const FMassEntityHandle& TargetEntity = ProcessEntityData.TargetEntity;
+	if (!IsTargetValid(ProcessEntityData.Entity, TargetEntity, EntitySubsystem, ProcessEntityData.TargetMinCaliberForDamage, TargetGrid, ProcessEntityData.bIsEntityOnTeam1, ProcessEntityData.bIsEntitySoldier, ProcessEntityData.EntityTransform, bInvalidateAllTargets))
 	{
-		TargetEntity.Reset();
-		EntitiesWithInvalidTargetQueue.Enqueue(Entity);
-
-		// Unstash move target if needed.
-		if (Context.DoesArchetypeHaveTag<FMassHasStashedMoveTargetTag>() && StashedMoveTargetFragment && MoveTargetFragment)
-		{
-			CopyMoveTarget(*StashedMoveTargetFragment, *MoveTargetFragment, *EntitySubsystem.GetWorld());
-			EntitiesWithUnstashedMoveTargetQueue.Enqueue(Entity);
-		}
+		EntitiesWithInvalidTargetQueue.Enqueue(ProcessEntityData.Entity);
+		return true;
 	}
+	return false;
 }
 
 void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
@@ -213,47 +221,125 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 		return;
 	}
 
-	TQueue<FMassEntityHandle, EQueueMode::Mpsc> EntitiesWithInvalidTargetQueue;
-	TQueue<FMassEntityHandle, EQueueMode::Mpsc> EntitiesWithUnstashedMoveTargetQueue;
+	TQueue<FProcessEntityData, EQueueMode::Mpsc> EntitiesToCheckQueue;
+	std::atomic<int32> TotalNumEntities = 0;
 
   {
-    TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.ParallelForEachEntityChunk);
+    TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.BuildQueue);
 
-		const bool bInvalidateAllTargets = UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets;
-
-		// NOTE: We don't use ParallelForEachEntityChunk here because in aggregate it hurts both max and avg time for this processor.
-		EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [&EntitySubsystem, &TargetFinderSubsystem = TargetFinderSubsystem, &EntitiesWithInvalidTargetQueue, &EntitiesWithUnstashedMoveTargetQueue, &bInvalidateAllTargets](FMassExecutionContext& Context)
+		BuildQueueEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&EntitiesToCheckQueue, &TotalNumEntities](FMassExecutionContext& Context)
     {
       const int32 NumEntities = Context.GetNumEntities();
 
       const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
       const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
-      const TConstArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetFragmentView<FMassStashedMoveTargetFragment>();
-      const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
       const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 
-			const FTargetHashGrid2D& TargetGrid = TargetFinderSubsystem->GetTargetGrid();
-
-			ParallelFor(NumEntities, [&](const int32 EntityIndex)
+			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 			{
-				ProcessEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, TargetEntityList[EntityIndex], TransformList[EntityIndex].GetTransform().GetLocation(), StashedMoveTargetList.Num() > 0 ? &StashedMoveTargetList[EntityIndex] : nullptr, MoveTargetList.Num() > 0 ? &MoveTargetList[EntityIndex] : nullptr, EntitiesWithInvalidTargetQueue, TargetGrid, TeamMemberList[EntityIndex].IsOnTeam1, TransformList[EntityIndex].GetTransform(), EntitiesWithUnstashedMoveTargetQueue, bInvalidateAllTargets);
-			});
+				FProcessEntityData ProcessEntityData;
+				ProcessEntityData.Entity = Context.GetEntity(EntityIndex);
+				ProcessEntityData.TargetEntity = TargetEntityList[EntityIndex].Entity;
+				ProcessEntityData.TargetMinCaliberForDamage = TargetEntityList[EntityIndex].TargetMinCaliberForDamage;
+				ProcessEntityData.EntityTransform = TransformList[EntityIndex].GetTransform();
+				ProcessEntityData.bIsEntityOnTeam1 = TeamMemberList[EntityIndex].IsOnTeam1;
+				ProcessEntityData.bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+				EntitiesToCheckQueue.Enqueue(ProcessEntityData);
+				TotalNumEntities++;
+			}
     });
   }
 
-	UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets = false;
+	TArray<FProcessEntityData> EntitiesToCheck;
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.ConvertQueueToArray);
+
+		EntitiesToCheck.Reserve(TotalNumEntities);
+		while (!EntitiesToCheckQueue.IsEmpty())
+		{
+			FProcessEntityData ProcessEntityData;
+			const bool bSuccess = EntitiesToCheckQueue.Dequeue(ProcessEntityData);
+			check(bSuccess);
+			EntitiesToCheck.Add(ProcessEntityData);
+		}
+	}
+
+	TQueue<FMassEntityHandle, EQueueMode::Mpsc> EntitiesWithInvalidTargetQueue;
+	std::atomic<int32> NumEntitiesWithInvalidTarget = 0;
 
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UInvalidTargetFinderProcessor.Execute.ProcessQueues");
+		TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.ProcessEntities);
 
-		TransientEntitiesToSignal.Reset();
+		const bool bInvalidateAllTargets = UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets;
+		const FTargetHashGrid2D& TargetGrid = TargetFinderSubsystem->GetTargetGrid();
 
+		ParallelFor(EntitiesToCheck.Num(), [&](const int32 JobIndex)
+		{
+			if (ProcessEntity(EntitiesToCheck[JobIndex], bInvalidateAllTargets, EntitySubsystem, TargetGrid, EntitiesWithInvalidTargetQueue))
+			{
+				NumEntitiesWithInvalidTarget++;
+			}
+		});
+	}
+
+	TSet<FMassEntityHandle> EntitiesWithInvalidTargets;
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.BuildInvalidTargetsSet);
+
+		EntitiesWithInvalidTargets.Reserve(NumEntitiesWithInvalidTarget);
 		while (!EntitiesWithInvalidTargetQueue.IsEmpty())
 		{
 			FMassEntityHandle Entity;
 			const bool bSuccess = EntitiesWithInvalidTargetQueue.Dequeue(Entity);
 			check(bSuccess);
+			EntitiesWithInvalidTargets.Add(Entity);
+		}
+	}
 
+	TQueue<FMassEntityHandle, EQueueMode::Mpsc> EntitiesWithUnstashedMoveTargetQueue;
+
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.ProcessInvalidTargets);
+
+		const UWorld& World = *EntitySubsystem.GetWorld();
+		InvalidateTargetsEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&World, &EntitiesWithInvalidTargets, &EntitiesWithUnstashedMoveTargetQueue](FMassExecutionContext& Context)
+		{
+			const int32 NumEntities = Context.GetNumEntities();
+
+			const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
+			const TConstArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetFragmentView<FMassStashedMoveTargetFragment>();
+			const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
+
+			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+			{
+				const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
+				const bool bIsInvalid = EntitiesWithInvalidTargets.Contains(Entity);
+				if (bIsInvalid)
+				{
+					TargetEntityList[EntityIndex].Entity.Reset();
+					// Unstash move target if needed.
+					const FMassStashedMoveTargetFragment* StashedMoveTargetFragment = StashedMoveTargetList.Num() > 0 ? &StashedMoveTargetList[EntityIndex] : nullptr;
+					FMassMoveTargetFragment* MoveTargetFragment = MoveTargetList.Num() > 0 ? &MoveTargetList[EntityIndex] : nullptr;
+					if (Context.DoesArchetypeHaveTag<FMassHasStashedMoveTargetTag>() && StashedMoveTargetFragment && MoveTargetFragment)
+					{
+						CopyMoveTarget(*StashedMoveTargetFragment, *MoveTargetFragment, World);
+						EntitiesWithUnstashedMoveTargetQueue.Enqueue(Entity);
+					}
+				}
+			}
+		});
+	}
+
+
+	UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets = false;
+
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.ProcessQueues);
+
+		TransientEntitiesToSignal.Reset();
+
+		for (const FMassEntityHandle& Entity : EntitiesWithInvalidTargets)
+		{
 			Context.Defer().AddTag<FMassNeedsEnemyTargetTag>(Entity);
 			Context.Defer().RemoveTag<FMassWillNeedEnemyTargetTag>(Entity);
 			Context.Defer().RemoveTag<FMassTrackTargetTag>(Entity);

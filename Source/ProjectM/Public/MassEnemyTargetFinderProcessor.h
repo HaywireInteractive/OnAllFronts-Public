@@ -21,7 +21,7 @@ inline FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_SkipFindingTa
 constexpr float UMassEnemyTargetFinder_FinestCellSize = 5000.f; // TODO: Don't hard-code, get from data asset.
 constexpr float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
 
-bool CanEntityDamageTargetEntity(const FTargetEntityFragment& TargetEntityFragment, const float& MinCaliberForDamage);
+bool CanEntityDamageTargetEntity(const float TargetMinCaliberForDamage, const float MinCaliberForDamage);
 FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation);
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier);
 float GetEntityRange(const bool bIsEntitySoldier);
