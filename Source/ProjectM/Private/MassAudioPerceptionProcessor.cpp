@@ -35,29 +35,16 @@ void UMassAudioPerceptionProcessor::ConfigureQueries()
 	PostLineTracesEntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
 }
 
-struct FSoundTraceData
+void EnqueueClosestSoundToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityHandle& Entity)
 {
-	FSoundTraceData() = default;
-	FSoundTraceData(const FMassEntityHandle& Entity, const FVector& TraceStart)
-		: Entity(Entity), TraceStart(TraceStart)
-	{
-	  
-	}
-	FMassEntityHandle Entity;
-	FVector TraceStart;
-	TArray<FVector> SoundLocations;
-};
-
-void EnqueueClosestSoundsToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityHandle& Entity)
-{
-	TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundsToTraceQueue);
+	TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundToTraceQueue);
 
 	check(CloseSounds.Num() > 0);
 	const FVector TraceStart = EntityLocation + FVector(0.f, 0.f, UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier));
 	int32 MinIndex = -1;
 
   {
-		TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundsToTraceQueue.FindMin);
+		TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundToTraceQueue.FindMin);
 
 		auto DistanceSqToLocation = [&TraceStart](const FVector& SoundSource) {
 			return (SoundSource - TraceStart).SizeSquared();
@@ -78,16 +65,9 @@ void EnqueueClosestSoundsToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoun
 		check(MinIndex != -1);
 	}
 
-	FSoundTraceData SoundTraceData(Entity, TraceStart);
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundsToTraceQueue.SoundLocations.Add);
-
-    SoundTraceData.SoundLocations.Add(CloseSounds[MinIndex]);
-  }
-
   {
-		TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundsToTraceQueue.Enqueue);
-		SoundTraceQueue.Enqueue(SoundTraceData);
+		TRACE_CPUPROFILER_EVENT_SCOPE(EnqueueClosestSoundToTraceQueue.Enqueue);
+		SoundTraceQueue.Enqueue(FSoundTraceData(Entity, TraceStart, CloseSounds[MinIndex]));
   }
 }
 
@@ -104,7 +84,7 @@ void ProcessEntityForAudioTarget(UMassSoundPerceptionSubsystem* SoundPerceptionS
 	TArray<FVector> CloseSounds;
 	if (SoundPerceptionSubsystem->GetSoundsNearLocation(EntityLocation, CloseSounds, !bIsEntityOnTeam1))
 	{
-		EnqueueClosestSoundsToTraceQueue(CloseSounds, SoundTraceQueue, EntityLocation, bIsEntitySoldier, Entity);
+		EnqueueClosestSoundToTraceQueue(CloseSounds, SoundTraceQueue, EntityLocation, bIsEntitySoldier, Entity);
 	}
 }
 
@@ -123,35 +103,53 @@ void DoLineTraces(TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, co
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces);
 
+	constexpr int32 MaxTracesPerFrame = 200;
 	TArray<FSoundTraceData> SoundTraces;
-	while (!SoundTraceQueue.IsEmpty())
-	{
-		FSoundTraceData SoundTraceData;
-		const bool bSuccess = SoundTraceQueue.Dequeue(SoundTraceData);
-		check(bSuccess);
-		SoundTraces.Add(SoundTraceData);
-	}
+  {
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces.BuildArray);
+		while (!SoundTraceQueue.IsEmpty())
+    {
+      FSoundTraceData SoundTraceData;
+      const bool bSuccess = SoundTraceQueue.Dequeue(SoundTraceData);
+      check(bSuccess);
+      SoundTraces.Add(SoundTraceData);
+			if (SoundTraces.Num() >= MaxTracesPerFrame)
+			{
+				break;
+			}
+    }
+  }
 
 	TQueue<FSoundTraceResult, EQueueMode::Mpsc> BestSoundLocations;
 
-	ParallelFor(SoundTraces.Num(), [&](const int32 JobIndex)
+	const uint64 CyclesStart = FPlatformTime::Cycles64();
+
 	{
-	  FSoundTraceData SoundTrace = SoundTraces[JobIndex];
-		for (int32 i = 0; i < SoundTrace.SoundLocations.Num(); i++)
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.ParallelFor);
+		ParallelFor(SoundTraces.Num(), [&](const int32 JobIndex)
 		{
-			const FVector& SoundLocation = SoundTrace.SoundLocations[i];
+			TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.ParallelForBody);
+			constexpr float BudgetTimeMs = 2.f;
+
+			const FSoundTraceData& SoundTrace = SoundTraces[JobIndex];
+			const double ElapsedMs = FGenericPlatformTime::ToMilliseconds64(FPlatformTime::Cycles64() - CyclesStart);
+
+			if (ElapsedMs >= BudgetTimeMs)
+			{
+				SoundTraceQueue.Enqueue(SoundTrace);
+				return;
+			}
 			bool bHasBlockingHit;
 			{
 				TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces.LineTraceTestByChannel);
-				bHasBlockingHit = World.LineTraceTestByChannel(SoundTrace.TraceStart, SoundLocation, ECollisionChannel::ECC_Visibility);
+				bHasBlockingHit = World.LineTraceTestByChannel(SoundTrace.TraceStart, SoundTrace.TraceEnd, ECollisionChannel::ECC_Visibility);
 			}
 			if (!bHasBlockingHit)
 			{
-				BestSoundLocations.Enqueue(FSoundTraceResult(SoundTrace.Entity, SoundLocation));
-				break;
+				BestSoundLocations.Enqueue(FSoundTraceResult(SoundTrace.Entity, SoundTrace.TraceEnd));
 			}
-		}
-	});
+		});
+	}
 
 	while (!BestSoundLocations.IsEmpty())
 	{
@@ -189,8 +187,6 @@ void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 	{
 		return;
 	}
-
-	TQueue<FSoundTraceData, EQueueMode::Mpsc> SoundTraceQueue;
 
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.Execute.PreLineTracesEntityQuery.ParallelForEachEntityChunk);
