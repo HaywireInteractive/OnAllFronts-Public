@@ -127,38 +127,27 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
 	TArray<FVector> SearchPoints;
 	GetSearchPointsAlongTrace(ProjectileTraceCapsule, SearchPoints);
 
-	TArray<FCapsule> CloseCapsules;
-
-	std::atomic<bool> bDidAnyCapsulesCollide(false);
+	bool bDidAnyCapsulesCollide(false);
   {
-    TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ParallelFor);
-	  ParallelFor(SearchPoints.Num() - 1, [&](const int32 JobIndex)
+    TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.For);
+		for (int32 i = 0; i < SearchPoints.Num() - 1; i++)
     {
-      TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ParallelForBody);
+      TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ForBody);
 
-			if (bDidAnyCapsulesCollide)
-			{
-				return;
-			}
-
-      const FVector& SearchBoxStart = SearchPoints[JobIndex];
-      const FVector& SearchBoxEnd = SearchPoints[JobIndex + 1];
+      const FVector& SearchBoxStart = SearchPoints[i];
+      const FVector& SearchBoxEnd = SearchPoints[i + 1];
       const FBox SearchBounds(SearchBoxStart.ComponentMin(SearchBoxEnd), SearchBoxStart.ComponentMax(SearchBoxEnd));
 
 			TArray<FMassTargetGridItem> EntitiesInSearchBox;
 			EntitiesInSearchBox.Reserve(5);
 
       {
-        TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ParallelForBody.TargetGridQuery);
+        TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ForBody.TargetGridQuery);
         TargetGrid.Query(SearchBounds, EntitiesInSearchBox);
       }
 
       for (const FMassTargetGridItem& TargetGridItem : EntitiesInSearchBox)
       {
-				if (bDidAnyCapsulesCollide)
-				{
-					break;
-				}
         if (TargetGridItem.Entity == Entity || TargetGridItem.Entity == TargetEntity)
         {
           continue;
@@ -169,15 +158,19 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
 					break;
         }
       }
-    });
+
+			if (bDidAnyCapsulesCollide)
+			{
+				break;
+			}
+    }
   }
 
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
-		const bool bIsBlocked = bDidAnyCapsulesCollide;
-		AsyncTask(ENamedThreads::GameThread, [&World, Location = ProjectileTraceCapsule.b, bIsBlocked]()
+		AsyncTask(ENamedThreads::GameThread, [&World, Location = ProjectileTraceCapsule.b, bDidAnyCapsulesCollide]()
 		{
-		  ::DrawDebugSphere(&World, Location + FVector(0.f, 0.f, 300.f), 100.f, 10, bIsBlocked ? FColor::Red : FColor::Green, false, 0.1f);
+		  ::DrawDebugSphere(&World, Location + FVector(0.f, 0.f, 300.f), 100.f, 10, bDidAnyCapsulesCollide ? FColor::Red : FColor::Green, false, 0.1f);
 		});
 	}
 	return bDidAnyCapsulesCollide;
