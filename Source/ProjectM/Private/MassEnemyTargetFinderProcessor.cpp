@@ -318,9 +318,9 @@ float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
 	return bIsEntitySoldier ? 6000.f : 10000.f; // TODO: make this configurable in data asset and get from there?
 }
 
-void ProcessEntityForVisualTarget(FMassEntityHandle Entity, UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TransformFragment, FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, const FTargetHashGrid2D& TargetGrid, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTrace)
+void ProcessEntityForVisualTarget(FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TransformFragment, const FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, const FTargetHashGrid2D& TargetGrid, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTrace)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor_ProcessEntityForVisualTarget");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.ProcessEntityForVisualTarget);
 
 	const FTransform& EntityTransform = TransformFragment.GetTransform();
 	GetPotentialTargetSphereTraces(Entity, EntitySubsystem, TargetGrid, EntityTransform, IsEntityOnTeam1, TargetEntityFragment, bIsEntitySoldier, PotentialTargetsNeedingSphereTrace);
@@ -560,19 +560,21 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 
 	auto ExecuteFunction = [&EntitySubsystem, &PotentialTargetsNeedingSphereTrace, &TargetGrid](FMassExecutionContext& Context)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.ForEachEntityChunk.Body);
+
 		const int32 NumEntities = Context.GetNumEntities();
 
 		const TConstArrayView<FTransformFragment> LocationList = Context.GetFragmentView<FTransformFragment>();
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 		const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
 
-		ParallelFor(NumEntities, [&](const int32 EntityIndex)
+		for (int32 EntityIndex = 0; EntityIndex < NumEntities; EntityIndex++)
 		{
 			const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
 			const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
 			ProcessEntityForVisualTarget(Entity, EntitySubsystem, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, TargetGrid, bIsEntitySoldier, PotentialTargetsNeedingSphereTrace);
 			DrawEntitySearchingIfNeeded(EntitySubsystem.GetWorld(), LocationList[EntityIndex].GetTransform().GetLocation(), Context.GetEntity(EntityIndex));
-		});
+		}
 	};
 
 	if (UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk)
