@@ -66,8 +66,8 @@ void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& Enti
 					// Unstash move target.
 					CopyMoveTarget(StashedMoveTargetList[EntityIndex], MoveTargetList[EntityIndex], *EntitySubsystem.GetWorld());
 					Context.Defer().RemoveTag<FMassHasStashedMoveTargetTag>(Entity);
-					Context.Defer().RemoveTag<FMassTrackSoundTag>(Entity);
 				}
+				Context.Defer().RemoveTag<FMassTrackSoundTag>(Entity);
 				Context.Defer().RemoveTag<FMassNeedsMoveTargetForwardCompleteSignalTag>(Entity);
 			}
 		}

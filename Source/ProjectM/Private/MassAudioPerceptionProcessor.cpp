@@ -27,12 +27,14 @@ void UMassAudioPerceptionProcessor::ConfigureQueries()
 	PreLineTracesEntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadOnly);
 	PreLineTracesEntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 	PreLineTracesEntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
+	PreLineTracesEntityQuery.AddTagRequirement<FMassTrackSoundTag>(EMassFragmentPresence::None);
 
 	PostLineTracesEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	PostLineTracesEntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
 	PostLineTracesEntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
 	PostLineTracesEntityQuery.AddRequirement<FMassMoveForwardCompleteSignalFragment>(EMassFragmentAccess::ReadWrite);
 	PostLineTracesEntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
+	PostLineTracesEntityQuery.AddTagRequirement<FMassTrackSoundTag>(EMassFragmentPresence::None);
 }
 
 void EnqueueClosestSoundToTraceQueue(TArray<FVector>& CloseSounds, TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, const FVector& EntityLocation, const bool bIsEntitySoldier, const FMassEntityHandle& Entity)
