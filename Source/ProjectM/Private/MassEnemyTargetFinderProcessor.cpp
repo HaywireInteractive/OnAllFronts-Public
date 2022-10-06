@@ -166,6 +166,7 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
     }
   }
 
+#if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		AsyncTask(ENamedThreads::GameThread, [&World, Location = ProjectileTraceCapsule.b, bDidAnyCapsulesCollide]()
@@ -173,6 +174,8 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
 		  ::DrawDebugSphere(&World, Location + FVector(0.f, 0.f, 300.f), 100.f, 10, bDidAnyCapsulesCollide ? FColor::Red : FColor::Green, false, 0.1f);
 		});
 	}
+#endif
+
 	return bDidAnyCapsulesCollide;
 }
 
@@ -183,6 +186,7 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	static constexpr float Radius = 20.f; // TODO: don't hard-code
   const bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
 
+#if WITH_MASSGAMEPLAY_DEBUG
 	// We can't use SphereTraceSingle's ability to draw trace because this function may run in a background thread which isn't allowed to draw. So we do it ourselves async.
 	if (DrawTrace)
 	{
@@ -193,6 +197,7 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 			DrawCapsule(Capsule, World, Color, false, 0.1f);
 		});
 	}
+#endif
 
   return !bFoundBlockingHit;
 }
@@ -296,6 +301,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 		}
 	}
 
+#if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		AsyncTask(ENamedThreads::GameThread, [SearchCenter, SearchExtent, World, NumCloseEntities = CloseEntities.Num(), NumPotentialTargetsNeedingSphereTraceEnqueued]()
@@ -304,6 +310,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 			DrawDebugString(World, SearchCenter, FString::Printf(TEXT("%d (%d)"), NumCloseEntities, NumPotentialTargetsNeedingSphereTraceEnqueued), nullptr, FColor::Green, 1.f);
 		});
 	}
+#endif
 }
 
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
@@ -324,6 +331,7 @@ FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_UseParallelForEachEn
 
 void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location, const FMassEntityHandle& Entity)
 {
+#if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		AsyncTask(ENamedThreads::GameThread, [World, Location]()
@@ -331,6 +339,7 @@ void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location, const F
 			::DrawDebugSphere(World, Location + FVector(0.f, 0.f, 300.f), 200.f, 10, FColor::Yellow, false, 0.1f);
 		});
 	}
+#endif
 }
 
 struct FProcessSphereTracesContext
@@ -371,8 +380,13 @@ private:
 	  ParallelFor(PotentialTargetsNeedingSphereTrace.Num(), [&](const int32 JobIndex)
 		{
 	    const FCapsule TraceCapsule(PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, 1.f);
+#if WITH_MASSGAMEPLAY_DEBUG
+			const bool bDrawTrace = UE::Mass::Debug::IsDebuggingEntity(PotentialTargetsNeedingSphereTrace[JobIndex].Entity);
+#else
+			constexpr bool bDrawTrace = false;
+#endif
 			const bool bAreEntitiesBlockingTarget = AreEntitiesBlockingTarget(TraceCapsule, PotentialTargetsNeedingSphereTrace[JobIndex].Entity, PotentialTargetsNeedingSphereTrace[JobIndex].TargetEntity, World, TargetGrid);
-			if (!bAreEntitiesBlockingTarget && IsTargetEntityVisibleViaSphereTrace(World, PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, UE::Mass::Debug::IsDebuggingEntity(PotentialTargetsNeedingSphereTrace[JobIndex].Entity)))
+			if (!bAreEntitiesBlockingTarget && IsTargetEntityVisibleViaSphereTrace(World, PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, bDrawTrace))
 			{
 				PotentialVisibleTargets.Enqueue(PotentialTargetsNeedingSphereTrace[JobIndex]);
 			}
@@ -427,6 +441,7 @@ struct FSelectBestTargetProcessEntityContext
 			TargetEntityFragment.VerticalAimOffset = GetVerticalAimOffset(TargetEntityLocation, bIsTargetEntitySoldier);
 			TargetFinderEntityQueue.Enqueue(Entity);
 
+#if WITH_MASSGAMEPLAY_DEBUG
 			if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 			{
 				AsyncTask(ENamedThreads::GameThread, [World = EntitySubsystem.GetWorld(), EntityLocation = EntityLocation, TargetEntityLocation]()
@@ -434,6 +449,7 @@ struct FSelectBestTargetProcessEntityContext
 					DrawDebugDirectionalArrow(World, EntityLocation, TargetEntityLocation, 10.f, FColor::Blue, false, 0.1f);
 				});
 			}
+#endif
 		}
 	}
 

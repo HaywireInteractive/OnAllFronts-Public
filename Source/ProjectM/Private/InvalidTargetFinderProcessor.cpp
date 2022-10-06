@@ -59,6 +59,7 @@ bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector
 
 	const float MaxRange = GetEntityRange(bIsEntitySoldier);
 
+#if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		AsyncTask(ENamedThreads::GameThread, [World = EntitySubsystem.GetWorld(), EntityLocation, TargetEntityLocation]()
@@ -66,6 +67,7 @@ bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector
 			DrawDebugDirectionalArrow(World, EntityLocation, TargetEntityLocation, 10.f, FColor::Yellow, false, 0.1f);
 		});
 	}
+#endif
 
 	return DistanceBetweenEntities > MaxRange;
 }
@@ -76,6 +78,7 @@ bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, cons
 
 	const bool Result = TestCapsuleCapsule(Capsule1, Capsule2);
 
+#if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		AsyncTask(ENamedThreads::GameThread, [Capsule1, Capsule2, &World, Result]()
@@ -85,6 +88,7 @@ bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, cons
 			DrawCapsule(Capsule2, World, Color, false, 0.1f);
 		});
 	}
+#endif
 
 	return Result;
 }
@@ -98,6 +102,7 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 	TArray<FMassTargetGridItem> CloseEntities;
 	TargetGrid.Query(QueryBounds, CloseEntities);
 
+#if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		AsyncTask(ENamedThreads::GameThread, [QueryBounds, World = EntitySubsystem.GetWorld()]()
@@ -107,6 +112,7 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 			DrawDebugBox(World, QueryCenter, QueryBounds.Max - QueryCenter + VerticalOffset, FColor::Blue, false, 0.1f);
 		});
 	}
+#endif
 
 	const bool& bIsTargetEntitySoldier = TargetEntityView.HasTag<FMassProjectileDamagableSoldierTag>();
 	const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, bIsTargetEntitySoldier, EntityTransform, TargetEntityLocation);

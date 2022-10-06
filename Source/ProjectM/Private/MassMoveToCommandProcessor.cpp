@@ -112,6 +112,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 		return false;
 	}
 
+#if WITH_MASSGAMEPLAY_DEBUG
 	if (UMassMoveToCommandProcessor_DrawPathResults || UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		int32 LineEndIndex = 1;
@@ -126,6 +127,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 			DrawDebugLine(NavSys->GetWorld(), NavPathPoint.Location, LineEndNavPathPoint.Location, FColor::Red, true);
 		}
 	}
+#endif
 
 	NavMeshMoveFragment.Path = Result.Path;
 	NavMeshMoveFragment.CurrentPathPointIndex = 0;

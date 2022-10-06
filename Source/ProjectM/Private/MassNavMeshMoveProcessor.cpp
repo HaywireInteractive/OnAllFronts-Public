@@ -54,33 +54,39 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward) : bAtNextMovePoint;
 	if (!bFinishedNextMovePoint)
 	{
+#if WITH_MASSGAMEPLAY_DEBUG
 		if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
 		{
 			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Red, false, 1.f); // Red = Not at next point yet
 		}
+#endif
 
 		// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
 		return;
 	}
 
+#if WITH_MASSGAMEPLAY_DEBUG
 	if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Green, false, 1.f); // Green = Reached next point
 	}
+#endif
 
 	NavMeshMoveFragment.CurrentPathPointIndex++;
 
-	bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentPathPointIndex >= Points.Num();
+	const bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentPathPointIndex >= Points.Num();
 	if (bFinishedNavMeshMove)
 	{
 		MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
 		MoveTargetFragmentToModify.DistanceToGoal = 0.f;
 		MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
 
+#if WITH_MASSGAMEPLAY_DEBUG
 		if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
 		{
 			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Blue, false, 1.f); // Blue = Reached last point
 		}
+#endif
 
 		Context.Defer().RemoveTag<FMassNeedsNavMeshMoveTag>(Entity);
 		return;
