@@ -4,9 +4,18 @@
 
 #define LOCTEXT_NAMESPACE "FProjectMModule"
 
+#if WITH_GAMEPLAY_DEBUGGER
+#include "GameplayDebugger.h"
+#include "GameplayDebuggerCategory_ProjectM.h"
+#endif // WITH_GAMEPLAY_DEBUGGER
+
 void FProjectMModule::StartupModule()
 {
-	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
+#if WITH_GAMEPLAY_DEBUGGER
+  IGameplayDebugger& GameplayDebuggerModule = IGameplayDebugger::Get();
+  GameplayDebuggerModule.RegisterCategory("ProjectM", IGameplayDebugger::FOnGetCategory::CreateStatic(&FGameplayDebuggerCategory_ProjectM::MakeInstance), EGameplayDebuggerCategoryState::EnabledInGameAndSimulate, 1);
+  GameplayDebuggerModule.NotifyCategoriesChanged();
+#endif
 }
 
 void FProjectMModule::ShutdownModule()

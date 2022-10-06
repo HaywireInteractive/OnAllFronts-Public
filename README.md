@@ -95,7 +95,10 @@ These ideas below would be explored in one of the phases above.
     1. If you want to use the [City Sample project](https://www.unrealengine.com/marketplace/en-US/product/city-sample) for developing in a large level, get the project from UE Marketplace and then create a project using that template.
     1. If you want to quickly develop in a smaller project, in UE create a new empty C++ project.
 1. If there is no .sln in the project folder, generate VS project from right clicking .uproject in project folder.
-1. Open .sln in VS if it isn't already open.
+1. Open .sln in Visual Studio if it isn't already open.
+1. Visual Studio > Tools > Options
+    1. Text Editor > C/C++ > Tabs > select Keep tabs
+    1. Text Editor > Advanced > uncheck "Use adaptive formatting"
 1. If project isn't open yet in UE, run the project from VS.
 1. Enable the required plugins in UE project if they are not already:
     1. Edit > Plugins

@@ -11,9 +11,9 @@ typedef THierarchicalHashGrid2D<2, 4> FSoundPerceptionHashGrid2D;	// 2 levels of
 
 struct FMassSoundPerceptionItemMetaData
 {
-	FMassSoundPerceptionItemMetaData(float InTimeLeftTilDestruction, const FSoundPerceptionHashGrid2D::FCellLocation InCellLocation, const FVector InSoundSource)
-		: TimeLeftTilDestruction(InTimeLeftTilDestruction), CellLocation(InCellLocation), SoundSource(InSoundSource) {}
-	float TimeLeftTilDestruction;
+	FMassSoundPerceptionItemMetaData(uint8 InTicksLeftTilDestruction, const FSoundPerceptionHashGrid2D::FCellLocation InCellLocation, const FVector InSoundSource)
+		: TicksLeftTilDestruction(InTicksLeftTilDestruction), CellLocation(InCellLocation), SoundSource(InSoundSource) {}
+	uint8 TicksLeftTilDestruction;
 	const FSoundPerceptionHashGrid2D::FCellLocation CellLocation;
 	const FVector SoundSource;
 };
@@ -39,4 +39,6 @@ protected:
 	FSoundPerceptionHashGrid2D SoundPerceptionGridForTeam2;
 	TMap<uint32, FMassSoundPerceptionItemMetaData> IdsToMetaDataForTeam1;
 	TMap<uint32, FMassSoundPerceptionItemMetaData> IdsToMetaDataForTeam2;
+
+	static constexpr int FramesUntilSoundPerceptionDestruction = 2; // We don't use 1 to avoid having to deal with ordering of various events in single game tick.
 };

@@ -12,7 +12,7 @@
 UMassAudioPerceptionProcessor::UMassAudioPerceptionProcessor()
 {
 	bAutoRegisterWithProcessingPhases = true;
-	ExecutionFlags = (int32)EProcessorExecutionFlags::All;
+	ExecutionFlags = static_cast<int32>(EProcessorExecutionFlags::All);
 	ProcessingPhase = EMassProcessingPhase::StartPhysics; // TODO: Find a better way to ensure this runs after UMassEnemyTargetFinderProcessor
 }
 
@@ -103,7 +103,6 @@ void DoLineTraces(TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, co
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces);
 
-	constexpr int32 MaxTracesPerFrame = 200;
 	TArray<FSoundTraceData> SoundTraces;
   {
 		TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces.BuildArray);
@@ -113,32 +112,19 @@ void DoLineTraces(TQueue<FSoundTraceData, EQueueMode::Mpsc>& SoundTraceQueue, co
       const bool bSuccess = SoundTraceQueue.Dequeue(SoundTraceData);
       check(bSuccess);
       SoundTraces.Add(SoundTraceData);
-			if (SoundTraces.Num() >= MaxTracesPerFrame)
-			{
-				break;
-			}
     }
   }
 
 	TQueue<FSoundTraceResult, EQueueMode::Mpsc> BestSoundLocations;
-
-	const uint64 CyclesStart = FPlatformTime::Cycles64();
 
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.ParallelFor);
 		ParallelFor(SoundTraces.Num(), [&](const int32 JobIndex)
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.ParallelForBody);
-			constexpr float BudgetTimeMs = 2.f;
 
 			const FSoundTraceData& SoundTrace = SoundTraces[JobIndex];
-			const double ElapsedMs = FGenericPlatformTime::ToMilliseconds64(FPlatformTime::Cycles64() - CyclesStart);
 
-			if (ElapsedMs >= BudgetTimeMs)
-			{
-				SoundTraceQueue.Enqueue(SoundTrace);
-				return;
-			}
 			bool bHasBlockingHit;
 			{
 				TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.DoLineTraces.LineTraceTestByChannel);
@@ -188,9 +174,11 @@ void UMassAudioPerceptionProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 		return;
 	}
 
-	{
+	TQueue<FSoundTraceData, EQueueMode::Mpsc> SoundTraceQueue;
+
+  {
 		TRACE_CPUPROFILER_EVENT_SCOPE(UMassAudioPerceptionProcessor.Execute.PreLineTracesEntityQuery.ParallelForEachEntityChunk);
-		PreLineTracesEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&SoundPerceptionSubsystem = SoundPerceptionSubsystem, &SoundTraceQueue = SoundTraceQueue](FMassExecutionContext& Context)
+		PreLineTracesEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&SoundPerceptionSubsystem = SoundPerceptionSubsystem, &SoundTraceQueue = SoundTraceQueue](const FMassExecutionContext& Context)
 		{
 			const int32 NumEntities = Context.GetNumEntities();
 

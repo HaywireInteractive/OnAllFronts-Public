@@ -13,7 +13,6 @@ struct FSoundTraceData
 	FSoundTraceData(const FMassEntityHandle& Entity, const FVector& TraceStart, const FVector& TraceEnd)
 		: Entity(Entity), TraceStart(TraceStart), TraceEnd(TraceEnd)
 	{
-
 	}
 	FMassEntityHandle Entity;
 	FVector TraceStart;
@@ -36,5 +35,4 @@ private:
 	FMassEntityQuery PreLineTracesEntityQuery;
 	FMassEntityQuery PostLineTracesEntityQuery;
 	TObjectPtr<UMassSoundPerceptionSubsystem> SoundPerceptionSubsystem;
-	TQueue<FSoundTraceData, EQueueMode::Mpsc> SoundTraceQueue;
 };

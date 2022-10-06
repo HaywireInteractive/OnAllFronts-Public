@@ -5,7 +5,6 @@
 #include <MassEnemyTargetFinderProcessor.h>
 
 static int32 GMassSoundPerceptionSubsystemCounter = 0;
-static constexpr float GSecondsTilSoundPerceptionDestruction = 2.f;
 static constexpr float GUMassSoundPerceptionSubsystem_GridCellSize = 100000.f; // TODO: value here may not be optimal for performance.
 
 UMassSoundPerceptionSubsystem::UMassSoundPerceptionSubsystem()
@@ -24,9 +23,9 @@ void UMassSoundPerceptionSubsystem::Tick(float DeltaTime)
 	TArray<uint32> ItemsToRemove;
 	for (const auto& Item : SoundPerceptionGridForTeam1.GetItems())
 	{
-		float& TimeLeftTilDestruction = IdsToMetaDataForTeam1[Item.ID].TimeLeftTilDestruction;
-		TimeLeftTilDestruction -= DeltaTime;
-		if (TimeLeftTilDestruction <= 0.f)
+		uint8& TicksLeftTilDestruction = IdsToMetaDataForTeam1[Item.ID].TicksLeftTilDestruction;
+		TicksLeftTilDestruction--;
+		if (TicksLeftTilDestruction <= 0)
 		{
 			ItemsToRemove.Add(Item.ID);
 		}
@@ -41,9 +40,9 @@ void UMassSoundPerceptionSubsystem::Tick(float DeltaTime)
 
 	for (const auto& Item : SoundPerceptionGridForTeam2.GetItems())
 	{
-		float& TimeLeftTilDestruction = IdsToMetaDataForTeam2[Item.ID].TimeLeftTilDestruction;
-		TimeLeftTilDestruction -= DeltaTime;
-		if (TimeLeftTilDestruction <= 0.f)
+		uint8& TicksLeftTilDestruction = IdsToMetaDataForTeam2[Item.ID].TicksLeftTilDestruction;
+		TicksLeftTilDestruction--;
+		if (TicksLeftTilDestruction <= 0)
 		{
 			ItemsToRemove.Add(Item.ID);
 		}
@@ -67,13 +66,13 @@ void UMassSoundPerceptionSubsystem::AddSoundPerception(const FVector Location, c
 	const FSoundPerceptionHashGrid2D::FCellLocation& CellLocation = SoundPerceptionGrid.Add(ItemID, Bounds);
 
 
-  const FMassSoundPerceptionItemMetaData ItemMetaData(GSecondsTilSoundPerceptionDestruction, CellLocation, Location);
+  const FMassSoundPerceptionItemMetaData ItemMetaData(FramesUntilSoundPerceptionDestruction, CellLocation, Location);
 	auto& IdsToMetaData = bIsSourceFromTeam1 ? IdsToMetaDataForTeam1 : IdsToMetaDataForTeam2;
 	IdsToMetaData.Add(ItemID, ItemMetaData);
 
 	if (UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception && !SkipDebugDraw)
 	{
-		::DrawDebugSphere(GetWorld(), Location, 200.f, 10, bIsSourceFromTeam1 ? FColor::Red : FColor::Blue, false, GSecondsTilSoundPerceptionDestruction);
+		::DrawDebugSphere(GetWorld(), Location, 200.f, 10, bIsSourceFromTeam1 ? FColor::Red : FColor::Blue, false, 0.1f);
 	}
 }
 
@@ -93,7 +92,7 @@ void UMassSoundPerceptionSubsystem::AddSoundPerception(const FVector Location)
 
 	if (UMassSoundPerceptionSubsystem_DrawOnAddSoundPerception)
 	{
-		::DrawDebugSphere(GetWorld(), Location, 200.f, 10, FColor::White, false, GSecondsTilSoundPerceptionDestruction);
+		::DrawDebugSphere(GetWorld(), Location, 200.f, 10, FColor::White, false, 0.1f);
 	}
 }
 
