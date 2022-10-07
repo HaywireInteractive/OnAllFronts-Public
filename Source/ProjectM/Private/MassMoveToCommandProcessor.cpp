@@ -4,13 +4,11 @@
 #include "MassMoveToCommandProcessor.h"
 
 #include "MassEnemyTargetFinderProcessor.h"
-#include "MassTrackTargetProcessor.h"
 #include "MassMoveToCommandSubsystem.h"
 #include "MassCommonFragments.h"
 #include "NavigationSystem.h"
 #include <MassNavMeshMoveProcessor.h>
 #include <MilitaryStructureSubsystem.h>
-#include "DrawDebugHelpers.h"
 
 //----------------------------------------------------------------------//
 //  UMassCommandableTrait
@@ -36,7 +34,7 @@ void UMassCommandableTrait::BuildTemplate(FMassEntityTemplateBuildContext& Build
 UMassMoveToCommandProcessor::UMassMoveToCommandProcessor()
 {
 	bAutoRegisterWithProcessingPhases = true;
-	ExecutionFlags = (int32)EProcessorExecutionFlags::All;
+	ExecutionFlags = static_cast<int32>(EProcessorExecutionFlags::All);
 }
 
 void UMassMoveToCommandProcessor::ConfigureQueries()
@@ -69,10 +67,7 @@ bool IsEntityCommandableByUnit(const FMassEntityHandle& Entity, const UMilitaryU
 	return EntityUnit->IsChildOfUnit(ParentUnit);
 }
 
-bool UMassMoveToCommandProcessor_DrawPathResults = false;
-FAutoConsoleVariableRef CVarUMassMoveToCommandProcessor_DrawPathResults(TEXT("pm.UMassMoveToCommandProcessor_DrawPathResults"), UMassMoveToCommandProcessor_DrawPathResults, TEXT("UMassMoveToCommandProcessor: Draw NavMesh Path Results"));
-
-bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& NavMeshRadius)
+bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, const FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& NavMeshRadius)
 {
 	if (TeamMemberFragment.IsOnTeam1 != IsLastMoveToCommandForTeam1)
 	{
@@ -84,7 +79,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 		return false;
 	}
 
-	static const float AgentHeight = 200.f; // TODO: Don't hardcode
+	static constexpr float AgentHeight = 200.f; // TODO: Don't hard-code
 	const ANavigationData* NavData = NavSys->GetNavDataForProps(FNavAgentProperties(NavMeshRadius, AgentHeight), EntityLocation);
 
 	if (!NavData)
@@ -103,31 +98,14 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 		return false;
 	}
 
-	FPathFindingQuery Query(Processor, *NavData, EntityLocation, ClosestValidLocation.Location);
-	FPathFindingResult Result = NavSys->FindPathSync(Query);
+	const FPathFindingQuery Query(Processor, *NavData, EntityLocation, ClosestValidLocation.Location);
+	const FPathFindingResult Result = NavSys->FindPathSync(Query);
 
 	if (!Result.IsSuccessful())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find path to target. NavMeshRadius = %.0f, Start = %s, End = %s"), NavMeshRadius, *EntityLocation.ToString(), *ClosestValidLocation.Location.ToString());
 		return false;
 	}
-
-#if WITH_MASSGAMEPLAY_DEBUG
-	if (UMassMoveToCommandProcessor_DrawPathResults || UE::Mass::Debug::IsDebuggingEntity(Entity))
-	{
-		int32 LineEndIndex = 1;
-		for (const FNavPathPoint& NavPathPoint : Result.Path.Get()->GetPathPoints())
-		{
-			DrawDebugPoint(NavSys->GetWorld(), NavPathPoint.Location, 10.f, FColor::Red, true);
-			if (LineEndIndex >= Result.Path.Get()->GetPathPoints().Num())
-			{
-				break;
-			}
-			const auto LineEndNavPathPoint = Result.Path.Get()->GetPathPoints()[LineEndIndex++];
-			DrawDebugLine(NavSys->GetWorld(), NavPathPoint.Location, LineEndNavPathPoint.Location, FColor::Red, true);
-		}
-	}
-#endif
 
 	NavMeshMoveFragment.Path = Result.Path;
 	NavMeshMoveFragment.CurrentPathPointIndex = 0;

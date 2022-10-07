@@ -13,7 +13,7 @@
 UMassNavMeshMoveProcessor::UMassNavMeshMoveProcessor()
 {
 	bAutoRegisterWithProcessingPhases = true;
-	ExecutionFlags = (int32)EProcessorExecutionFlags::All;
+	ExecutionFlags = static_cast<int32>(EProcessorExecutionFlags::All);
 }
 
 void UMassNavMeshMoveProcessor::ConfigureQueries()
@@ -52,25 +52,32 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	MoveTargetFragmentToModify.DistanceToGoal = DistanceFromNextMovePoint;
 	const bool bAtNextMovePoint = DistanceFromNextMovePoint < AgentRadius;
 	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward) : bAtNextMovePoint;
-	if (!bFinishedNextMovePoint)
-	{
-#if WITH_MASSGAMEPLAY_DEBUG
-		if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
-		{
-			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Red, false, 1.f); // Red = Not at next point yet
-		}
-#endif
-
-		// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
-		return;
-	}
 
 #if WITH_MASSGAMEPLAY_DEBUG
 	if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
-		DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Green, false, 1.f); // Green = Reached next point
+		int32 LineEndIndex = 1;
+		int32 PointIndex = 0;
+		for (const FNavPathPoint& NavPathPoint : Points)
+		{
+			// Red = point not yet reached. Green = point already reached.
+			DrawDebugPoint(World, NavPathPoint.Location, 10.f, PointIndex < NavMeshMoveFragment.CurrentPathPointIndex ? FColor::Green : FColor::Red, true);
+			if (LineEndIndex >= Points.Num())
+			{
+				break;
+			}
+			PointIndex++;
+			const auto LineEndNavPathPoint = Points[LineEndIndex++];
+			DrawDebugLine(World, NavPathPoint.Location, LineEndNavPathPoint.Location, FColor::Red, false, 0.1f);
+		}
 	}
 #endif
+
+	if (!bFinishedNextMovePoint)
+	{
+		// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
+		return;
+	}
 
 	NavMeshMoveFragment.CurrentPathPointIndex++;
 
