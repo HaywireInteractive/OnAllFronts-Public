@@ -2,17 +2,11 @@
 
 ## Latest Demo
 
-1,000 vs 1,000 soldier city battle:
+2,000 soldier and tank city battle:
 
-[![1,000 vs 1,000 soldier city battle](https://img.youtube.com/vi/3JT4XytxOiQ/0.jpg)](https://www.youtube.com/watch?v=3JT4XytxOiQ)
+[![2,000 soldier and tank city battle](https://img.youtube.com/vi/NDfSpPRgOHg/0.jpg)](https://youtu.be/NDfSpPRgOHg)
 
 https://youtu.be/3JT4XytxOiQ
-
-Tanks...with a lot of bugs:
-
-[![Tanks...with a lot of bugs](https://img.youtube.com/vi/DS4ORM3VnDk/0.jpg)](https://www.youtube.com/watch?v=DS4ORM3VnDk)
-
-https://youtu.be/DS4ORM3VnDk
 
 ## What is this?
 
