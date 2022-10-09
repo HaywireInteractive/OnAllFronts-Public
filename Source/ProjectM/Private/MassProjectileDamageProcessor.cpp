@@ -371,6 +371,10 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& Project
 	{
 		for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : CloseEntities)
 		{
+			if (!EntitySubsystem.IsEntityValid(OtherEntity.Entity))
+			{
+				continue;
+			}
 			FMassEntityView OtherEntityEntityView(EntitySubsystem, OtherEntity.Entity);
 			if (CollidedEntity.IsValid() && CollidedEntity == OtherEntity.Entity)
 			{

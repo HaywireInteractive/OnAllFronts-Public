@@ -47,6 +47,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Mass")
 	FMassEntityConfig SoldierEntityConfig;
 
+	UFUNCTION(BlueprintCallable)
+	void SpawnProjectile(const FTransform SpawnTransform) const;
+
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 

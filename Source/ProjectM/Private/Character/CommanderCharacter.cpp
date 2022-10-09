@@ -235,8 +235,11 @@ bool ACommanderCharacter::IsPlayerOnTeam1() const
 
 FMassEntityHandle ACommanderCharacter::GetMassEntityHandle() const
 {
-	UMassAgentComponent* AgentComponent = Cast<UMassAgentComponent>(GetComponentByClass(UMassAgentComponent::StaticClass()));
-	check(AgentComponent);
+	const UMassAgentComponent* AgentComponent = Cast<UMassAgentComponent>(GetComponentByClass(UMassAgentComponent::StaticClass()));
+	if (!AgentComponent)
+	{
+		return FMassEntityHandle();
+	}
 
 	const FMassEntityHandle& AgentEntityHandle = AgentComponent->GetEntityHandle();
 	check(AgentEntityHandle.IsValid());
@@ -255,4 +258,11 @@ bool ACommanderCharacter::IsCommander() const
 	}
 
 	return MyMilitaryUnit->bIsCommander;
+}
+
+void ACommanderCharacter::SpawnProjectile(const FTransform SpawnTransform) const
+{
+	const UWorld* World = GetWorld();
+	const FVector InitialVelocity = SpawnTransform.GetRotation().Vector() * GetProjectileInitialXYVelocityMagnitude(true);
+	::SpawnProjectile(World, SpawnTransform.GetLocation(), SpawnTransform.GetRotation(), InitialVelocity, ProjectileEntityConfig, IsPlayerOnTeam1());
 }
