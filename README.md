@@ -122,8 +122,15 @@ These ideas below would be explored in one of the phases above.
     1. Engine - Input > Bindings > Action Mappings
         1. Add "MoveToCommand", 1 key
         1. Add "Spectate", F key
-        1. Add "Respawn", R key
+        1. Add "Respawn", K key
         1. Add "Map", M key
+		1. Add "Shoot", Left Mouse Button
+		1. Add "Aim", Right Mouse Button
+		1. Add "Crouch", Left Ctrl key
+		1. Add "Sprint", Left Shift key
+		1. Add "Reload", R key
+		1. Add "Climb Up", T key
+		1. Add "Drop", G key
     1. Engine - Mass > Search for "MassUpdateISMProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassUpdateISMProcessor) > Auto Register with Processing Phases > uncheck. Note this will already be unchecked in the City Sample project.
     1. Engine - Navigation System > Agents > Supported Agents > Add 2 elements:
         1. Name: Soldier, Nav Agent Radius: 50.0, Nav Agent Height: 200.0
