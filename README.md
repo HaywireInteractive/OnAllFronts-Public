@@ -36,13 +36,17 @@ Human players will never spawn soldiers onto the battlefield. Instead they will 
 
 Currently this is a hobby project, so it's unclear how far it'll go. Therefore, the project is broken into multiple phases. For current status, see [Project Tracker](https://github.com/users/LeroyTechnologies/projects/1).
 
-## Phase 1: Single-player
+## Phase 1: Early Access
 
-Same as multiplayer below, except only one human-controller soldier.
+- Multiplayer FPS game with per-server battles
+- Human and AI soldiers only (no vehicles)
+- Single map
 
-## Phase 2: Multiplayer Per-Server Battle
+## Phase 2: Release
 
-Maximum number of players in server will be limited by Unreal Engine's limits.
+- Ground vehicles
+- Commander assets (e.g. artillery)
+- More maps
 
 ## Phase 3: Multiplayer MMO
 
@@ -110,27 +114,28 @@ These ideas below would be explored in one of the phases above.
     1. In VS Solution Explorer, right click the project under Games folder > Properties.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
 1. Rerun project from VS.
+1. At this point you should confirm that the ProjectM folder shows up in your Content Drawer under Plugins. If you don't see Plugins, click Settings button on top right of Content Drawer > Show Plugin Content.
 1. Add Content Packs from Content Drawer > Add > Add Feature or Content Pack > Blueprint
     1. First Person > Add to project.
     1. Third Person > Add to project.
 1. Add Unreal Engine Marketplace free content to project. Note that some of this content hasn't been migrated to UE5 yet, so when you try to add it from the Epic Games Launcher, check "Show all projects" after clicking "Add to Project". Then in the "Select Version" dropdown select the newest version in the list.
-    1. Military Weapons Silver: https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver
+    1. [Military Weapons Silver](https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver)
         1. Then open M_WeaponMaster_01 > Used with Instanced Static Meshes > Apply > Save
-    1. M1A1 Abrams Tank: https://www.unrealengine.com/marketplace/en-US/product/m1a1-abrams-tank
-    1. Realistic Starter VFX Pack Vol 2: https://www.unrealengine.com/marketplace/en-US/product/realistic-starter-vfx-pack-vol
+    1. [M1A1 Abrams Tank](https://www.unrealengine.com/marketplace/en-US/product/m1a1-abrams-tank)
+    1. [Realistic Starter VFX Pack Vol 2](https://www.unrealengine.com/marketplace/en-US/product/realistic-starter-vfx-pack-vol)
+    1. [Animation Starter Pack](https://www.unrealengine.com/marketplace/en-US/product/animation-starter-pack)
 1. Edit > Project Settings
     1. Engine - Input > Bindings > Action Mappings
         1. Add "MoveToCommand", 1 key
         1. Add "Spectate", F key
         1. Add "Respawn", K key
         1. Add "Map", M key
-		1. Add "Shoot", Left Mouse Button
-		1. Add "Aim", Right Mouse Button
-		1. Add "Crouch", Left Ctrl key
-		1. Add "Sprint", Left Shift key
-		1. Add "Reload", R key
-		1. Add "Climb Up", T key
-		1. Add "Drop", G key
+        1. Add "Shoot", Left Mouse Button
+        1. Add "Aim", Right Mouse Button
+        1. Add "Crouch", Left Ctrl key
+        1. Add "Sprint", Left Shift key
+        1. Add "Reload", R key
+        1. Add "Prone", Z key
     1. Engine - Mass > Search for "MassUpdateISMProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassUpdateISMProcessor) > Auto Register with Processing Phases > uncheck. Note this will already be unchecked in the City Sample project.
     1. Engine - Navigation System > Agents > Supported Agents > Add 2 elements:
         1. Name: Soldier, Nav Agent Radius: 50.0, Nav Agent Height: 200.0
