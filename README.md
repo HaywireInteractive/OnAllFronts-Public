@@ -36,29 +36,33 @@ Human players will never spawn soldiers onto the battlefield. Instead they will 
 
 Currently this is a hobby project, so it's unclear how far it'll go. Therefore, the project is broken into multiple phases. For current status, see [Project Tracker](https://github.com/users/LeroyTechnologies/projects/1).
 
-## Phase 1: Early Access
+## Phase 1: Demo
+- Single player: One human player and thousands of AI soldiers (no vehicles)
+- Single map
+
+## Phase 2: Early Access
 
 - Multiplayer FPS game with per-server battles
 - Human and AI soldiers only (no vehicles)
 - Single map
 
-## Phase 2: Release
+## Phase 3: Release
 
 - Ground vehicles
 - Commander assets (e.g. artillery)
 - More maps
 
-## Phase 3: Multiplayer MMO
+## Phase 4: Multiplayer MMO
 
 All players in the game will be in a single battle at a time, across multiple servers.
 
 This phase is split into two sub-phases below.
 
-### Phase 3A: Server switching between zones
+### Phase 4A: Server switching between zones
 
 The map will be split up into zones. When a player reaches the border between zones, they load into a different server that manages that area of the map.
 
-### Phase 3B: Server meshing across zones
+### Phase 4B: Server meshing across zones
 
 Seamless switching between servers and players at the borders of servers will talk to all nearby servers to have a seamless experience across zones.
 
