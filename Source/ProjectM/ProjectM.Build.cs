@@ -13,7 +13,9 @@ public class ProjectM : ModuleRules
 			"StateTreeModule",
 			"StructUtils",
 			"UMG",
-		});
+            "MotionWarping",
+            "AnimToTexture",
+        });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
 			"MassAIBehavior",

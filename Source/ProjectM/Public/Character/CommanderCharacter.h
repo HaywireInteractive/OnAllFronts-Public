@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntityTraitBase.h"
+#include "AnimToTextureDataAsset.h"
+
 #include "CommanderCharacter.generated.h"
 
 class UMassMoveToCommandSubsystem;
@@ -76,4 +78,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	bool IsCommander() const;
+
+	UPROPERTY(EditAnywhere, Category = "Mass")
+	TObjectPtr<UAnimToTextureDataAsset> AnimToTextureDataAsset;
 };

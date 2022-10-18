@@ -109,6 +109,8 @@ These ideas below would be explored in one of the phases above.
     1. If `Plugins` folder does not exist, `mkdir Plugins`.
     1. `cd Plugins`
     1. `git clone https://github.com/LeroyTechnologies/ProjectM.git`
+	1. If in City Sample: `rmdir -recurse AnimToTexture`
+	1. `git clone --branch projectm https://github.com/LeroyTechnologies/AnimToTexture.git`
 1. Right click the .uproject file again and re-generate the solution to get the new files from the Plugins folder to show in VS.
 1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing argument to editor on launch:
     1. In VS Solution Explorer, right click the project under Games folder > Properties.
@@ -136,7 +138,9 @@ These ideas below would be explored in one of the phases above.
         1. Add "Sprint", Left Shift key
         1. Add "Reload", R key
         1. Add "Prone", Z key
-    1. Engine - Mass > Search for "MassUpdateISMProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassUpdateISMProcessor) > Auto Register with Processing Phases > uncheck. Note this will already be unchecked in the City Sample project.
+    1. Engine - Mass
+		1. Search for "MassUpdateISMProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassUpdateISMProcessor) > Auto Register with Processing Phases > uncheck. Note this will already be unchecked in the City Sample project.
+		1. Search for "MassGenericUpdateISMVertexAnimationProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassGenericUpdateISMVertexAnimationProcessor) > Auto Register with Processing Phases > check
     1. Engine - Navigation System > Agents > Supported Agents > Add 2 elements:
         1. Name: Soldier, Nav Agent Radius: 50.0, Nav Agent Height: 200.0
         1. Name: Tank, Nav Agent Radius: 500.0, Nav Agent Height: 200.0
