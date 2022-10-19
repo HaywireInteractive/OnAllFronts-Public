@@ -18,6 +18,7 @@ public:
   static TSharedRef<FGameplayDebuggerCategory> MakeInstance();
 
 protected:
+	void DrawTargetEntityLocations(const TArray<FVector>& TargetEntityLocations, const FColor& Color, const FVector& EntityLocation);
 };
 
 #endif // WITH_GAMEPLAY_DEBUGGER

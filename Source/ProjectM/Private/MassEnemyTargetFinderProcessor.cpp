@@ -167,11 +167,11 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
   }
 
 #if WITH_MASSGAMEPLAY_DEBUG
-	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
+	if (UE::Mass::Debug::IsDebuggingEntity(Entity) && bDidAnyCapsulesCollide)
 	{
-		AsyncTask(ENamedThreads::GameThread, [&World, Location = ProjectileTraceCapsule.b, bDidAnyCapsulesCollide]()
+		AsyncTask(ENamedThreads::GameThread, [&World, Location = ProjectileTraceCapsule.b]()
 		{
-		  ::DrawDebugSphere(&World, Location + FVector(0.f, 0.f, 300.f), 100.f, 10, bDidAnyCapsulesCollide ? FColor::Red : FColor::Green, false, 0.1f);
+			UMassEnemyTargetFinderProcessor_DebugEntityData.TargetEntitiesCulledDueToOtherEntityBlocking.Add(Location);
 		});
 	}
 #endif
@@ -261,6 +261,12 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 
 	int32 NumPotentialTargetsNeedingSphereTraceEnqueued = 0;
 
+#if WITH_MASSGAMEPLAY_DEBUG
+	TArray<FVector> TargetEntitiesCulledDueToSameTeam;
+	TArray<FVector> TargetEntitiesCulledDueToImpenetrable;
+	TArray<FVector> TargetEntitiesCulledDueToOutOfRange;
+#endif
+
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces.ProcessCloseEntities);
 
@@ -280,16 +286,35 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 
 			// Skip same team.
 			if (IsEntityOnTeam1 == OtherEntity.bIsOnTeam1) {
+#if WITH_MASSGAMEPLAY_DEBUG
+				if (UE::Mass::Debug::IsDebuggingEntity(Entity))
+				{
+					TargetEntitiesCulledDueToSameTeam.Add(OtherEntity.Location);
+				}
+#endif
+
 				continue;
 			}
 
 			if (!CanEntityDamageTargetEntity(TargetEntityFragment.TargetMinCaliberForDamage, OtherEntity.MinCaliberForDamage))
 			{
+#if WITH_MASSGAMEPLAY_DEBUG
+				if (UE::Mass::Debug::IsDebuggingEntity(Entity))
+				{
+					TargetEntitiesCulledDueToImpenetrable.Add(OtherEntity.Location);
+				}
+#endif
 				continue;
 			}
 
 			if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntity.Location))
 			{
+#if WITH_MASSGAMEPLAY_DEBUG
+				if (UE::Mass::Debug::IsDebuggingEntity(Entity))
+				{
+					TargetEntitiesCulledDueToOutOfRange.Add(OtherEntity.Location);
+				}
+#endif
 				continue;
 			}
 
@@ -304,10 +329,17 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 #if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
-		AsyncTask(ENamedThreads::GameThread, [SearchCenter, SearchExtent, World, NumCloseEntities = CloseEntities.Num(), NumPotentialTargetsNeedingSphereTraceEnqueued]()
+		AsyncTask(ENamedThreads::GameThread, [EntityLocation, SearchCenter, SearchExtent, World, NumCloseEntities = CloseEntities.Num(), NumPotentialTargetsNeedingSphereTraceEnqueued, TargetEntitiesCulledDueToSameTeam, TargetEntitiesCulledDueToImpenetrable, TargetEntitiesCulledDueToOutOfRange]()
 		{
-			DrawDebugBox(World, SearchCenter, SearchExtent, FColor::Green, false, 1.f);
-			DrawDebugString(World, SearchCenter, FString::Printf(TEXT("%d (%d)"), NumCloseEntities, NumPotentialTargetsNeedingSphereTraceEnqueued), nullptr, FColor::Green, 1.f);
+			UMassEnemyTargetFinderProcessor_DebugEntityData.IsEntitySearching = true;
+			UMassEnemyTargetFinderProcessor_DebugEntityData.EntityLocation = EntityLocation;
+			UMassEnemyTargetFinderProcessor_DebugEntityData.SearchCenter = SearchCenter;
+			UMassEnemyTargetFinderProcessor_DebugEntityData.SearchExtent = SearchExtent;
+			UMassEnemyTargetFinderProcessor_DebugEntityData.NumCloseEntities = NumCloseEntities;
+			UMassEnemyTargetFinderProcessor_DebugEntityData.NumPotentialTargetsNeedingSphereTrace = NumPotentialTargetsNeedingSphereTraceEnqueued;
+			UMassEnemyTargetFinderProcessor_DebugEntityData.TargetEntitiesCulledDueToSameTeam.Append(TargetEntitiesCulledDueToSameTeam);
+			UMassEnemyTargetFinderProcessor_DebugEntityData.TargetEntitiesCulledDueToImpenetrable.Append(TargetEntitiesCulledDueToImpenetrable);
+			UMassEnemyTargetFinderProcessor_DebugEntityData.TargetEntitiesCulledDueToOutOfRange.Append(TargetEntitiesCulledDueToOutOfRange);
 		});
 	}
 #endif
@@ -329,18 +361,8 @@ void ProcessEntityForVisualTarget(FMassEntityHandle Entity, const UMassEntitySub
 bool UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk = true;
 FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk(TEXT("pm.UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk"), UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassEnemyTargetFinderProcessor to improve performance"));
 
-void DrawEntitySearchingIfNeeded(UWorld* World, const FVector& Location, const FMassEntityHandle& Entity)
-{
-#if WITH_MASSGAMEPLAY_DEBUG
-	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
-	{
-		AsyncTask(ENamedThreads::GameThread, [World, Location]()
-		{
-			::DrawDebugSphere(World, Location + FVector(0.f, 0.f, 300.f), 200.f, 10, FColor::Yellow, false, 0.1f);
-		});
-	}
-#endif
-}
+bool UMassEnemyTargetFinderProcessor_SkipUpdatingTargetEntity = false;
+FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_SkipUpdatingTargetEntity(TEXT("pm.UMassEnemyTargetFinderProcessor_SkipUpdatingTargetEntity"), UMassEnemyTargetFinderProcessor_SkipUpdatingTargetEntity, TEXT("UMassEnemyTargetFinderProcessor_SkipUpdatingTargetEntity"));
 
 struct FProcessSphereTracesContext
 {
@@ -380,15 +402,25 @@ private:
 	  ParallelFor(PotentialTargetsNeedingSphereTrace.Num(), [&](const int32 JobIndex)
 		{
 	    const FCapsule TraceCapsule(PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, 1.f);
-#if WITH_MASSGAMEPLAY_DEBUG
-			const bool bDrawTrace = UE::Mass::Debug::IsDebuggingEntity(PotentialTargetsNeedingSphereTrace[JobIndex].Entity);
-#else
-			constexpr bool bDrawTrace = false;
-#endif
 			const bool bAreEntitiesBlockingTarget = AreEntitiesBlockingTarget(TraceCapsule, PotentialTargetsNeedingSphereTrace[JobIndex].Entity, PotentialTargetsNeedingSphereTrace[JobIndex].TargetEntity, World, TargetGrid);
-			if (!bAreEntitiesBlockingTarget && IsTargetEntityVisibleViaSphereTrace(World, PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, bDrawTrace))
+			if (!bAreEntitiesBlockingTarget)
 			{
-				PotentialVisibleTargets.Enqueue(PotentialTargetsNeedingSphereTrace[JobIndex]);
+				if (IsTargetEntityVisibleViaSphereTrace(World, PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd))
+				{
+					PotentialVisibleTargets.Enqueue(PotentialTargetsNeedingSphereTrace[JobIndex]);
+				}
+#if WITH_MASSGAMEPLAY_DEBUG
+				else
+				{
+					if (UE::Mass::Debug::IsDebuggingEntity(PotentialTargetsNeedingSphereTrace[JobIndex].Entity))
+					{
+						AsyncTask(ENamedThreads::GameThread, [TargetEntityLocation = PotentialTargetsNeedingSphereTrace[JobIndex].Location]()
+						{
+							UMassEnemyTargetFinderProcessor_DebugEntityData.TargetEntitiesCulledDueToNoLineOfSight.Add(TargetEntityLocation);
+						});
+					}
+				}
+#endif
 			}
 		});
   }
@@ -437,16 +469,20 @@ struct FSelectBestTargetProcessEntityContext
 		bool bIsTargetEntitySoldier;
 		if (SelectBestTarget(PotentialTargetsByCaliber, TargetEntity, TargetEntityLocation, bIsTargetEntitySoldier))
 		{
-			TargetEntityFragment.Entity = TargetEntity;
-			TargetEntityFragment.VerticalAimOffset = GetVerticalAimOffset(TargetEntityLocation, bIsTargetEntitySoldier);
-			TargetFinderEntityQueue.Enqueue(Entity);
+			if (!UMassEnemyTargetFinderProcessor_SkipUpdatingTargetEntity)
+			{
+				TargetEntityFragment.Entity = TargetEntity;
+				TargetEntityFragment.VerticalAimOffset = GetVerticalAimOffset(TargetEntityLocation, bIsTargetEntitySoldier);
+				TargetFinderEntityQueue.Enqueue(Entity);
+			}
 
 #if WITH_MASSGAMEPLAY_DEBUG
 			if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 			{
 				AsyncTask(ENamedThreads::GameThread, [World = EntitySubsystem.GetWorld(), EntityLocation = EntityLocation, TargetEntityLocation]()
 				{
-					DrawDebugDirectionalArrow(World, EntityLocation, TargetEntityLocation, 10.f, FColor::Blue, false, 0.1f);
+					UMassEnemyTargetFinderProcessor_DebugEntityData.TargetEntityLocation = TargetEntityLocation;
+					UMassEnemyTargetFinderProcessor_DebugEntityData.HasTargetEntity = true;
 				});
 			}
 #endif
@@ -564,6 +600,10 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		return;
 	}
 
+#if WITH_MASSGAMEPLAY_DEBUG
+	UMassEnemyTargetFinderProcessor_DebugEntityData.Reset();
+#endif
+
 	TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc> PotentialTargetsNeedingSphereTrace;
 	const FTargetHashGrid2D& TargetGrid = TargetFinderSubsystem->GetTargetGrid();
 
@@ -582,7 +622,6 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 			const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
 			const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
 			ProcessEntityForVisualTarget(Entity, EntitySubsystem, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, TargetGrid, bIsEntitySoldier, PotentialTargetsNeedingSphereTrace);
-			DrawEntitySearchingIfNeeded(EntitySubsystem.GetWorld(), LocationList[EntityIndex].GetTransform().GetLocation(), Context.GetEntity(EntityIndex));
 		}
 	};
 

@@ -75,22 +75,7 @@ bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector
 bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, const FMassEntityHandle& Entity, const UWorld& World)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(DidCapsulesCollide);
-
-	const bool Result = TestCapsuleCapsule(Capsule1, Capsule2);
-
-#if WITH_MASSGAMEPLAY_DEBUG
-	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
-	{
-		AsyncTask(ENamedThreads::GameThread, [Capsule1, Capsule2, &World, Result]()
-		{
-			const FLinearColor& Color = Result ? FLinearColor::Red : FLinearColor::Green;
-			DrawCapsule(Capsule1, World, Color, false, 0.1f);
-			DrawCapsule(Capsule2, World, Color, false, 0.1f);
-		});
-	}
-#endif
-
-	return Result;
+	return TestCapsuleCapsule(Capsule1, Capsule2);
 }
 
 bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const FTargetHashGrid2D& TargetGrid, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const bool bIsEntitySoldier, const float TargetMinCaliberForDamage, const FMassEntityView& TargetEntityView, const FTransform& EntityTransform)

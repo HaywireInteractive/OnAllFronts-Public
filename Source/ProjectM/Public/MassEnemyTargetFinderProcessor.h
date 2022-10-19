@@ -25,7 +25,33 @@ bool CanEntityDamageTargetEntity(const float TargetMinCaliberForDamage, const fl
 FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bool bIsTargetEntitySoldier, const FTransform& EntityTransform, const FVector& TargetEntityLocation);
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier);
 float GetEntityRange(const bool bIsEntitySoldier);
-bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation, const bool DrawTrace);
+bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& StartLocation, const FVector& EndLocation, const bool DrawTrace = false);
+
+#if WITH_MASSGAMEPLAY_DEBUG
+struct FDebugEntityData
+{
+	FVector SearchCenter = FVector::ZeroVector;
+	FVector SearchExtent = FVector::ZeroVector;
+	FVector EntityLocation = FVector::ZeroVector;
+	FVector TargetEntityLocation = FVector::ZeroVector;
+	int32 NumCloseEntities = 0;
+	int32 NumPotentialTargetsNeedingSphereTrace = 0;
+	bool IsEntitySearching = true;
+	bool HasTargetEntity = false;
+	TArray<FVector> TargetEntitiesCulledDueToOtherEntityBlocking;
+	TArray<FVector> TargetEntitiesCulledDueToSameTeam;
+	TArray<FVector> TargetEntitiesCulledDueToImpenetrable;
+	TArray<FVector> TargetEntitiesCulledDueToOutOfRange;
+	TArray<FVector> TargetEntitiesCulledDueToNoLineOfSight;
+
+	void Reset()
+	{
+		*this = FDebugEntityData();
+	}
+};
+
+inline FDebugEntityData UMassEnemyTargetFinderProcessor_DebugEntityData;
+#endif
 
 USTRUCT()
 struct PROJECTM_API FTargetEntityFragment : public FMassFragment
