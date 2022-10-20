@@ -8,8 +8,8 @@
 
 struct FMassTargetGridItem
 {
-	FMassTargetGridItem(FMassEntityHandle InEntity, bool bInIsOnTeam1, FVector InLocation, float InMinCaliberForDamage, FCapsule InCapsule, bool bInIsSoldier) 
-		: Entity(InEntity), bIsOnTeam1(bInIsOnTeam1), Location(InLocation), MinCaliberForDamage(InMinCaliberForDamage), Capsule(InCapsule), bIsSoldier(bInIsSoldier)
+	FMassTargetGridItem(FMassEntityHandle InEntity, bool bInIsOnTeam1,float InMinCaliberForDamage, bool bInIsSoldier) 
+		: Entity(InEntity), bIsOnTeam1(bInIsOnTeam1), MinCaliberForDamage(InMinCaliberForDamage), bIsSoldier(bInIsSoldier)
 	{
 	}
 
@@ -22,10 +22,22 @@ struct FMassTargetGridItem
 
 	FMassEntityHandle Entity;
 	bool bIsOnTeam1;
-	FVector Location;
 	float MinCaliberForDamage;
-	FCapsule Capsule;
 	bool bIsSoldier;
+};
+
+// We cannot store this data in FMassTargetGridItem because the grid gets updated only when entities move to a new cell.
+struct FMassTargetGridItemDynamicData
+{
+	FMassTargetGridItemDynamicData(FVector Location, FCapsule Capsule)
+		: Location(Location), Capsule(Capsule)
+	{
+	}
+
+	FMassTargetGridItemDynamicData() = default;
+
+	FVector Location;
+	FCapsule Capsule;
 };
 
 // TODO: Constants here may not be optimal for performance.
@@ -44,6 +56,10 @@ public:
 	const FTargetHashGrid2D& GetTargetGrid() const { return TargetGrid; }
 	FTargetHashGrid2D& GetTargetGridMutable() { return TargetGrid; }
 
+	const TMap<FMassEntityHandle, FMassTargetGridItemDynamicData>& GetTargetDynamicData() const { return TargetDynamicData; }
+	TMap<FMassEntityHandle, FMassTargetGridItemDynamicData>& GetTargetDynamicDataMutable() { return TargetDynamicData; }
+
 protected:
 	FTargetHashGrid2D TargetGrid;
+	TMap<FMassEntityHandle, FMassTargetGridItemDynamicData> TargetDynamicData;
 };

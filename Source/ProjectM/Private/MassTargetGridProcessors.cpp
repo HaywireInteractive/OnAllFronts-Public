@@ -65,16 +65,19 @@ void UMassTargetGridProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FM
 		{
 			// Add to the grid
 			const FTransform& EntityTransform = LocationList[EntityIndex].GetTransform();
-			const FVector NewPos = EntityTransform.GetLocation();
+			const FVector EntityLocation = EntityTransform.GetLocation();
 			const float Radius = RadiiList[EntityIndex].Radius;
 
 			const FMassEntityHandle& TargetEntity = Context.GetEntity(EntityIndex);
 			const bool& bIsEntitySolder = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-			FCapsule Capsule = MakeCapsuleForEntity(CollisionCapsuleParametersList[EntityIndex], EntityTransform);
-			FMassTargetGridItem TargetGridItem(TargetEntity, TeamMemberList[EntityIndex].IsOnTeam1, NewPos, ProjectileDamagableList[EntityIndex].MinCaliberForDamage, Capsule, bIsEntitySolder);
+			FMassTargetGridItem TargetGridItem(TargetEntity, TeamMemberList[EntityIndex].IsOnTeam1, ProjectileDamagableList[EntityIndex].MinCaliberForDamage, bIsEntitySolder);
 
-			const FBox NewBounds(NewPos - FVector(Radius, Radius, 0.f), NewPos + FVector(Radius, Radius, 0.f));
+			const FBox NewBounds(EntityLocation - FVector(Radius, Radius, 0.f), EntityLocation + FVector(Radius, Radius, 0.f));
 			TargetGridCellLocationList[EntityIndex].CellLoc = TargetFinderSubsystem->GetTargetGridMutable().Add(TargetGridItem, NewBounds);
+			
+			FCapsule Capsule = MakeCapsuleForEntity(CollisionCapsuleParametersList[EntityIndex], EntityTransform);
+			FMassTargetGridItemDynamicData DynamicData(EntityLocation, Capsule);
+			TargetFinderSubsystem->GetTargetDynamicDataMutable().Emplace(TargetEntity, DynamicData);
 
 			Context.Defer().AddTag<FMassInTargetGridTag>(TargetEntity);
 		}
@@ -95,16 +98,19 @@ void UMassTargetGridProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FM
 		{
 			// Update position in grid
 			const FTransform& EntityTransform = LocationList[EntityIndex].GetTransform();
-			const FVector NewPos = EntityTransform.GetLocation();
+			const FVector EntityLocation = EntityTransform.GetLocation();
 			const float Radius = RadiiList[EntityIndex].Radius;
 			
 			const FMassEntityHandle& TargetEntity = Context.GetEntity(EntityIndex);
 			const bool& bIsEntitySolder = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
 			FCapsule Capsule = MakeCapsuleForEntity(CollisionCapsuleParametersList[EntityIndex], EntityTransform);
-			FMassTargetGridItem TargetGridItem(TargetEntity, TeamMemberList[EntityIndex].IsOnTeam1, NewPos, ProjectileDamagableList[EntityIndex].MinCaliberForDamage, Capsule, bIsEntitySolder);
+			FMassTargetGridItem TargetGridItem(TargetEntity, TeamMemberList[EntityIndex].IsOnTeam1, ProjectileDamagableList[EntityIndex].MinCaliberForDamage, bIsEntitySolder);
+			const FBox NewBounds(EntityLocation - FVector(Radius, Radius, 0.f), EntityLocation + FVector(Radius, Radius, 0.f));
 
-			const FBox NewBounds(NewPos - FVector(Radius, Radius, 0.f), NewPos + FVector(Radius, Radius, 0.f));
 			TargetGridCellLocationList[EntityIndex].CellLoc = TargetFinderSubsystem->GetTargetGridMutable().Move(TargetGridItem, TargetGridCellLocationList[EntityIndex].CellLoc, NewBounds);
+			FMassTargetGridItemDynamicData& TargetDynamicData = TargetFinderSubsystem->GetTargetDynamicDataMutable().FindOrAdd(TargetEntity);
+			TargetDynamicData.Location = EntityLocation;
+			TargetDynamicData.Capsule = Capsule;
 		}
 	});
 }
@@ -147,6 +153,7 @@ void UMassTargetRemoverProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 			FMassTargetGridItem TargetGridItem;
 			TargetGridItem.Entity = Context.GetEntity(i);
 			TargetFinderSubsystem->GetTargetGridMutable().Remove(TargetGridItem, TargetGridCellLocationList[i].CellLoc);
+			TargetFinderSubsystem->GetTargetDynamicDataMutable().Remove(TargetGridItem.Entity);
 		}
 	});
 }

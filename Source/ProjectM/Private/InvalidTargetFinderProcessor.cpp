@@ -78,14 +78,14 @@ bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, cons
 	return TestCapsuleCapsule(Capsule1, Capsule2);
 }
 
-bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const FTargetHashGrid2D& TargetGrid, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const bool bIsEntitySoldier, const float TargetMinCaliberForDamage, const FMassEntityView& TargetEntityView, const FTransform& EntityTransform)
+bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& TargetEntityLocation, const UMassTargetFinderSubsystem& TargetFinderSubsystem, const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const bool& IsEntityOnTeam1, const bool bIsEntitySoldier, const float TargetMinCaliberForDamage, const FMassEntityView& TargetEntityView, const FTransform& EntityTransform)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetEntityObstructed);
 
   const FVector Buffer(10.f, 10.f, 10.f); // We keep a buffer in case EntityLocation and TargetEntityLocation are same value on any axis.
 	FBox QueryBounds(EntityLocation.ComponentMin(TargetEntityLocation) - Buffer, EntityLocation.ComponentMax(TargetEntityLocation) + Buffer);
 	TArray<FMassTargetGridItem> CloseEntities;
-	TargetGrid.Query(QueryBounds, CloseEntities);
+	TargetFinderSubsystem.GetTargetGrid().Query(QueryBounds, CloseEntities);
 
 #if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity))
@@ -120,7 +120,8 @@ bool IsTargetEntityObstructed(const FVector& EntityLocation, const FVector& Targ
 
 		// If same team or undamageable, check for collision.
 		if (IsEntityOnTeam1 == OtherEntity.bIsOnTeam1 || !CanEntityDamageTargetEntity(TargetMinCaliberForDamage, OtherEntity.MinCaliberForDamage)) {
-			if (DidCapsulesCollide(ProjectileTraceCapsule, OtherEntity.Capsule, Entity, *EntitySubsystem.GetWorld()))
+			const FCapsule& OtherEntityCapsule = TargetFinderSubsystem.GetTargetDynamicData()[OtherEntity.Entity].Capsule;
+			if (DidCapsulesCollide(ProjectileTraceCapsule, OtherEntityCapsule, Entity, *EntitySubsystem.GetWorld()))
 			{
 				return true;
 			}
@@ -148,7 +149,7 @@ static FAutoConsoleCommand InvalidateAllTargetsCmd(
 	FConsoleCommandDelegate::CreateStatic(InvalidateAllTargets)
 );
 
-bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& TargetEntity, const UMassEntitySubsystem& EntitySubsystem, const float TargetMinCaliberForDamage, const FTargetHashGrid2D& TargetGrid, const bool& IsEntityOnTeam1, const bool bIsEntitySoldier, const FTransform& EntityTransform, const bool bInvalidateAllTargets)
+bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& TargetEntity, const UMassEntitySubsystem& EntitySubsystem, const float TargetMinCaliberForDamage, const UMassTargetFinderSubsystem& TargetFinderSubsystem, const bool& IsEntityOnTeam1, const bool bIsEntitySoldier, const FTransform& EntityTransform, const bool bInvalidateAllTargets)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetValid);
 
@@ -171,7 +172,7 @@ bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& Tar
 		return false;
 	}
 
-	if (IsTargetEntityObstructed(EntityLocation, TargetEntityLocation, TargetGrid, Entity, EntitySubsystem, IsEntityOnTeam1, bIsEntitySoldier, TargetMinCaliberForDamage, TargetEntityView, EntityTransform))
+	if (IsTargetEntityObstructed(EntityLocation, TargetEntityLocation, TargetFinderSubsystem, Entity, EntitySubsystem, IsEntityOnTeam1, bIsEntitySoldier, TargetMinCaliberForDamage, TargetEntityView, EntityTransform))
 	{
 		return false;
 	}
@@ -190,12 +191,12 @@ struct FProcessEntityData
 };
 
 /** Returns true if entity has invalid target. */
-bool ProcessEntity(const FProcessEntityData& ProcessEntityData, const bool bInvalidateAllTargets, const UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& EntitiesWithInvalidTargetQueue)
+bool ProcessEntity(const FProcessEntityData& ProcessEntityData, const bool bInvalidateAllTargets, const UMassEntitySubsystem& EntitySubsystem, const UMassTargetFinderSubsystem& TargetFinderSubsystem, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& EntitiesWithInvalidTargetQueue)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.ProcessEntity);
 
 	const FMassEntityHandle& TargetEntity = ProcessEntityData.TargetEntity;
-	if (!IsTargetValid(ProcessEntityData.Entity, TargetEntity, EntitySubsystem, ProcessEntityData.TargetMinCaliberForDamage, TargetGrid, ProcessEntityData.bIsEntityOnTeam1, ProcessEntityData.bIsEntitySoldier, ProcessEntityData.EntityTransform, bInvalidateAllTargets))
+	if (!IsTargetValid(ProcessEntityData.Entity, TargetEntity, EntitySubsystem, ProcessEntityData.TargetMinCaliberForDamage, TargetFinderSubsystem, ProcessEntityData.bIsEntityOnTeam1, ProcessEntityData.bIsEntitySoldier, ProcessEntityData.EntityTransform, bInvalidateAllTargets))
 	{
 		EntitiesWithInvalidTargetQueue.Enqueue(ProcessEntityData.Entity);
 		return true;
@@ -262,11 +263,10 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 		TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.ProcessEntities);
 
 		const bool bInvalidateAllTargets = UInvalidTargetFinderProcessor_ShouldInvalidateAllTargets;
-		const FTargetHashGrid2D& TargetGrid = TargetFinderSubsystem->GetTargetGrid();
 
 		ParallelFor(EntitiesToCheck.Num(), [&](const int32 JobIndex)
 		{
-			if (ProcessEntity(EntitiesToCheck[JobIndex], bInvalidateAllTargets, EntitySubsystem, TargetGrid, EntitiesWithInvalidTargetQueue))
+			if (ProcessEntity(EntitiesToCheck[JobIndex], bInvalidateAllTargets, EntitySubsystem, *TargetFinderSubsystem.Get(), EntitiesWithInvalidTargetQueue))
 			{
 				NumEntitiesWithInvalidTarget++;
 			}

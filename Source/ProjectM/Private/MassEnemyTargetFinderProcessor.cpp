@@ -16,6 +16,11 @@
 #include "MassRepresentationTypes.h"
 #include "MassTargetGridProcessors.h"
 
+const FVector& GetEntityLocationViaTargetFinderSubsystem(const FMassEntityHandle& Entity, const UMassTargetFinderSubsystem& TargetFinderSubsystem)
+{
+	return TargetFinderSubsystem.GetTargetDynamicData()[Entity].Location;
+}
+
 struct FPotentialTargetSphereTraceData
 {
   FPotentialTargetSphereTraceData(FMassEntityHandle InEntity, FMassEntityHandle InTargetEntity, FVector InTraceStart, FVector InTraceEnd, float InMinCaliberForDamage, FVector InLocation, bool bInIsSoldier)
@@ -120,7 +125,7 @@ void GetSearchPointsAlongTrace(const FCapsule& ProjectileTraceCapsule, TArray<FV
 	}
 }
 
-bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMassEntityHandle& Entity, const FMassEntityHandle& TargetEntity, const UWorld& World, const FTargetHashGrid2D& TargetGrid)
+bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMassEntityHandle& Entity, const FMassEntityHandle& TargetEntity, const UWorld& World, const UMassTargetFinderSubsystem& TargetFinderSubsystem)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget);
 
@@ -143,7 +148,7 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
 
       {
         TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ForBody.TargetGridQuery);
-        TargetGrid.Query(SearchBounds, EntitiesInSearchBox);
+				TargetFinderSubsystem.GetTargetGrid().Query(SearchBounds, EntitiesInSearchBox);
       }
 
       for (const FMassTargetGridItem& TargetGridItem : EntitiesInSearchBox)
@@ -152,7 +157,8 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
         {
           continue;
         }
-        if (DidCapsulesCollide(ProjectileTraceCapsule, TargetGridItem.Capsule, Entity, World))
+				const FCapsule& TargetGridItemCapsule = TargetFinderSubsystem.GetTargetDynamicData()[TargetGridItem.Entity].Capsule;
+        if (DidCapsulesCollide(ProjectileTraceCapsule, TargetGridItemCapsule, Entity, World))
         {
 					bDidAnyCapsulesCollide = true;
 					break;
@@ -169,9 +175,9 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
 #if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity) && bDidAnyCapsulesCollide)
 	{
-		AsyncTask(ENamedThreads::GameThread, [&World, Location = ProjectileTraceCapsule.b]()
+		AsyncTask(ENamedThreads::GameThread, [&World, TargetEntity]()
 		{
-			UMassEnemyTargetFinderProcessor_DebugEntityData.TargetEntitiesCulledDueToOtherEntityBlocking.Add(Location);
+			UMassEnemyTargetFinderProcessor_DebugEntityData.TargetEntitiesCulledDueToOtherEntityBlocking.Add(GetEntityLocationViaTargetFinderSubsystem(TargetEntity, *UWorld::GetSubsystem<UMassTargetFinderSubsystem>(&World)));
 		});
 	}
 #endif
@@ -235,7 +241,7 @@ struct FPotentialTarget
 	bool bIsSoldier;
 };
 
-void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const FTargetHashGrid2D& TargetGrid, const FTransform& EntityTransform, const bool& IsEntityOnTeam1, const FTargetEntityFragment& TargetEntityFragment, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& OutPotentialTargetsNeedingSphereTrace)
+void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const UMassTargetFinderSubsystem& TargetFinderSubsystem, const FTransform& EntityTransform, const bool& IsEntityOnTeam1, const FTargetEntityFragment& TargetEntityFragment, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& OutPotentialTargetsNeedingSphereTrace)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces");
 
@@ -256,7 +262,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces.TargetGridQuery");
-		TargetGrid.Query(SearchBounds, CloseEntities);
+		TargetFinderSubsystem.GetTargetGrid().Query(SearchBounds, CloseEntities);
 	}
 
 	int32 NumPotentialTargetsNeedingSphereTraceEnqueued = 0;
@@ -289,7 +295,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 #if WITH_MASSGAMEPLAY_DEBUG
 				if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 				{
-					TargetEntitiesCulledDueToSameTeam.Add(OtherEntity.Location);
+					TargetEntitiesCulledDueToSameTeam.Add(GetEntityLocationViaTargetFinderSubsystem(OtherEntity.Entity, TargetFinderSubsystem));
 				}
 #endif
 
@@ -301,24 +307,24 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 #if WITH_MASSGAMEPLAY_DEBUG
 				if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 				{
-					TargetEntitiesCulledDueToImpenetrable.Add(OtherEntity.Location);
+					TargetEntitiesCulledDueToImpenetrable.Add(GetEntityLocationViaTargetFinderSubsystem(OtherEntity.Entity, TargetFinderSubsystem));
 				}
 #endif
 				continue;
 			}
 
-			if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntity.Location))
+			const FVector& OtherEntityLocation = GetEntityLocationViaTargetFinderSubsystem(OtherEntity.Entity, TargetFinderSubsystem);
+			if (IsTargetEntityOutOfRange(EntityLocation, bIsEntitySoldier, OtherEntityLocation))
 			{
 #if WITH_MASSGAMEPLAY_DEBUG
 				if (UE::Mass::Debug::IsDebuggingEntity(Entity))
 				{
-					TargetEntitiesCulledDueToOutOfRange.Add(OtherEntity.Location);
+					TargetEntitiesCulledDueToOutOfRange.Add(GetEntityLocationViaTargetFinderSubsystem(OtherEntity.Entity, TargetFinderSubsystem));
 				}
 #endif
 				continue;
 			}
 
-			const FVector& OtherEntityLocation = OtherEntity.Location;
 			const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, OtherEntity.bIsSoldier, EntityTransform, OtherEntityLocation);
 
 			OutPotentialTargetsNeedingSphereTrace.Enqueue(FPotentialTargetSphereTraceData(Entity, OtherEntity.Entity, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, OtherEntity.MinCaliberForDamage, OtherEntityLocation, OtherEntity.bIsSoldier));
@@ -350,12 +356,12 @@ float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
 	return bIsEntitySoldier ? 6000.f : 10000.f; // TODO: make this configurable in data asset and get from there?
 }
 
-void ProcessEntityForVisualTarget(FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TransformFragment, const FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, const FTargetHashGrid2D& TargetGrid, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTrace)
+void ProcessEntityForVisualTarget(FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TransformFragment, const FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, const UMassTargetFinderSubsystem& TargetFinderSubsystem, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTrace)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.ProcessEntityForVisualTarget);
 
 	const FTransform& EntityTransform = TransformFragment.GetTransform();
-	GetPotentialTargetSphereTraces(Entity, EntitySubsystem, TargetGrid, EntityTransform, IsEntityOnTeam1, TargetEntityFragment, bIsEntitySoldier, PotentialTargetsNeedingSphereTrace);
+	GetPotentialTargetSphereTraces(Entity, EntitySubsystem, TargetFinderSubsystem, EntityTransform, IsEntityOnTeam1, TargetEntityFragment, bIsEntitySoldier, PotentialTargetsNeedingSphereTrace);
 }
 
 bool UMassEnemyTargetFinderProcessor_UseParallelForEachEntityChunk = true;
@@ -366,8 +372,8 @@ FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_SkipUpdatingTargetEn
 
 struct FProcessSphereTracesContext
 {
-  FProcessSphereTracesContext(TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTraceQueue, UWorld& World, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& OutEntityToPotentialTargetEntities, const FTargetHashGrid2D& TargetGrid)
-    : PotentialTargetsNeedingSphereTraceQueue(PotentialTargetsNeedingSphereTraceQueue), World(World), EntityToPotentialTargetEntities(OutEntityToPotentialTargetEntities), TargetGrid(TargetGrid)
+  FProcessSphereTracesContext(TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTraceQueue, UWorld& World, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& OutEntityToPotentialTargetEntities, const UMassTargetFinderSubsystem& TargetFinderSubsystem)
+    : PotentialTargetsNeedingSphereTraceQueue(PotentialTargetsNeedingSphereTraceQueue), World(World), EntityToPotentialTargetEntities(OutEntityToPotentialTargetEntities), TargetFinderSubsystem(TargetFinderSubsystem)
   {
   }
 
@@ -402,7 +408,7 @@ private:
 	  ParallelFor(PotentialTargetsNeedingSphereTrace.Num(), [&](const int32 JobIndex)
 		{
 	    const FCapsule TraceCapsule(PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, 1.f);
-			const bool bAreEntitiesBlockingTarget = AreEntitiesBlockingTarget(TraceCapsule, PotentialTargetsNeedingSphereTrace[JobIndex].Entity, PotentialTargetsNeedingSphereTrace[JobIndex].TargetEntity, World, TargetGrid);
+			const bool bAreEntitiesBlockingTarget = AreEntitiesBlockingTarget(TraceCapsule, PotentialTargetsNeedingSphereTrace[JobIndex].Entity, PotentialTargetsNeedingSphereTrace[JobIndex].TargetEntity, World, TargetFinderSubsystem);
 			if (!bAreEntitiesBlockingTarget)
 			{
 				if (IsTargetEntityVisibleViaSphereTrace(World, PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd))
@@ -447,7 +453,7 @@ private:
 	TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities;
 	TArray<FPotentialTargetSphereTraceData> PotentialTargetsNeedingSphereTrace;
 	TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc> PotentialVisibleTargets;
-	const FTargetHashGrid2D& TargetGrid;
+	const UMassTargetFinderSubsystem& TargetFinderSubsystem;
 };
 
 struct FSelectBestTargetProcessEntityContext
@@ -605,9 +611,8 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 #endif
 
 	TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc> PotentialTargetsNeedingSphereTrace;
-	const FTargetHashGrid2D& TargetGrid = TargetFinderSubsystem->GetTargetGrid();
 
-	auto ExecuteFunction = [&EntitySubsystem, &PotentialTargetsNeedingSphereTrace, &TargetGrid](FMassExecutionContext& Context)
+	auto ExecuteFunction = [&EntitySubsystem, &PotentialTargetsNeedingSphereTrace, TargetFinderSubsystem = TargetFinderSubsystem](FMassExecutionContext& Context)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.ForEachEntityChunk.Body);
 
@@ -621,7 +626,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		{
 			const FMassEntityHandle& Entity = Context.GetEntity(EntityIndex);
 			const bool& bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-			ProcessEntityForVisualTarget(Entity, EntitySubsystem, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, TargetGrid, bIsEntitySoldier, PotentialTargetsNeedingSphereTrace);
+			ProcessEntityForVisualTarget(Entity, EntitySubsystem, LocationList[EntityIndex], TargetEntityList[EntityIndex], TeamMemberList[EntityIndex].IsOnTeam1, *TargetFinderSubsystem.Get(), bIsEntitySoldier, PotentialTargetsNeedingSphereTrace);
 		}
 	};
 
@@ -641,7 +646,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 
 	TMap<FMassEntityHandle, TArray<FPotentialTarget>> EntityToPotentialTargetEntities;
 	TQueue<FMassEntityHandle, EQueueMode::Mpsc> TargetFinderEntityQueue;
-	FProcessSphereTracesContext(PotentialTargetsNeedingSphereTrace, *EntitySubsystem.GetWorld(), EntityToPotentialTargetEntities, TargetGrid).Execute();
+	FProcessSphereTracesContext(PotentialTargetsNeedingSphereTrace, *EntitySubsystem.GetWorld(), EntityToPotentialTargetEntities, *TargetFinderSubsystem.Get()).Execute();
 	FSelectBestTargetContext(PostSphereTraceEntityQuery, EntitySubsystem, Context, EntityToPotentialTargetEntities, TargetFinderEntityQueue).Execute();
 
 	{
