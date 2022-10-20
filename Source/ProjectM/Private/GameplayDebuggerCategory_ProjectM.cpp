@@ -22,6 +22,7 @@ void FGameplayDebuggerCategory_ProjectM::DrawTargetEntityLocations(const TArray<
 	}
 }
 
+// Warning: This gets called on every tick before UMassProcessor::Execute.
 void FGameplayDebuggerCategory_ProjectM::CollectData(APlayerController* OwnerPC, AActor* DebugActor)
 {
   if (!OwnerPC)

@@ -18,7 +18,9 @@ class UMassTargetFinderSubsystem;
 inline bool UMassEnemyTargetFinderProcessor_SkipFindingTargets = false;
 inline FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_SkipFindingTargets(TEXT("pm.UMassEnemyTargetFinderProcessor_SkipFindingTargets"), UMassEnemyTargetFinderProcessor_SkipFindingTargets, TEXT("UMassEnemyTargetFinderProcessor: Skip Finding Targets"));
 
-constexpr float UMassEnemyTargetFinder_FinestCellSize = 5000.f; // TODO: Don't hard-code, get from data asset.
+inline float UMassEnemyTargetFinder_FinestCellSize = 5000.f;
+inline FAutoConsoleVariableRef CVarUMassEnemyTargetFinder_FinestCellSize(TEXT("pm.UMassEnemyTargetFinder_FinestCellSize"), UMassEnemyTargetFinder_FinestCellSize, TEXT("CVarUMassEnemyTargetFinder_FinestCellSize"));
+
 constexpr float ProjectileRadius = 3.f; // TODO: Use Radius from projectile Data Asset.
 
 bool CanEntityDamageTargetEntity(const float TargetMinCaliberForDamage, const float MinCaliberForDamage);

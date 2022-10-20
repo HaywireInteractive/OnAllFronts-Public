@@ -204,7 +204,7 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 
 float GetEntityRange(const bool bIsEntitySoldier)
 {
-	return UMassEnemyTargetFinder_FinestCellSize * (bIsEntitySoldier ?  2.f : 4.f); // TODO: Don't hard-code, get from data asset.
+	return 5000.f * (bIsEntitySoldier ?  2.f : 4.f); // TODO: Don't hard-code, get from data asset.
 }
 
 bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntitySoldier, const FVector& TargetEntityLocation)
