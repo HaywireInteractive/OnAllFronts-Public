@@ -6,6 +6,9 @@
 
 #include "MilitaryUnitMassSpawner.generated.h"
 
+inline bool AMilitaryUnitMassSpawner_SpawnSoldiersOnly = true;
+inline FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnSoldiersOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnSoldiersOnly"), AMilitaryUnitMassSpawner_SpawnSoldiersOnly, TEXT("AMilitaryUnitMassSpawner_SpawnSoldiersOnly"));
+
 // Note that setting Count inherited from AMassSpawner gets ignored.
 UCLASS()
 class PROJECTM_API AMilitaryUnitMassSpawner : public AMassSpawner

@@ -74,7 +74,7 @@ TPair<int32, int32> RecursivelyCreateUnits(UMilitaryUnit* Unit, UMilitaryUnit* P
 	Result.Key += 1;
 
 	uint8 IndexOffset = 0;
-	if (ArmorSubUnitCount > 0)
+	if (ArmorSubUnitCount > 0 && !AMilitaryUnitMassSpawner_SpawnSoldiersOnly)
 	{
 		IndexOffset++;
 		UMilitaryUnit* RootArmorUnit = NewObject<UMilitaryUnit>();
