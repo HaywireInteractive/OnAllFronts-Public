@@ -22,6 +22,12 @@ struct FMassCommandableTag : public FMassTag
 	GENERATED_BODY()
 };
 
+USTRUCT()
+struct FMassFollowLeaderTag : public FMassTag
+{
+	GENERATED_BODY()
+};
+
 // This fragment should not be shared across entities because movement speed may get affected by damage in the future.
 USTRUCT()
 struct PROJECTM_API FMassCommandableMovementSpeedFragment : public FMassFragment
@@ -63,12 +69,14 @@ struct PROJECTM_API FMassStashedMoveTargetFragment : public FMassMoveTargetFragm
 };
 
 USTRUCT()
-struct PROJECTM_API FMassNavMeshMoveFragment : public FMassMoveTargetFragment
+struct PROJECTM_API FMassNavMeshMoveFragment : public FMassFragment
 {
 	GENERATED_BODY()
 
 	FNavPathSharedPtr Path;
 	int32 CurrentPathPointIndex = 0;
+	FMassEntityHandle EntityToFollow;
+	FVector LeaderFollowDelta;
 };
 
 UCLASS()

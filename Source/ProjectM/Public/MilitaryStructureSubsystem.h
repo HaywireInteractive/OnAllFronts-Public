@@ -14,6 +14,8 @@ struct FMilitaryUnitCounts
 	int32 SquadCount = 0;
 };
 
+constexpr int32 GSquadUnitDepth = 6; // TODO: calculate dynamically?
+
 UCLASS(BlueprintType)
 class PROJECTM_API UTreeViewItem : public UObject
 {

@@ -9,6 +9,7 @@
 #include "NavigationSystem.h"
 #include <MassNavMeshMoveProcessor.h>
 #include <MilitaryStructureSubsystem.h>
+#include "MassEntityView.h"
 
 //----------------------------------------------------------------------//
 //  UMassCommandableTrait
@@ -67,7 +68,39 @@ bool IsEntityCommandableByUnit(const FMassEntityHandle& Entity, const UMilitaryU
 	return EntityUnit->IsChildOfUnit(ParentUnit);
 }
 
-bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, const FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& NavMeshRadius)
+// TODO: Move the data needed to compute this into Mass fragment so we don't need inefficient RAM hits.
+bool ShouldFollowSquadLeader(const FMassEntityHandle& Entity, const UWorld* World, FMassEntityHandle& OutSquadLeaderEntity)
+{
+	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
+	check(MilitaryStructureSubsystem);
+	UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+	const bool bShouldFollowSquadLeader = EntityUnit->Depth > GSquadUnitDepth + 1; // We add one to exclude squad leader.
+	if (bShouldFollowSquadLeader)
+	{
+		const uint8 NumLevelsToSquad = EntityUnit->Depth - GSquadUnitDepth;
+		UMilitaryUnit* SquadUnit = EntityUnit;
+		for (int i = 0; i < NumLevelsToSquad; i++)
+		{
+			SquadUnit = SquadUnit->Parent;
+		}
+		UMilitaryUnit* SquadLeaderMilitaryUnit = nullptr;
+		for (int i = 0; i < SquadUnit->SubUnits.Num(); i++)
+		{
+			if (SquadUnit->SubUnits[i]->bIsCommander)
+			{
+				SquadLeaderMilitaryUnit = SquadUnit->SubUnits[i];
+				break;
+			}
+		}
+		if (SquadLeaderMilitaryUnit)
+		{
+			OutSquadLeaderEntity = SquadLeaderMilitaryUnit->GetMassEntityHandle();
+		}
+	}
+	return bShouldFollowSquadLeader;
+}
+
+bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, const FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& NavMeshRadius, const UMassEntitySubsystem& EntitySubsystem)
 {
 	if (TeamMemberFragment.IsOnTeam1 != IsLastMoveToCommandForTeam1)
 	{
@@ -77,6 +110,24 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 	if (!IsEntityCommandableByUnit(Entity, LastMoveToCommandMilitaryUnit, World))
 	{
 		return false;
+	}
+
+	FMassEntityHandle SquadLeaderEntity;
+	if (ShouldFollowSquadLeader(Entity, World, SquadLeaderEntity))
+	{
+		if (SquadLeaderEntity.IsSet())
+		{
+			NavMeshMoveFragment.EntityToFollow = SquadLeaderEntity;
+			FMassEntityView SquadLeaderEntityView(EntitySubsystem, SquadLeaderEntity);
+			const FTransformFragment& SquadLeaderTransformFragment = SquadLeaderEntityView.GetFragmentData<FTransformFragment>();
+			NavMeshMoveFragment.LeaderFollowDelta = EntityLocation - SquadLeaderTransformFragment.GetTransform().GetLocation();
+			Context.Defer().AddTag<FMassFollowLeaderTag>(Entity);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find squad leader for squad member."));
+		}
+		return SquadLeaderEntity.IsSet();
 	}
 
 	static constexpr float AgentHeight = 200.f; // TODO: Don't hard-code
@@ -137,7 +188,7 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 
-	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &IsLastMoveToCommandForTeam1, LastMoveToCommandTarget, NavSys, LastMoveToCommandMilitaryUnit, &NumEntitiesSetMoveTarget](FMassExecutionContext& Context)
+	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &IsLastMoveToCommandForTeam1, LastMoveToCommandTarget, NavSys, LastMoveToCommandMilitaryUnit, &NumEntitiesSetMoveTarget, &EntitySubsystem](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
@@ -152,7 +203,7 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 			FVector MoveToCommandTarget = *LastMoveToCommandTarget;
 			MoveToCommandTarget.Z = EntityLocation.Z;
 
-			const bool& bDidSetMoveTarget = ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntityLocation, Context.GetEntity(i), NavSys, NavMeshMoveList[i], Context, LastMoveToCommandMilitaryUnit, GetWorld(), NavMeshParams.NavMeshRadius);
+			const bool& bDidSetMoveTarget = ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, EntityLocation, Context.GetEntity(i), NavSys, NavMeshMoveList[i], Context, LastMoveToCommandMilitaryUnit, GetWorld(), NavMeshParams.NavMeshRadius, EntitySubsystem);
 
 			if (bDidSetMoveTarget)
 			{

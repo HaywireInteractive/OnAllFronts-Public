@@ -172,7 +172,9 @@ TArray<FVector> GetRelativePointsForSquad(const FVector& SquadOrigin)
 
 	for (int i = 0; i < GNumSoldiersInSquad; i++)
 	{
-		const FVector2D Offset(GSquadMemberOffsetsMeters[i] * 25.f);
+		constexpr float CentimetersInMeter = 100.f;
+		constexpr float SpacingScalingFactor = 0.25f;
+		const FVector2D Offset(GSquadMemberOffsetsMeters[i] * CentimetersInMeter * SpacingScalingFactor);
 		Result.Add(SquadOrigin + FVector(Offset.Y, Offset.X, 0.f)); // Need to swap X and Y because we positions soldiers facing east to west initially instead of north to south.
 	}
 
@@ -254,10 +256,9 @@ void GatherSquadsAndHigherCommand(UMilitaryUnit* MilitaryUnit, TArray<UMilitaryU
 		return;
 	}
 
-	constexpr int32 SquadUnitDepth = 6; // TODO: calculate dynamically?
 	if (MilitaryUnit->bIsSoldier)
 	{
-		if (MilitaryUnit->Depth <= SquadUnitDepth)
+		if (MilitaryUnit->Depth <= GSquadUnitDepth)
 		{
 			OutHigherCommandSoldiers.Add(MilitaryUnit);
 		}
@@ -265,7 +266,7 @@ void GatherSquadsAndHigherCommand(UMilitaryUnit* MilitaryUnit, TArray<UMilitaryU
 	}
 
 	// Not a soldier.
-	if (MilitaryUnit->Depth == SquadUnitDepth)
+	if (MilitaryUnit->Depth == GSquadUnitDepth)
 	{
 		OutSquads.Add(MilitaryUnit);
 	}
