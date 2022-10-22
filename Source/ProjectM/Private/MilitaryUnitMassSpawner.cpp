@@ -12,6 +12,8 @@
 #include <MassSimulationSubsystem.h>
 #include "VisualLogger/VisualLogger.h"
 #include "Engine/StreamableManager.h"
+#include "MassSpawnLocationProcessor.h"
+#include "MassOrderedSpawnLocationProcessor.h"
 
 AMilitaryUnitMassSpawner::AMilitaryUnitMassSpawner()
 {
@@ -49,6 +51,8 @@ FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnVehiclesOnly(TEXT("pm
 bool AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly = false;
 FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"), AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly, TEXT("AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"));
 
+constexpr int32 GNumSoldiersInSquad = 9;
+
 void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 {
 	// TODO: Get team from EntityTypes (UMassEntityConfigAsset) once figure out linker issue with using FMassSpawnedEntityType::GetEntityConfig(). Then replace bIsTeam1 below.
@@ -76,12 +80,12 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 	MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(GetWorld());
 	check(MilitaryStructureSubsystem);
 
-	TPair<int32, int32> UnitCounts = MilitaryStructureSubsystem->CreateMilitaryUnit(MilitaryUnitIndex, bIsTeam1);
+	UnitCounts = MilitaryStructureSubsystem->CreateMilitaryUnit(MilitaryUnitIndex, bIsTeam1);
 
-	// no spawn point generators configured. Let user know and fall back to the spawner's location
+	// No spawn point generators configured. Let user know and fall back to the spawner's location.
 	if (SpawnDataGenerators.Num() == 0)
 	{
-		UE_VLOG_UELOG(this, LogTemp, Warning, TEXT("No Spawn Data Generators configured."));
+		UE_VLOG_UELOG(this, LogTemp, Error, TEXT("No Spawn Data Generators configured."));
 		return;
 	}
 
@@ -113,11 +117,11 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 	bDidSpawnSoldiersOnly = AMilitaryUnitMassSpawner_SpawnSoldiersOnly || (bIsTeam1 && AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly);
 	bDidSpawnVehiclesOnly = bSpawnVehiclesOnly || AMilitaryUnitMassSpawner_SpawnVehiclesOnly;
 
-	auto GenerateSpawningPoints = [this, UnitCounts]()
+	auto GenerateSpawningPoints = [this, &UnitCounts = UnitCounts]()
 	{
 		if (SpawnDataGenerators.Num() != 2 || EntityTypes.Num() != 2)
 		{
-			UE_VLOG_UELOG(this, LogTemp, Warning, TEXT("AMilitaryUnitMassSpawner needs exactly two EntityTypes and SpawnDataGenerators, first for soldiers, second for vehicles."));
+			UE_VLOG_UELOG(this, LogTemp, Error, TEXT("AMilitaryUnitMassSpawner needs exactly two EntityTypes and SpawnDataGenerators, first for soldiers, second for vehicles."));
 			return;
 		}
 
@@ -126,12 +130,13 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 		{
 			if (Generator.GeneratorInstance)
 			{
-				const int32 SpawnCount = Index == 0 ? (bDidSpawnVehiclesOnly ? 0 : UnitCounts.Key) : (bDidSpawnSoldiersOnly ? 0 : UnitCounts.Value);
+				const int32 UpperCommandSoldierCount = UnitCounts.SoldierCount - UnitCounts.SquadCount * GNumSoldiersInSquad;
+				const int32 SpawnCount = Index == 0 ? (bDidSpawnVehiclesOnly ? 0 : UnitCounts.SquadCount + UpperCommandSoldierCount) : (bDidSpawnSoldiersOnly ? 0 : UnitCounts.VehicleCount);
 				const int32 OtherIndex = Index == 0 ? 1 : 0;
 				EntityTypes[Index].Proportion = 1.f;
 				EntityTypes[OtherIndex].Proportion = 0.f;
 
-				FFinishedGeneratingSpawnDataSignature Delegate = FFinishedGeneratingSpawnDataSignature::CreateUObject(this, &AMassSpawner::OnSpawnDataGenerationFinished, &Generator);
+				FFinishedGeneratingSpawnDataSignature Delegate = FFinishedGeneratingSpawnDataSignature::CreateUObject(this, &AMilitaryUnitMassSpawner::OnMilitaryUnitSpawnDataGenerationFinished, &Generator);
 				Generator.GeneratorInstance->Generate(*this, EntityTypes, SpawnCount, Delegate);
 			}
 			Index++;
@@ -146,6 +151,130 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 	else
 	{
 		GenerateSpawningPoints();
+	}
+}
+
+static const FVector2D GSquadMemberOffsetsMeters[] = {
+	FVector2D(0.f, 0.f), // SL
+	FVector2D(0.f, 30.f), // FT1,L
+	FVector2D(-20.f, 15.f), // FT1,S1
+	FVector2D(-10.f, 20.f), // FT1,S2
+	FVector2D(10.f, 20.f), // FT1,S3
+	FVector2D(0.f, -20.f), // FT2,L
+	FVector2D(-10.f, -30.f), // FT2,S1
+	FVector2D(10.f, -30.f), // FT2,S2
+	FVector2D(20.f, -40.f), // FT2,S3
+};
+
+TArray<FVector> GetRelativePointsForSquad(const FVector& SquadOrigin)
+{
+	TArray<FVector> Result;
+
+	for (int i = 0; i < GNumSoldiersInSquad; i++)
+	{
+		const FVector2D Offset(GSquadMemberOffsetsMeters[i] * 25.f);
+		Result.Add(SquadOrigin + FVector(Offset.Y, Offset.X, 0.f)); // Need to swap X and Y because we positions soldiers facing east to west initially instead of north to south.
+	}
+
+	return Result;
+}
+
+void AMilitaryUnitMassSpawner::OnMilitaryUnitSpawnDataGenerationFinished(TConstArrayView<FMassEntitySpawnDataGeneratorResult> ConstResults, FMassSpawnDataGenerator* FinishedGenerator)
+{
+	const FMassEntitySpawnDataGeneratorResult* Data = ConstResults.GetData();
+	int32 ResultsCount = ConstResults.Num();
+
+	TArray<FMassEntitySpawnDataGeneratorResult> ResultArray;
+
+	for (int i = 0; i < ResultsCount; i++)
+	{
+		const FMassEntitySpawnDataGeneratorResult& Result = Data[i];
+		FMassEntitySpawnDataGeneratorResult SquadResult;
+		const TArray<FTransform>& ResultTransforms = Result.SpawnData.GetMutable<FMassTransformsSpawnData>().Transforms;
+		SquadResult.NumEntities = UnitCounts.SoldierCount;
+		SquadResult.EntityConfigIndex = Result.EntityConfigIndex;
+
+		SquadResult.SpawnDataProcessor = UMassOrderedSpawnLocationProcessor::StaticClass();
+		SquadResult.SpawnData.InitializeAs<FMassTransformsSpawnData>();
+		FMassTransformsSpawnData& Transforms = SquadResult.SpawnData.GetMutable<FMassTransformsSpawnData>();
+
+		Transforms.Transforms.Reserve(SquadResult.NumEntities);
+		for (int SquadIndex = 0; SquadIndex < UnitCounts.SquadCount; SquadIndex++)
+		{
+			const TArray<FVector>& SquadMemberSpawnLocations = GetRelativePointsForSquad(ResultTransforms[SquadIndex].GetLocation());
+			for (const FVector& SquadMemberSpawnLocation : SquadMemberSpawnLocations)
+			{
+				FTransform& Transform = Transforms.Transforms.AddDefaulted_GetRef();
+				Transform.SetLocation(SquadMemberSpawnLocation);
+			}
+		}
+		int32 NumHigherCommandSoldiers = UnitCounts.SoldierCount - GNumSoldiersInSquad * UnitCounts.SquadCount;
+		for (int CommandIndex = 0; CommandIndex < NumHigherCommandSoldiers; CommandIndex++)
+		{
+			FTransform& Transform = Transforms.Transforms.AddDefaulted_GetRef();
+			Transform = ResultTransforms[CommandIndex + UnitCounts.SquadCount];
+		}
+
+		ResultArray.Add(SquadResult);
+	}
+	TConstArrayView<FMassEntitySpawnDataGeneratorResult> Results(ResultArray);
+
+	// Rest is copied from AMassSpawner::OnSpawnDataGenerationFinished.
+
+	// @todo: this can be potentially expensive copy for the instanced structs, could there be a way to use move gere instead?
+	AllGeneratedResults.Append(Results.GetData(), Results.Num());
+
+	bool bAllSpawnPointsGenerated = true;
+	bool bFoundFinishedGenerator = false;
+	for (FMassSpawnDataGenerator& Generator : SpawnDataGenerators)
+	{
+		if (&Generator == FinishedGenerator)
+		{
+			Generator.bDataGenerated = true;
+			bFoundFinishedGenerator = true;
+		}
+
+		bAllSpawnPointsGenerated &= Generator.bDataGenerated;
+	}
+
+	checkf(bFoundFinishedGenerator, TEXT("Something went wrong, we are receiving a callback on an unknow spawn point generator"));
+
+	if (bAllSpawnPointsGenerated)
+	{
+		SpawnGeneratedEntities(AllGeneratedResults);
+		AllGeneratedResults.Reset();
+	}
+}
+
+void GatherSquadsAndHigherCommand(UMilitaryUnit* MilitaryUnit, TArray<UMilitaryUnit*>& OutSquads, TArray<UMilitaryUnit*>& OutHigherCommandSoldiers)
+{
+	if (MilitaryUnit->bIsVehicle)
+	{
+		UE_LOG(LogTemp, Error, TEXT("GatherSquadsAndHigherCommand does not support vehicles yet."));
+		return;
+	}
+
+	constexpr int32 SquadUnitDepth = 6; // TODO: calculate dynamically?
+	if (MilitaryUnit->bIsSoldier)
+	{
+		if (MilitaryUnit->Depth <= SquadUnitDepth)
+		{
+			OutHigherCommandSoldiers.Add(MilitaryUnit);
+		}
+		return;
+	}
+
+	// Not a soldier.
+	if (MilitaryUnit->Depth == SquadUnitDepth)
+	{
+		OutSquads.Add(MilitaryUnit);
+	}
+	else
+	{
+		for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
+		{
+			GatherSquadsAndHigherCommand(SubUnit, OutSquads, OutHigherCommandSoldiers);
+		}
 	}
 }
 
@@ -168,38 +297,53 @@ void AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits()
 		}
 	}
 
-	int32 SoldierIndex = 0;
 	int32 VehicleIndex = 0;
-	AssignEntitiesToMilitaryUnits(MilitaryStructureSubsystem->GetRootUnitForTeam(bIsTeam1), SoldierIndex, VehicleIndex);
+
+	TArray<UMilitaryUnit*> Squads;
+	TArray<UMilitaryUnit*> HigherCommandSoldiers;
+	GatherSquadsAndHigherCommand(MilitaryStructureSubsystem->GetRootUnitForTeam(bIsTeam1), Squads, HigherCommandSoldiers);
+	AssignEntitiesToMilitaryUnits(Squads, HigherCommandSoldiers);
+
 	MilitaryStructureSubsystem->DidCompleteAssigningEntitiesToMilitaryUnits(bIsTeam1);
 }
 
-void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(UMilitaryUnit* MilitaryUnit, int32& SoldierIndex, int32& VehicleIndex)
+void AMilitaryUnitMassSpawner::SafeBindSoldier(UMilitaryUnit* SoldierMilitaryUnit, const TArray<FMassEntityHandle>& SpawnedEntities, int32& EntityIndex)
 {
-	if (MilitaryUnit->bIsSoldier || MilitaryUnit->bIsVehicle)
+	if (EntityIndex < SpawnedEntities.Num())
 	{
-		int32 AllSpawnedEntitiesIndex = MilitaryUnit->bIsSoldier ? AllSpawnedEntitiesSoldierIndex : AllSpawnedEntitiesVehicleIndex;
-		int32& EntitiesIndex = MilitaryUnit->bIsSoldier ? SoldierIndex : VehicleIndex;
-		if (MilitaryUnit->bIsSoldier)
-		{
-			if (!bDidSpawnVehiclesOnly)
-			{
-				MilitaryStructureSubsystem->BindUnitToMassEntity(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesIndex].Entities[EntitiesIndex++]);
-			}
-		}
-		else
-		{
-			if (!bDidSpawnSoldiersOnly)
-			{
-				MilitaryStructureSubsystem->BindUnitToMassEntity(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesIndex].Entities[EntitiesIndex++]);
-			}
-		}
+		MilitaryStructureSubsystem->BindUnitToMassEntity(SoldierMilitaryUnit, SpawnedEntities[EntityIndex++]);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("AMilitaryUnitMassSpawner::SafeBindSoldier: Invalid index."));
+	}
+}
+
+void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(TArray<UMilitaryUnit*>& Squads, TArray<UMilitaryUnit*>& HigherCommandSoldiers)
+{
+	int32 SoldierIndex = 0;
+	for (UMilitaryUnit* Squad : Squads)
+	{
+		AssignEntitiesToSquad(SoldierIndex, Squad);
+	}
+
+	for (UMilitaryUnit* Soldier : HigherCommandSoldiers)
+	{
+		SafeBindSoldier(Soldier, AllSpawnedEntities[AllSpawnedEntitiesSoldierIndex].Entities, SoldierIndex);
+	}
+}
+
+void AMilitaryUnitMassSpawner::AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* MilitaryUnit)
+{
+	if (MilitaryUnit->bIsSoldier)
+	{
+		SafeBindSoldier(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesSoldierIndex].Entities, SoldierIndex);
 	}
 	else
 	{
 		for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
 		{
-			AssignEntitiesToMilitaryUnits(SubUnit, SoldierIndex, VehicleIndex);
+ 			AssignEntitiesToSquad(SoldierIndex, SubUnit);
 		}
 	}
 }

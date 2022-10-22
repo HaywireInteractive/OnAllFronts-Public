@@ -21,8 +21,11 @@ protected:
 	UFUNCTION()
 	void BeginAssignEntitiesToMilitaryUnits();
 
-	void AssignEntitiesToMilitaryUnits(UMilitaryUnit* MilitaryUnit, int32& SoldierIndex, int32& VehicleIndex);
+	void AssignEntitiesToMilitaryUnits(TArray<UMilitaryUnit*>& Squads, TArray<UMilitaryUnit*>& HigherCommandSoldiers);
+	void AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* Squad);
+	void SafeBindSoldier(UMilitaryUnit* SoldierMilitaryUnit, const TArray<FMassEntityHandle>& SpawnedEntities, int32& EntityIndex);
 	void DoMilitaryUnitSpawning();
+	void OnMilitaryUnitSpawnDataGenerationFinished(TConstArrayView<FMassEntitySpawnDataGeneratorResult> Results, FMassSpawnDataGenerator* FinishedGenerator);
 
 	UMilitaryStructureSubsystem* MilitaryStructureSubsystem;
 	
@@ -32,6 +35,7 @@ protected:
 
 	bool bDidSpawnVehiclesOnly = false;
 	bool bDidSpawnSoldiersOnly = false;
+	FMilitaryUnitCounts UnitCounts;
 
 public:
 	AMilitaryUnitMassSpawner();

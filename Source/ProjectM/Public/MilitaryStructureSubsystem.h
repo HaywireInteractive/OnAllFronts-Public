@@ -7,6 +7,13 @@
 #include "MassEntityTypes.h"
 #include "MilitaryStructureSubsystem.generated.h"
 
+struct FMilitaryUnitCounts
+{
+	int32 SoldierCount = 0;
+	int32 VehicleCount = 0;
+	int32 SquadCount = 0;
+};
+
 UCLASS(BlueprintType)
 class PROJECTM_API UTreeViewItem : public UObject
 {
@@ -103,8 +110,7 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	// USubsystem END
 
-	// returns pair of (soldier count, vehicle count)
-	TPair<int32, int32> CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1);
+	FMilitaryUnitCounts CreateMilitaryUnit(uint8 MilitaryUnitIndex, bool bIsTeam1);
 
 	void BindUnitToMassEntity(UMilitaryUnit* MilitaryUnit, FMassEntityHandle Entity);
 	void DestroyEntity(FMassEntityHandle Entity);
