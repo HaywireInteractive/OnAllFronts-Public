@@ -156,9 +156,8 @@ ProjectM is structured as an Unreal Engine plugin. To quickly get started, we ha
 		1. Search for "MassUpdateISMProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassUpdateISMProcessor) > Auto Register with Processing Phases > uncheck. Note this will already be unchecked in the City Sample project.
 		1. Search for "MassGenericUpdateISMVertexAnimationProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassGenericUpdateISMVertexAnimationProcessor) > Auto Register with Processing Phases > check
 		1. Do the same as previous for "MassSimpleUpdateISMProcessor".
-    1. Engine - Navigation System > Agents > Supported Agents > Add 2 elements:
-        1. Name: Soldier, Nav Agent Radius: 50.0, Nav Agent Height: 200.0
-        1. Name: Tank, Nav Agent Radius: 500.0, Nav Agent Height: 200.0
+    1. Engine - Navigation System > Agents > Supported Agents > Add agents based on the "SupportedAgents" towards bottom of this file: https://github.com/LeroyTechnologies/ProjectMStarter/blob/main/Config/DefaultEngine.ini
+        1. Only the Name, Nav Agent Radius, and Nav Agent Height need to be set.
 1. Follow steps above in "Add Assets" section.
 
 ## To add soldiers to City Sample Level

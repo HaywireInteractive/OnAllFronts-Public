@@ -51,8 +51,6 @@ FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnVehiclesOnly(TEXT("pm
 bool AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly = false;
 FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"), AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly, TEXT("AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"));
 
-constexpr int32 GNumSoldiersInSquad = 9;
-
 void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 {
 	// TODO: Get team from EntityTypes (UMassEntityConfigAsset) once figure out linker issue with using FMassSpawnedEntityType::GetEntityConfig(). Then replace bIsTeam1 below.
@@ -154,26 +152,14 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 	}
 }
 
-static const FVector2D GSquadMemberOffsetsMeters[] = {
-	FVector2D(0.f, 0.f), // SL
-	FVector2D(0.f, 30.f), // FT1,L
-	FVector2D(-20.f, 15.f), // FT1,S1
-	FVector2D(-10.f, 20.f), // FT1,S2
-	FVector2D(10.f, 20.f), // FT1,S3
-	FVector2D(0.f, -20.f), // FT2,L
-	FVector2D(-10.f, -30.f), // FT2,S1
-	FVector2D(10.f, -30.f), // FT2,S2
-	FVector2D(20.f, -40.f), // FT2,S3
-};
-
 TArray<FVector> GetRelativePointsForSquad(const FVector& SquadOrigin)
 {
 	TArray<FVector> Result;
 
 	for (int i = 0; i < GNumSoldiersInSquad; i++)
 	{
-		const FVector2D Offset(GSquadMemberOffsetsMeters[i] * 25.f);
-		Result.Add(SquadOrigin + FVector(Offset.Y, Offset.X, 0.f)); // Need to swap X and Y because we positions soldiers facing east to west initially instead of north to south.
+		const FVector2D Offset(GSquadMemberOffsetsMeters[i] * 100.f * GSquadSpacingScalingFactor);
+		Result.Add(SquadOrigin + FVector(Offset, 0.f));
 	}
 
 	return Result;
@@ -254,10 +240,9 @@ void GatherSquadsAndHigherCommand(UMilitaryUnit* MilitaryUnit, TArray<UMilitaryU
 		return;
 	}
 
-	constexpr int32 SquadUnitDepth = 6; // TODO: calculate dynamically?
 	if (MilitaryUnit->bIsSoldier)
 	{
-		if (MilitaryUnit->Depth <= SquadUnitDepth)
+		if (MilitaryUnit->Depth <= GSquadUnitDepth)
 		{
 			OutHigherCommandSoldiers.Add(MilitaryUnit);
 		}
@@ -265,7 +250,7 @@ void GatherSquadsAndHigherCommand(UMilitaryUnit* MilitaryUnit, TArray<UMilitaryU
 	}
 
 	// Not a soldier.
-	if (MilitaryUnit->Depth == SquadUnitDepth)
+	if (MilitaryUnit->Depth == GSquadUnitDepth)
 	{
 		OutSquads.Add(MilitaryUnit);
 	}
@@ -324,7 +309,8 @@ void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(TArray<UMilitaryUni
 	int32 SoldierIndex = 0;
 	for (UMilitaryUnit* Squad : Squads)
 	{
-		AssignEntitiesToSquad(SoldierIndex, Squad);
+		int32 SquadMemberIndex = 0;
+		AssignEntitiesToSquad(SoldierIndex, Squad, Squad, SquadMemberIndex);
 	}
 
 	for (UMilitaryUnit* Soldier : HigherCommandSoldiers)
@@ -333,17 +319,19 @@ void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(TArray<UMilitaryUni
 	}
 }
 
-void AMilitaryUnitMassSpawner::AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* MilitaryUnit)
+void AMilitaryUnitMassSpawner::AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* MilitaryUnit, UMilitaryUnit* SquadMilitaryUnit, int32& SquadMemberIndex)
 {
 	if (MilitaryUnit->bIsSoldier)
 	{
 		SafeBindSoldier(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesSoldierIndex].Entities, SoldierIndex);
+		MilitaryUnit->SquadMemberIndex = SquadMemberIndex++;
+		MilitaryUnit->SquadMilitaryUnit = SquadMilitaryUnit;
 	}
 	else
 	{
 		for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
 		{
- 			AssignEntitiesToSquad(SoldierIndex, SubUnit);
+ 			AssignEntitiesToSquad(SoldierIndex, SubUnit, SquadMilitaryUnit, SquadMemberIndex);
 		}
 	}
 }

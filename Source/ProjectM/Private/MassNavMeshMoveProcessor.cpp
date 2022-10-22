@@ -9,6 +9,7 @@
 #include "NavigationSystem.h"
 #include <MassMoveToCommandProcessor.h>
 #include <MassTrackedVehicleOrientationProcessor.h>
+#include "MassEntityView.h"
 
 UMassNavMeshMoveProcessor::UMassNavMeshMoveProcessor()
 {
@@ -27,90 +28,156 @@ void UMassNavMeshMoveProcessor::ConfigureQueries()
 	EntityQuery.AddTagRequirement<FMassNeedsNavMeshMoveTag>(EMassFragmentPresence::All);
 }
 
-bool UMassNavMeshMoveProcessor_DrawPathState = false;
-FAutoConsoleVariableRef CVarUMassNavMeshMoveProcessor_DrawPathState(TEXT("pm.UMassNavMeshMoveProcessor_DrawPathState"), UMassNavMeshMoveProcessor_DrawPathState, TEXT("UMassNavMeshMoveProcessor: Draw Path State"));
+const FMassNavMeshMoveFragment& GetNavMeshMoveFragmentForSoldier(const UMilitaryUnit* SoldierMilitaryUnit, const UMassEntitySubsystem& EntitySubsystem)
+{
+	FMassEntityView SoldierEntityView(EntitySubsystem, SoldierMilitaryUnit->GetMassEntityHandle());
+	return SoldierEntityView.GetFragmentData<FMassNavMeshMoveFragment>();
+}
 
-void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float& MovementSpeed, const float& AgentRadius)
+bool DoesSoldierHaveSameActionsRemaining(int32 ActionsRemaining, const UMilitaryUnit* SoldierMilitaryUnit, const UMassEntitySubsystem& EntitySubsystem)
+{
+	const FMassNavMeshMoveFragment& NavMeshMoveFragment = GetNavMeshMoveFragmentForSoldier(SoldierMilitaryUnit, EntitySubsystem);
+	return NavMeshMoveFragment.ActionsRemaining <= ActionsRemaining;
+}
+
+bool HaveAllSquadMembersReachedSameAction(int32 ActionsRemaining, const UMilitaryUnit* MilitaryUnit, const UMassEntitySubsystem& EntitySubsystem, UMilitaryUnit* UnitToIgnore)
+{
+	if (MilitaryUnit == UnitToIgnore)
+	{
+		return true;
+	}
+
+	if (MilitaryUnit->bIsSoldier)
+	{
+		if (!DoesSoldierHaveSameActionsRemaining(ActionsRemaining, MilitaryUnit, EntitySubsystem))
+		{
+			return false;
+		}
+	}
+	
+	for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
+	{
+		if (!HaveAllSquadMembersReachedSameAction(ActionsRemaining, SubUnit, EntitySubsystem, UnitToIgnore))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+FVector GetExpectedLocationRelativeToSquadLeader(int32 SquadMemberIndex, UMilitaryUnit* SquadMilitaryUnit, const UMassEntitySubsystem& EntitySubsystem)
+{
+	UMilitaryUnit* SquadLeaderMilitaryUnit = nullptr;
+	for (UMilitaryUnit* SubUnit : SquadMilitaryUnit->SubUnits)
+	{
+		if (SubUnit->IsSquadLeader())
+		{
+			SquadLeaderMilitaryUnit = SubUnit;
+		}
+	}
+	if (!SquadLeaderMilitaryUnit)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("GetExpectedLocationRelativeToSquadLeader: Cannot find military unit for squad leader"));
+		return FVector::ZeroVector;
+	}
+
+	const FMassNavMeshMoveFragment& SquadLeaderNavMeshMoveFragment = GetNavMeshMoveFragmentForSoldier(SquadLeaderMilitaryUnit, EntitySubsystem);
+	const FNavigationAction& SquadLeaderCurrentAction = SquadLeaderNavMeshMoveFragment.ActionList.Get()->Actions[SquadLeaderNavMeshMoveFragment.CurrentActionIndex];
+
+	const float ForwardToNextPointHeadingDegrees = FMath::RadiansToDegrees(UE::MassNavigation::GetYawFromDirection(SquadLeaderCurrentAction.Forward));
+	FVector2D UnrotatedOffset = GSquadMemberOffsetsMeters[SquadMemberIndex] * 100.f * GSquadSpacingScalingFactor;
+	UnrotatedOffset = FVector2D(UnrotatedOffset.Y, UnrotatedOffset.X);
+	const FVector2D RotatedOffset = UnrotatedOffset.GetRotated(ForwardToNextPointHeadingDegrees);
+	const FVector& SquadMemberExpectedLocation = SquadLeaderCurrentAction.TargetLocation + FVector(RotatedOffset, 0.f);
+	return SquadMemberExpectedLocation;
+}
+
+void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float MovementSpeed, const float AgentRadius, const UMassEntitySubsystem& EntitySubsystem)
 {
 	const FVector& EntityLocation = EntityTransform.GetLocation();
-	const bool& bIsTrackedVehicle = Context.DoesArchetypeHaveTag<FMassTrackedVehicleOrientationTag>();
 
 	// TODO: would it be faster to have two separate entity queries instead of checking tag here?
 	const bool& bUseStashedMoveTarget = Context.DoesArchetypeHaveTag<FMassTrackTargetTag>() || Context.DoesArchetypeHaveTag<FMassTrackSoundTag>();
 	FMassMoveTargetFragment& MoveTargetFragmentToModify = bUseStashedMoveTarget ? StashedMoveTargetFragment : MoveTargetFragment;
 
-	const auto& Points = NavMeshMoveFragment.Path.Get()->GetPathPoints();
-	FVector NextMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
+	const TArray<FNavigationAction>& Actions = NavMeshMoveFragment.ActionList.Get()->Actions;
+	const FNavigationAction& CurrentAction = Actions[NavMeshMoveFragment.CurrentActionIndex];
 
-	// For tracked vehicles set initial move target forward to direction so they first turn if needed.
-	if (NavMeshMoveFragment.CurrentPathPointIndex == 0 && bIsTrackedVehicle)
+	if (!NavMeshMoveFragment.bIsWaitingOnSquadMates)
 	{
-		MoveTargetFragmentToModify.Forward = (Points[1].Location - EntityLocation).GetSafeNormal();
-	}
+		bool bFinishedCurrentAction = false;
 
-	const auto DistanceFromNextMovePoint = (EntityLocation - NextMovePoint).Size();
-	MoveTargetFragmentToModify.DistanceToGoal = DistanceFromNextMovePoint;
-	const bool bAtNextMovePoint = DistanceFromNextMovePoint < AgentRadius;
-	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward) : bAtNextMovePoint;
-
-#if WITH_MASSGAMEPLAY_DEBUG
-	if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
-	{
-		int32 LineEndIndex = 1;
-		int32 PointIndex = 0;
-		for (const FNavPathPoint& NavPathPoint : Points)
+		const float DistanceFromTarget = (EntityLocation - CurrentAction.TargetLocation).Size();
+		if (CurrentAction.Action == EMassMovementAction::Stand)
 		{
-			// Red = point not yet reached. Green = point already reached.
-			DrawDebugPoint(World, NavPathPoint.Location, 10.f, PointIndex < NavMeshMoveFragment.CurrentPathPointIndex ? FColor::Green : FColor::Red, true);
-			if (LineEndIndex >= Points.Num())
-			{
-				break;
-			}
-			PointIndex++;
-			const auto LineEndNavPathPoint = Points[LineEndIndex++];
-			DrawDebugLine(World, NavPathPoint.Location, LineEndNavPathPoint.Location, FColor::Red, false, 0.1f);
+			bFinishedCurrentAction = IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward);
 		}
-	}
-#endif
+		else
+		{
+			bFinishedCurrentAction = DistanceFromTarget < AgentRadius;
+		}
 
-	if (!bFinishedNextMovePoint)
+		if (!bFinishedCurrentAction)
+		{
+			// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
+			MoveTargetFragmentToModify.DistanceToGoal = DistanceFromTarget;
+
+			if (CurrentAction.bShouldFollowLeader)
+			{
+				UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
+				check(MilitaryStructureSubsystem);
+				UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+				MoveTargetFragmentToModify.Center = GetExpectedLocationRelativeToSquadLeader(NavMeshMoveFragment.SquadMemberIndex, EntityUnit->SquadMilitaryUnit, EntitySubsystem);
+			}
+			return;
+		}
+
+		NavMeshMoveFragment.ActionsRemaining = NavMeshMoveFragment.ActionList.Get()->Actions.Num() - (NavMeshMoveFragment.CurrentActionIndex + 1);
+	}
+
+	if (NavMeshMoveFragment.IsSquadMember())
 	{
-		// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
-		return;
+		UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
+		check(MilitaryStructureSubsystem);
+		UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+		if (!HaveAllSquadMembersReachedSameAction(NavMeshMoveFragment.ActionsRemaining, EntityUnit->SquadMilitaryUnit, EntitySubsystem, EntityUnit))
+		{
+			NavMeshMoveFragment.bIsWaitingOnSquadMates = true;
+			return; // Wait for squad mates.
+		}
+		NavMeshMoveFragment.bIsWaitingOnSquadMates = false;
 	}
 
-	NavMeshMoveFragment.CurrentPathPointIndex++;
+	NavMeshMoveFragment.CurrentActionIndex++;
 
-	const bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentPathPointIndex >= Points.Num();
+	const bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentActionIndex >= Actions.Num();
 	if (bFinishedNavMeshMove)
 	{
 		MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
 		MoveTargetFragmentToModify.DistanceToGoal = 0.f;
 		MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
 
-#if WITH_MASSGAMEPLAY_DEBUG
-		if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
-		{
-			DrawDebugPoint(World, NextMovePoint, 10.f, FColor::Blue, false, 1.f); // Blue = Reached last point
-		}
-#endif
-
 		Context.Defer().RemoveTag<FMassNeedsNavMeshMoveTag>(Entity);
+
+		if (bUseStashedMoveTarget) {
+			Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
+		}
 		return;
 	}
 
-	// We are at the next move point but we haven't reached the final move point, so update FMassMoveTargetFragment.
-	NextMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
+	// Update move target to next action.
+	
+	const FNavigationAction& NextAction = Actions[NavMeshMoveFragment.CurrentActionIndex];
 
-	MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Move, *World);
-	MoveTargetFragmentToModify.Center = NextMovePoint;
-	MoveTargetFragmentToModify.Forward = (NextMovePoint - EntityLocation).GetSafeNormal();
-	const float Distance = (EntityLocation - NextMovePoint).Size();
+	MoveTargetFragmentToModify.CreateNewAction(NextAction.Action, *World);
+	MoveTargetFragmentToModify.Center = NextAction.TargetLocation;
+	MoveTargetFragmentToModify.Forward = NextAction.Forward;
+	const float Distance = (NextAction.TargetLocation - EntityLocation).Size();
 	MoveTargetFragmentToModify.DistanceToGoal = Distance;
 	MoveTargetFragmentToModify.bOffBoundaries = true;
-	MoveTargetFragmentToModify.DesiredSpeed.Set(MovementSpeed);
-	const bool& bIsLastMoveTarget = NavMeshMoveFragment.CurrentPathPointIndex + 1 == Points.Num();
-	MoveTargetFragmentToModify.IntentAtGoal = (bIsLastMoveTarget || bIsTrackedVehicle) ? EMassMovementAction::Stand : EMassMovementAction::Move;
+	MoveTargetFragmentToModify.DesiredSpeed.Set(NextAction.Action == EMassMovementAction::Stand ? 0.f : MovementSpeed);
+	MoveTargetFragmentToModify.IntentAtGoal = EMassMovementAction::Stand;
 
 	if (bUseStashedMoveTarget) {
 		Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
@@ -133,7 +200,7 @@ void UMassNavMeshMoveProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, F
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
-			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i], MovementSpeedList[i].MovementSpeed, AgentRadiusList[i].Radius);
+			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i], MovementSpeedList[i].MovementSpeed, AgentRadiusList[i].Radius, EntitySubsystem);
 		}
 	});
 }

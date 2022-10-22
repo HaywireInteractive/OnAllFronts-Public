@@ -75,6 +75,16 @@ UMilitaryUnit* ACommanderCharacter::GetMyMilitaryUnit() const
 	return MilitaryStructureSubsystem->GetUnitForEntity(GetMassEntityHandle());
 }
 
+static FAutoConsoleCommand SetTeam2MoveToCommandToOrigin(
+	TEXT("pm.SetTeam2MoveToCommandToOrigin"),
+	TEXT("SetTeam2MoveToCommandToOrigin.")
+	TEXT("Usage: \"pm.SetTeam2MoveToCommandToOrigin\""),
+	FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World, FOutputDevice& OutputDevice)
+	{
+		UMassMoveToCommandSubsystem* MoveToCommandSystem = World->GetSubsystem<UMassMoveToCommandSubsystem>();
+		MoveToCommandSystem->SetMoveToCommandTarget(nullptr, FVector(0.f, 0.f, 20.f), false);
+	}));
+
 void ACommanderCharacter::SetMoveToCommand(FVector2D CommandLocation) const
 {
 	UMilitaryUnit* MyMilitaryUnit = GetMyMilitaryUnit();

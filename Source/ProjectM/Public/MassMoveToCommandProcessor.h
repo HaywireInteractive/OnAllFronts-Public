@@ -6,9 +6,13 @@
 #include "MassProcessor.h"
 #include "MassNavigationFragments.h"
 #include "MassEntityTraitBase.h"
+#include <MilitaryStructureSubsystem.h>
+
 #include "MassMoveToCommandProcessor.generated.h"
 
 class UMassMoveToCommandSubsystem;
+
+bool IsSquadMember(const UMilitaryUnit* MilitaryUnit);
 
 USTRUCT()
 struct FMassHasStashedMoveTargetTag : public FMassTag
@@ -62,13 +66,54 @@ struct PROJECTM_API FMassStashedMoveTargetFragment : public FMassMoveTargetFragm
 	GENERATED_BODY()
 };
 
+struct FNavigationAction
+{
+	FNavigationAction(const FVector TargetLocation, const FVector Forward, const EMassMovementAction Action = EMassMovementAction::Move, const bool bShouldFollowLeader = false)
+		: TargetLocation(TargetLocation), Forward(Forward), Action(Action), bShouldFollowLeader(bShouldFollowLeader)
+	{
+	}
+	FVector TargetLocation;
+	FVector Forward;
+	EMassMovementAction Action;
+	bool bShouldFollowLeader;
+};
+
+struct FNavigationActionList
+{
+	FNavigationActionList(const TArray<FNavigationAction> Actions)
+		: Actions(Actions)
+	{
+	}
+	FNavigationActionList() = default;
+	const TArray<FNavigationAction> Actions;
+};
+
+typedef TSharedPtr<FNavigationActionList, ESPMode::ThreadSafe> FNavActionListSharedPtr;
+
 USTRUCT()
-struct PROJECTM_API FMassNavMeshMoveFragment : public FMassMoveTargetFragment
+struct PROJECTM_API FMassNavMeshMoveFragment : public FMassFragment
 {
 	GENERATED_BODY()
 
-	FNavPathSharedPtr Path;
-	int32 CurrentPathPointIndex = 0;
+	bool IsSquadMember()
+	{
+		return SquadMemberIndex >= 0;
+	}
+
+	void Reset()
+	{
+		ActionList = MakeShareable(new FNavigationActionList());
+		CurrentActionIndex = 0;
+		ActionsRemaining = -1;
+		SquadMemberIndex = -1;
+		bIsWaitingOnSquadMates = false;
+	}
+
+	FNavActionListSharedPtr ActionList;
+	int32 CurrentActionIndex = 0; // This gets incremented when completing the next action AND all squad members have completed that action as well.
+	int32 ActionsRemaining = -1; // This gets decremented when completing the next action BEFORE all squad members have completed that action as well.
+	int8 SquadMemberIndex = -1;
+	bool bIsWaitingOnSquadMates = false;
 };
 
 UCLASS()

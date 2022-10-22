@@ -244,7 +244,7 @@ void UMilitaryUnit::RemoveFromParent()
 	Parent->SubUnits.Remove(this);
 }
 
-FMassEntityHandle UMilitaryUnit::GetMassEntityHandle()
+FMassEntityHandle UMilitaryUnit::GetMassEntityHandle() const
 {
 	return FMassEntityHandle(MassEntityIndex, MassEntitySerialNumber);
 }
@@ -277,5 +277,11 @@ bool UMilitaryUnit::IsChildOfUnit(const UMilitaryUnit* ParentUnit)
 bool UMilitaryUnit::IsLeafUnit() const
 {
 	return bIsSoldier || bIsVehicle;
+}
+
+// TODO: Move the data needed to compute this into Mass fragment so we don't need inefficient RAM hits.
+bool UMilitaryUnit::IsSquadLeader() const
+{
+	return bIsCommander && Depth == GSquadUnitDepth + 1;
 }
 
