@@ -94,6 +94,7 @@ These ideas below would be explored in one of the phases above.
 1. Install Unreal Engine 5.0.3 from [Epic Games Launcher](https://store.epicgames.com/en-US/download).
 1. Install [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/).
     1. Follow steps [here](https://docs.unrealengine.com/5.0/en-US/setting-up-visual-studio-development-environment-for-cplusplus-projects-in-unreal-engine/#optionsforanewvisualstudioinstallation) for which options to choose when installing.
+    1. If you don't have it installed, install latest .NET Core 3.1: https://dotnet.microsoft.com/en-us/download/dotnet?cid=getdotnetcore
 1. Create a new project using one of the two options below:
     1. If you want to use the [City Sample project](https://www.unrealengine.com/marketplace/en-US/product/city-sample) for developing in a large level, get the project from UE Marketplace and then create a project using that template.
     1. If you want to quickly develop in a smaller project, in UE create a new empty C++ project.
