@@ -8,7 +8,6 @@
 #include "MassCommonFragments.h"
 #include "NavigationSystem.h"
 #include <MassNavMeshMoveProcessor.h>
-#include <MilitaryStructureSubsystem.h>
 #include "MassEntityView.h"
 
 //----------------------------------------------------------------------//
@@ -69,35 +68,27 @@ bool IsEntityCommandableByUnit(const FMassEntityHandle& Entity, const UMilitaryU
 }
 
 // TODO: Move the data needed to compute this into Mass fragment so we don't need inefficient RAM hits.
-bool ShouldFollowSquadLeader(const FMassEntityHandle& Entity, const UWorld* World, FMassEntityHandle& OutSquadLeaderEntity)
+bool IsSquadLeader(const FMassEntityHandle& Entity, const UWorld* World, UMilitaryUnit* OutSquadMilitaryUnit)
 {
 	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
 	check(MilitaryStructureSubsystem);
 	UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
-	const bool bShouldFollowSquadLeader = EntityUnit->Depth > GSquadUnitDepth + 1; // We add one to exclude squad leader.
-	if (bShouldFollowSquadLeader)
+	const bool bIsSquadLeader = EntityUnit->bIsCommander && EntityUnit->Depth == GSquadUnitDepth + 1;
+	if (bIsSquadLeader)
 	{
-		const uint8 NumLevelsToSquad = EntityUnit->Depth - GSquadUnitDepth;
-		UMilitaryUnit* SquadUnit = EntityUnit;
-		for (int i = 0; i < NumLevelsToSquad; i++)
-		{
-			SquadUnit = SquadUnit->Parent;
-		}
-		UMilitaryUnit* SquadLeaderMilitaryUnit = nullptr;
-		for (int i = 0; i < SquadUnit->SubUnits.Num(); i++)
-		{
-			if (SquadUnit->SubUnits[i]->bIsCommander)
-			{
-				SquadLeaderMilitaryUnit = SquadUnit->SubUnits[i];
-				break;
-			}
-		}
-		if (SquadLeaderMilitaryUnit)
-		{
-			OutSquadLeaderEntity = SquadLeaderMilitaryUnit->GetMassEntityHandle();
-		}
+		OutSquadMilitaryUnit = EntityUnit->Parent;
 	}
-	return bShouldFollowSquadLeader;
+	return bIsSquadLeader;
+}
+
+void PopulateFollowData(FMassNavMeshMoveFragment& NavMeshMoveFragment, const UMilitaryUnit* MilitaryUnit, int32& SoldierIndex)
+{
+	if (MilitaryUnit->bIsSoldier)
+	{
+		int32 IndexToUse = SoldierIndex++;
+		NavMeshMoveFragment.SquadMembersFollowData[IndexToUse].Entity = MilitaryUnit->GetMassEntityHandle();
+		NavMeshMoveFragment.SquadMembersFollowData[IndexToUse].SquadMemberIndex = MilitaryUnit->SquadMemberIndex;
+	}
 }
 
 bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, const FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& NavMeshRadius, const UMassEntitySubsystem& EntitySubsystem)
@@ -112,22 +103,16 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 		return false;
 	}
 
-	FMassEntityHandle SquadLeaderEntity;
-	if (ShouldFollowSquadLeader(Entity, World, SquadLeaderEntity))
+	UMilitaryUnit* SquadMilitaryUnit;
+	if (IsSquadLeader(Entity, World, SquadMilitaryUnit))
 	{
-		if (SquadLeaderEntity.IsSet())
-		{
-			NavMeshMoveFragment.EntityToFollow = SquadLeaderEntity;
-			FMassEntityView SquadLeaderEntityView(EntitySubsystem, SquadLeaderEntity);
-			const FTransformFragment& SquadLeaderTransformFragment = SquadLeaderEntityView.GetFragmentData<FTransformFragment>();
-			NavMeshMoveFragment.LeaderFollowDelta = EntityLocation - SquadLeaderTransformFragment.GetTransform().GetLocation();
-			Context.Defer().AddTag<FMassFollowLeaderTag>(Entity);
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find squad leader for squad member."));
-		}
-		return SquadLeaderEntity.IsSet();
+		int32 SoldierIndex = 0;
+		PopulateFollowData(NavMeshMoveFragment, SquadMilitaryUnit, SoldierIndex);
+		NavMeshMoveFragment.HasFollowData = true;
+	}
+	else
+	{
+		NavMeshMoveFragment.HasFollowData = false;
 	}
 
 	static constexpr float AgentHeight = 200.f; // TODO: Don't hard-code

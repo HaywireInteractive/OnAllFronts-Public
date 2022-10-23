@@ -244,7 +244,7 @@ void UMilitaryUnit::RemoveFromParent()
 	Parent->SubUnits.Remove(this);
 }
 
-FMassEntityHandle UMilitaryUnit::GetMassEntityHandle()
+FMassEntityHandle UMilitaryUnit::GetMassEntityHandle() const
 {
 	return FMassEntityHandle(MassEntityIndex, MassEntitySerialNumber);
 }

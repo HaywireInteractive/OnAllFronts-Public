@@ -6,6 +6,8 @@
 #include "MassProcessor.h"
 #include "MassNavigationFragments.h"
 #include "MassEntityTraitBase.h"
+#include <MilitaryStructureSubsystem.h>
+
 #include "MassMoveToCommandProcessor.generated.h"
 
 class UMassMoveToCommandSubsystem;
@@ -68,6 +70,12 @@ struct PROJECTM_API FMassStashedMoveTargetFragment : public FMassMoveTargetFragm
 	GENERATED_BODY()
 };
 
+struct FSquadMemberFollowData
+{
+	FMassEntityHandle Entity;
+	uint8 SquadMemberIndex; // Index into GSquadMemberOffsetsMeters
+};
+
 USTRUCT()
 struct PROJECTM_API FMassNavMeshMoveFragment : public FMassFragment
 {
@@ -75,8 +83,8 @@ struct PROJECTM_API FMassNavMeshMoveFragment : public FMassFragment
 
 	FNavPathSharedPtr Path;
 	int32 CurrentPathPointIndex = 0;
-	FMassEntityHandle EntityToFollow;
-	FVector LeaderFollowDelta;
+	TStaticArray<FSquadMemberFollowData, GNumSoldiersInSquad> SquadMembersFollowData;
+	bool HasFollowData = false;
 };
 
 UCLASS()

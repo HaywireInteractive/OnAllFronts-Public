@@ -15,6 +15,7 @@ struct FMilitaryUnitCounts
 };
 
 constexpr int32 GSquadUnitDepth = 6; // TODO: calculate dynamically?
+constexpr int32 GNumSoldiersInSquad = 9;
 
 UCLASS(BlueprintType)
 class PROJECTM_API UTreeViewItem : public UObject
@@ -78,8 +79,10 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	bool bIsPlayer = false;
 
+	uint8 SquadMemberIndex = -1; // Index into GSquadMemberOffsetsMeters
+
 	void RemoveFromParent();
-	FMassEntityHandle GetMassEntityHandle();
+	FMassEntityHandle GetMassEntityHandle() const;
 	bool IsChildOfUnit(const UMilitaryUnit* ParentUnit);
 
 	UFUNCTION(BlueprintCallable)

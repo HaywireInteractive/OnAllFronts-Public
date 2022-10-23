@@ -51,8 +51,6 @@ FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnVehiclesOnly(TEXT("pm
 bool AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly = false;
 FAutoConsoleVariableRef CVar_AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly(TEXT("pm.AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"), AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly, TEXT("AMilitaryUnitMassSpawner_SpawnTeam1SoldiersOnly"));
 
-constexpr int32 GNumSoldiersInSquad = 9;
-
 void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 {
 	// TODO: Get team from EntityTypes (UMassEntityConfigAsset) once figure out linker issue with using FMassSpawnedEntityType::GetEntityConfig(). Then replace bIsTeam1 below.
