@@ -16,6 +16,19 @@ struct FMilitaryUnitCounts
 
 constexpr int32 GSquadUnitDepth = 6; // TODO: calculate dynamically?
 constexpr int32 GNumSoldiersInSquad = 9;
+constexpr float GSquadSpacingScalingFactor = 0.25f;
+
+inline const FVector2D GSquadMemberOffsetsMeters[] = {
+	FVector2D(0.f, 0.f), // SL
+	FVector2D(0.f, 30.f), // FT1,L
+	FVector2D(-20.f, 15.f), // FT1,S1
+	FVector2D(-10.f, 20.f), // FT1,S2
+	FVector2D(10.f, 20.f), // FT1,S3
+	FVector2D(0.f, -20.f), // FT2,L
+	FVector2D(-10.f, -30.f), // FT2,S1
+	FVector2D(10.f, -30.f), // FT2,S2
+	FVector2D(20.f, -40.f), // FT2,S3
+};
 
 UCLASS(BlueprintType)
 class PROJECTM_API UTreeViewItem : public UObject
@@ -79,7 +92,7 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	bool bIsPlayer = false;
 
-	uint8 SquadMemberIndex = -1; // Index into GSquadMemberOffsetsMeters
+	int8 SquadMemberIndex = -1; // Index into GSquadMemberOffsetsMeters
 
 	void RemoveFromParent();
 	FMassEntityHandle GetMassEntityHandle() const;

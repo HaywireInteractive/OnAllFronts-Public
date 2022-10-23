@@ -152,27 +152,13 @@ void AMilitaryUnitMassSpawner::DoMilitaryUnitSpawning()
 	}
 }
 
-static const FVector2D GSquadMemberOffsetsMeters[] = {
-	FVector2D(0.f, 0.f), // SL
-	FVector2D(0.f, 30.f), // FT1,L
-	FVector2D(-20.f, 15.f), // FT1,S1
-	FVector2D(-10.f, 20.f), // FT1,S2
-	FVector2D(10.f, 20.f), // FT1,S3
-	FVector2D(0.f, -20.f), // FT2,L
-	FVector2D(-10.f, -30.f), // FT2,S1
-	FVector2D(10.f, -30.f), // FT2,S2
-	FVector2D(20.f, -40.f), // FT2,S3
-};
-
 TArray<FVector> GetRelativePointsForSquad(const FVector& SquadOrigin)
 {
 	TArray<FVector> Result;
 
 	for (int i = 0; i < GNumSoldiersInSquad; i++)
 	{
-		constexpr float CentimetersInMeter = 100.f;
-		constexpr float SpacingScalingFactor = 0.25f;
-		const FVector2D Offset(GSquadMemberOffsetsMeters[i] * CentimetersInMeter * SpacingScalingFactor);
+		const FVector2D Offset(GSquadMemberOffsetsMeters[i] * 100.f * GSquadSpacingScalingFactor);
 		Result.Add(SquadOrigin + FVector(Offset.Y, Offset.X, 0.f)); // Need to swap X and Y because we positions soldiers facing east to west initially instead of north to south.
 	}
 
@@ -323,7 +309,8 @@ void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(TArray<UMilitaryUni
 	int32 SoldierIndex = 0;
 	for (UMilitaryUnit* Squad : Squads)
 	{
-		AssignEntitiesToSquad(SoldierIndex, Squad);
+		int32 SquadMemberIndex = 0;
+		AssignEntitiesToSquad(SoldierIndex, Squad, SquadMemberIndex);
 	}
 
 	for (UMilitaryUnit* Soldier : HigherCommandSoldiers)
@@ -332,17 +319,18 @@ void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(TArray<UMilitaryUni
 	}
 }
 
-void AMilitaryUnitMassSpawner::AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* MilitaryUnit)
+void AMilitaryUnitMassSpawner::AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* MilitaryUnit, int32& SquadMemberIndex)
 {
 	if (MilitaryUnit->bIsSoldier)
 	{
 		SafeBindSoldier(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesSoldierIndex].Entities, SoldierIndex);
+		MilitaryUnit->SquadMemberIndex = SquadMemberIndex++;
 	}
 	else
 	{
 		for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
 		{
- 			AssignEntitiesToSquad(SoldierIndex, SubUnit);
+ 			AssignEntitiesToSquad(SoldierIndex, SubUnit, SquadMemberIndex);
 		}
 	}
 }
