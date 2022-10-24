@@ -203,7 +203,9 @@ void ACommanderCharacter::InitializeFromMassSoldierInternal()
 	int16 NewPlayerHealth = SoldierHealthFragment.Value;
 
 	const FTransformFragment& SoldierTransformFragment = EntitySubsystem->GetFragmentDataChecked<FTransformFragment>(MassSoldierEntityToInitializeWith);
-	FTransform NewPlayerTransform = SoldierTransformFragment.GetTransform();
+	const FTransform& SoldierTransform = SoldierTransformFragment.GetTransform();
+	const FVector& SoldierLocation = SoldierTransform.GetLocation();
+	const FQuat& SoldierRotation = SoldierTransform.GetRotation();
 
 	FMassEntityHandle PlayerEntityHandle = GetMassEntityHandle();
 
@@ -216,8 +218,10 @@ void ACommanderCharacter::InitializeFromMassSoldierInternal()
 	check(PlayerEntityHealthFragment);
 	
 	PlayerEntityHealthFragment->Value = NewPlayerHealth;
-	NewPlayerTransform.SetLocation(NewPlayerTransform.GetLocation() + FVector(0.f, 0.f, RootComponent->Bounds.BoxExtent.Z));
-	SetActorTransform(NewPlayerTransform);
+	const FVector NewPlayerLocation = SoldierLocation + FVector(0.f, 0.f, RootComponent->Bounds.BoxExtent.Z);
+
+	FTransform NewActorTransform(SoldierRotation, NewPlayerLocation, GetActorTransform().GetScale3D());
+	SetActorTransform(NewActorTransform, false, nullptr, ETeleportType::ResetPhysics);
 }
 
 bool ACommanderCharacter::IsPlayerOnTeam1() const
