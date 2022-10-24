@@ -22,7 +22,7 @@ protected:
 	void BeginAssignEntitiesToMilitaryUnits();
 
 	void AssignEntitiesToMilitaryUnits(TArray<UMilitaryUnit*>& Squads, TArray<UMilitaryUnit*>& HigherCommandSoldiers);
-	void AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* MilitaryUnit, int32& SquadMemberIndex);
+	void AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* MilitaryUnit, UMilitaryUnit* SquadMilitaryUnit, int32& SquadMemberIndex);
 	void SafeBindSoldier(UMilitaryUnit* SoldierMilitaryUnit, const TArray<FMassEntityHandle>& SpawnedEntities, int32& EntityIndex);
 	void DoMilitaryUnitSpawning();
 	void OnMilitaryUnitSpawnDataGenerationFinished(TConstArrayView<FMassEntitySpawnDataGeneratorResult> Results, FMassSpawnDataGenerator* FinishedGenerator);

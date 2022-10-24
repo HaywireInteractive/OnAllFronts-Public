@@ -159,7 +159,7 @@ TArray<FVector> GetRelativePointsForSquad(const FVector& SquadOrigin)
 	for (int i = 0; i < GNumSoldiersInSquad; i++)
 	{
 		const FVector2D Offset(GSquadMemberOffsetsMeters[i] * 100.f * GSquadSpacingScalingFactor);
-		Result.Add(SquadOrigin + FVector(Offset.Y, Offset.X, 0.f)); // Need to swap X and Y because we positions soldiers facing east to west initially instead of north to south.
+		Result.Add(SquadOrigin + FVector(Offset, 0.f));
 	}
 
 	return Result;
@@ -310,7 +310,7 @@ void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(TArray<UMilitaryUni
 	for (UMilitaryUnit* Squad : Squads)
 	{
 		int32 SquadMemberIndex = 0;
-		AssignEntitiesToSquad(SoldierIndex, Squad, SquadMemberIndex);
+		AssignEntitiesToSquad(SoldierIndex, Squad, Squad, SquadMemberIndex);
 	}
 
 	for (UMilitaryUnit* Soldier : HigherCommandSoldiers)
@@ -319,18 +319,19 @@ void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(TArray<UMilitaryUni
 	}
 }
 
-void AMilitaryUnitMassSpawner::AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* MilitaryUnit, int32& SquadMemberIndex)
+void AMilitaryUnitMassSpawner::AssignEntitiesToSquad(int32& SoldierIndex, UMilitaryUnit* MilitaryUnit, UMilitaryUnit* SquadMilitaryUnit, int32& SquadMemberIndex)
 {
 	if (MilitaryUnit->bIsSoldier)
 	{
 		SafeBindSoldier(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesSoldierIndex].Entities, SoldierIndex);
 		MilitaryUnit->SquadMemberIndex = SquadMemberIndex++;
+		MilitaryUnit->SquadMilitaryUnit = SquadMilitaryUnit;
 	}
 	else
 	{
 		for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
 		{
- 			AssignEntitiesToSquad(SoldierIndex, SubUnit, SquadMemberIndex);
+ 			AssignEntitiesToSquad(SoldierIndex, SubUnit, SquadMilitaryUnit, SquadMemberIndex);
 		}
 	}
 }

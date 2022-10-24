@@ -12,6 +12,8 @@
 
 class UMassMoveToCommandSubsystem;
 
+bool IsSquadMember(const UMilitaryUnit* MilitaryUnit);
+
 USTRUCT()
 struct FMassHasStashedMoveTargetTag : public FMassTag
 {

@@ -93,6 +93,7 @@ public:
 	bool bIsPlayer = false;
 
 	int8 SquadMemberIndex = -1; // Index into GSquadMemberOffsetsMeters
+	UMilitaryUnit* SquadMilitaryUnit;
 
 	void RemoveFromParent();
 	FMassEntityHandle GetMassEntityHandle() const;

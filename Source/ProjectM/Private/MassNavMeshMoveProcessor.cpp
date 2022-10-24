@@ -9,6 +9,7 @@
 #include "NavigationSystem.h"
 #include <MassMoveToCommandProcessor.h>
 #include <MassTrackedVehicleOrientationProcessor.h>
+#include "MassEntityView.h"
 
 UMassNavMeshMoveProcessor::UMassNavMeshMoveProcessor()
 {
@@ -30,7 +31,41 @@ void UMassNavMeshMoveProcessor::ConfigureQueries()
 bool UMassNavMeshMoveProcessor_DrawPathState = false;
 FAutoConsoleVariableRef CVarUMassNavMeshMoveProcessor_DrawPathState(TEXT("pm.UMassNavMeshMoveProcessor_DrawPathState"), UMassNavMeshMoveProcessor_DrawPathState, TEXT("UMassNavMeshMoveProcessor: Draw Path State"));
 
-void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float& MovementSpeed, const float& AgentRadius)
+bool HasSoldierReachedNextNavPoint(int32 NextNavPointIndex, const UMilitaryUnit* SoldierMilitaryUnit, const UMassEntitySubsystem& EntitySubsystem)
+{
+	FMassEntityView SoldierEntityView(EntitySubsystem, SoldierMilitaryUnit->GetMassEntityHandle());
+	const FMassNavMeshMoveFragment& NavMeshMoveFragment = SoldierEntityView.GetFragmentData<FMassNavMeshMoveFragment>();
+	return NavMeshMoveFragment.CurrentPathPointIndex >= NextNavPointIndex;
+}
+
+bool HaveAllSquadMembersReachedNextNavPoint(int32 NextNavPointIndex, const UMilitaryUnit* MilitaryUnit, const UMassEntitySubsystem& EntitySubsystem, UMilitaryUnit* UnitToIgnore)
+{
+	if (MilitaryUnit == UnitToIgnore)
+	{
+		return true;
+	}
+
+	if (MilitaryUnit->bIsSoldier)
+	{
+		const bool bHasSoldierReachedNextNavPoint = HasSoldierReachedNextNavPoint(NextNavPointIndex, MilitaryUnit, EntitySubsystem);
+		if (!bHasSoldierReachedNextNavPoint)
+		{
+			return false;
+		}
+	}
+	
+	for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
+	{
+		if (!HaveAllSquadMembersReachedNextNavPoint(NextNavPointIndex, SubUnit, EntitySubsystem, UnitToIgnore))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float& MovementSpeed, const float& AgentRadius, const UMassEntitySubsystem& EntitySubsystem)
 {
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	const bool& bIsTrackedVehicle = Context.DoesArchetypeHaveTag<FMassTrackedVehicleOrientationTag>();
@@ -51,7 +86,18 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	const auto DistanceFromNextMovePoint = (EntityLocation - NextMovePoint).Size();
 	MoveTargetFragmentToModify.DistanceToGoal = DistanceFromNextMovePoint;
 	const bool bAtNextMovePoint = DistanceFromNextMovePoint < AgentRadius;
-	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward) : bAtNextMovePoint;
+	bool bAllSquadMembersAtNextMovePoint = true;
+	if (bAtNextMovePoint)
+	{
+		UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
+		check(MilitaryStructureSubsystem);
+		UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+		if (IsSquadMember(EntityUnit))
+		{
+			bAllSquadMembersAtNextMovePoint = HaveAllSquadMembersReachedNextNavPoint(NavMeshMoveFragment.CurrentPathPointIndex, EntityUnit->SquadMilitaryUnit, EntitySubsystem, EntityUnit);
+		}
+	}
+	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward) : bAtNextMovePoint && bAllSquadMembersAtNextMovePoint;
 
 #if WITH_MASSGAMEPLAY_DEBUG
 	if (UMassNavMeshMoveProcessor_DrawPathState || UE::Mass::Debug::IsDebuggingEntity(Entity))
@@ -133,7 +179,7 @@ void UMassNavMeshMoveProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, F
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
-			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i], MovementSpeedList[i].MovementSpeed, AgentRadiusList[i].Radius);
+			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i], MovementSpeedList[i].MovementSpeed, AgentRadiusList[i].Radius, EntitySubsystem);
 		}
 	});
 }

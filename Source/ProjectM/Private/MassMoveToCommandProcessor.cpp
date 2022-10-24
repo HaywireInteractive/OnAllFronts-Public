@@ -98,7 +98,8 @@ void SetSquadMemberPaths(const UMilitaryUnit* MilitaryUnit, const UMassEntitySub
 			const FVector& SquadLeaderPathPointLocation = SquadLeaderPathPoint.Location;
 			const FVector& ForwardToNextPoint = (NextPoint - SquadLeaderPathPointLocation).GetSafeNormal();
 			const float ForwardToNextPointHeadingDegrees = FMath::RadiansToDegrees(UE::MassNavigation::GetYawFromDirection(ForwardToNextPoint));
-			const FVector2D UnrotatedOffset = GSquadMemberOffsetsMeters[MilitaryUnit->SquadMemberIndex] * 100.f * GSquadSpacingScalingFactor;
+			FVector2D UnrotatedOffset = GSquadMemberOffsetsMeters[MilitaryUnit->SquadMemberIndex] * 100.f * GSquadSpacingScalingFactor;
+			UnrotatedOffset = FVector2D(UnrotatedOffset.Y, UnrotatedOffset.X);
 			const FVector2D RotatedOffset = UnrotatedOffset.GetRotated(-ForwardToNextPointHeadingDegrees);
 			const FVector SquadMemberPathPointLocation = SquadLeaderPathPointLocation + FVector(RotatedOffset, 0.f);
 			SquadMemberPathPoints.Add(SquadMemberPathPointLocation);
@@ -116,6 +117,24 @@ void SetSquadMemberPaths(const UMilitaryUnit* MilitaryUnit, const UMassEntitySub
 	}
 }
 
+FNavPathSharedPtr PrependExtraPointIfNeeded(FNavPathSharedPtr NavPath, const bool bIsSquadLeader)
+{
+	if (!bIsSquadLeader)
+	{
+		return NavPath;
+	}
+
+	const TArray<FNavPathPoint>& PathPoints = NavPath.Get()->GetPathPoints();
+	TArray<FVector> NewPathPoints;
+	NewPathPoints.Reserve(PathPoints.Num() + 1);
+	NewPathPoints.Add(PathPoints[0].Location);
+	for (const FNavPathPoint& PathPoint : PathPoints)
+	{
+		NewPathPoints.Add(PathPoint.Location);
+	}
+
+	return MakeShareable(new FNavigationPath(NewPathPoints));
+}
 
 bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FVector& EntityLocation, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, const FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& NavMeshRadius, const UMassEntitySubsystem& EntitySubsystem)
 {
@@ -134,7 +153,8 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 	UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
 
 	bool bSetSquadMemberPaths = false;
-	if (IsSquadLeader(EntityUnit))
+	const bool bIsSquadLeader = IsSquadLeader(EntityUnit);
+	if (bIsSquadLeader)
 	{
 		bSetSquadMemberPaths = true;
 	}
@@ -171,14 +191,14 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 		return false;
 	}
 
-	NavMeshMoveFragment.Path = Result.Path;
-	NavMeshMoveFragment.CurrentPathPointIndex = 0;
-
 	if (bSetSquadMemberPaths)
 	{
 		const UMilitaryUnit* SquadMilitaryUnit = EntityUnit->Parent;
 		SetSquadMemberPaths(SquadMilitaryUnit, EntitySubsystem, Result.Path, Context);
 	}
+
+	NavMeshMoveFragment.Path = PrependExtraPointIfNeeded(Result.Path, bIsSquadLeader);
+	NavMeshMoveFragment.CurrentPathPointIndex = 0;
 
 	Context.Defer().AddTag<FMassNeedsNavMeshMoveTag>(Entity);
 
