@@ -7,6 +7,7 @@
 
 class APlayerController;
 class AActor;
+struct FMassNavMeshMoveFragment;
 
 class FGameplayDebuggerCategory_ProjectM : public FGameplayDebuggerCategory
 {
@@ -19,6 +20,8 @@ public:
 
 protected:
 	void DrawTargetEntityLocations(const TArray<FVector>& TargetEntityLocations, const FColor& Color, const FVector& EntityLocation);
+	void CollectDataForNavMeshMoveProcessor(const APlayerController* OwnerPC);
+	void DrawNavMeshPath(const FMassNavMeshMoveFragment& NavMeshMoveFragment);
 };
 
 #endif // WITH_GAMEPLAY_DEBUGGER

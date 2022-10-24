@@ -73,6 +73,7 @@ struct PROJECTM_API FMassNavMeshMoveFragment : public FMassFragment
 
 	FNavPathSharedPtr Path;
 	int32 CurrentPathPointIndex = 0;
+	int8 SquadMemberIndex = -1;
 };
 
 UCLASS()
