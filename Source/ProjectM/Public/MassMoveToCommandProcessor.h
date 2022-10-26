@@ -72,7 +72,8 @@ struct PROJECTM_API FMassNavMeshMoveFragment : public FMassFragment
 	GENERATED_BODY()
 
 	FNavPathSharedPtr Path;
-	int32 CurrentPathPointIndex = 0;
+	int32 CurrentPathPointIndex = 0; // This gets incremented when reaching the next point and all squad members have reached as well.
+	int32 ReachedPathPointIndex = 0; // This gets incremented when reaching the next point.
 	int8 SquadMemberIndex = -1;
 };
 

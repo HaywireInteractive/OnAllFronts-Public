@@ -108,6 +108,7 @@ void SetSquadMemberPaths(const UMilitaryUnit* MilitaryUnit, const UMassEntitySub
 		FNavPathSharedPtr SquadMemberPathShared = MakeShareable(new FNavigationPath(SquadMemberPathPoints));
 		SoldierNavMeshMoveFragment.Path = SquadMemberPathShared;
 		SoldierNavMeshMoveFragment.CurrentPathPointIndex = 0;
+		SoldierNavMeshMoveFragment.ReachedPathPointIndex = 0;
 		SoldierNavMeshMoveFragment.SquadMemberIndex = MilitaryUnit->SquadMemberIndex;
 
 		Context.Defer().AddTag<FMassNeedsNavMeshMoveTag>(MilitaryUnit->GetMassEntityHandle());
@@ -201,6 +202,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 
 	NavMeshMoveFragment.Path = PrependExtraPointIfNeeded(Result.Path, bIsSquadLeader);
 	NavMeshMoveFragment.CurrentPathPointIndex = 0;
+	NavMeshMoveFragment.ReachedPathPointIndex = 0;
 
 	Context.Defer().AddTag<FMassNeedsNavMeshMoveTag>(Entity);
 

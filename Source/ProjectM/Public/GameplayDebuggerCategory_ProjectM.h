@@ -21,7 +21,7 @@ public:
 protected:
 	void DrawTargetEntityLocations(const TArray<FVector>& TargetEntityLocations, const FColor& Color, const FVector& EntityLocation);
 	void CollectDataForNavMeshMoveProcessor(const APlayerController* OwnerPC);
-	void DrawNavMeshPath(const FMassNavMeshMoveFragment& NavMeshMoveFragment);
+	void DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform);
 };
 
 #endif // WITH_GAMEPLAY_DEBUGGER

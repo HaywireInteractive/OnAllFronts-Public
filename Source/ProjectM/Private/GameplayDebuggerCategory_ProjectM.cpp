@@ -9,6 +9,7 @@
 #include <MassNavMeshMoveProcessor.h>
 #include <MassMoveToCommandProcessor.h>
 #include "NavigationSystem.h"
+#include <MassCommonFragments.h>
 
 FGameplayDebuggerCategory_ProjectM::FGameplayDebuggerCategory_ProjectM()
 {
@@ -68,7 +69,8 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(cons
 	}
 
 	FMassEntityQuery EntityQuery;
-	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FMassNeedsNavMeshMoveTag>(EMassFragmentPresence::All);
 
 	FMassExecutionContext Context(0.0f);
@@ -77,15 +79,16 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(cons
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 		const TConstArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetFragmentView<FMassNavMeshMoveFragment>();
+		const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			DrawNavMeshPath(NavMeshMoveList[EntityIndex]);
+			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform());
 		}
 	});
 }
 
-void FGameplayDebuggerCategory_ProjectM::DrawNavMeshPath(const FMassNavMeshMoveFragment& NavMeshMoveFragment)
+void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform)
 {
 	const TArray<FNavPathPoint>& Points = NavMeshMoveFragment.Path.Get()->GetPathPoints();
 	int32 LineEndIndex = 1;
@@ -95,8 +98,8 @@ void FGameplayDebuggerCategory_ProjectM::DrawNavMeshPath(const FMassNavMeshMoveF
 	{
 		// Red = point not yet reached. Green = point already reached.
 		// TODO:
-		//const FColor& Color = PointIndex < NavMeshMoveFragment.CurrentPathPointIndex ? FColor::Green : FColor::Red;
-		const FColor& Color = PointIndex == 0 ? FColor::Green : FColor::Red;
+		const FColor& Color = PointIndex < NavMeshMoveFragment.CurrentPathPointIndex ? FColor::Green : FColor::Red;
+		//const FColor& Color = PointIndex == 0 ? FColor::Green : FColor::Red;
 		const FVector StringLocation = NavPathPoint.Location + FVector(0.f, 0.f, 50.f);
 		AddShape(FGameplayDebuggerShape::MakePoint(NavPathPoint.Location, 3.f, Color, FString::Printf(TEXT("PI %d, SI %d"), PointIndex, NavMeshMoveFragment.SquadMemberIndex)));
 		if (LineEndIndex >= Points.Num())
@@ -104,13 +107,18 @@ void FGameplayDebuggerCategory_ProjectM::DrawNavMeshPath(const FMassNavMeshMoveF
 			break;
 		}
 		const FNavPathPoint& LineEndNavPathPoint = Points[LineEndIndex++];
-		if (PointIndex >= 1 && NavMeshMoveFragment.SquadMemberIndex != 0)
-		{
-			break; // TODO: temp
-		}
+		const FColor& LineColor = LineEndIndex < NavMeshMoveFragment.CurrentPathPointIndex ? FColor::Green : FColor::Red;
+
+		//if (PointIndex >= 1 && NavMeshMoveFragment.SquadMemberIndex != 0)
+		//{
+		//	break; // TODO: temp
+		//}
 		AddShape(FGameplayDebuggerShape::MakeSegment(NavPathPoint.Location, LineEndNavPathPoint.Location, Color));
 		PointIndex++;
 	}
+
+	const FVector EntityDrawPoint = Transform.GetLocation() + FVector(0.f, 0.f, 200.f);
+	AddShape(FGameplayDebuggerShape::MakePoint(EntityDrawPoint, 3.f, FColor::Blue, FString::Printf(TEXT("SI %d"), NavMeshMoveFragment.SquadMemberIndex)));
 }
 
 void FGameplayDebuggerCategory_ProjectM::DrawData(APlayerController* OwnerPC, FGameplayDebuggerCanvasContext& CanvasContext)

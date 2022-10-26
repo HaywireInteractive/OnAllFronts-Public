@@ -35,7 +35,7 @@ bool HasSoldierReachedNextNavPoint(int32 NextNavPointIndex, const UMilitaryUnit*
 {
 	FMassEntityView SoldierEntityView(EntitySubsystem, SoldierMilitaryUnit->GetMassEntityHandle());
 	const FMassNavMeshMoveFragment& NavMeshMoveFragment = SoldierEntityView.GetFragmentData<FMassNavMeshMoveFragment>();
-	return NavMeshMoveFragment.CurrentPathPointIndex >= NextNavPointIndex;
+	return NavMeshMoveFragment.ReachedPathPointIndex >= NextNavPointIndex;
 }
 
 bool HaveAllSquadMembersReachedNextNavPoint(int32 NextNavPointIndex, const UMilitaryUnit* MilitaryUnit, const UMassEntitySubsystem& EntitySubsystem, UMilitaryUnit* UnitToIgnore)
@@ -75,7 +75,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	FMassMoveTargetFragment& MoveTargetFragmentToModify = bUseStashedMoveTarget ? StashedMoveTargetFragment : MoveTargetFragment;
 
 	const auto& Points = NavMeshMoveFragment.Path.Get()->GetPathPoints();
-	FVector NextMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
+	FVector CurrentMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
 
 	// For tracked vehicles set initial move target forward to direction so they first turn if needed.
 	if (NavMeshMoveFragment.CurrentPathPointIndex == 0 && bIsTrackedVehicle)
@@ -83,18 +83,19 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 		MoveTargetFragmentToModify.Forward = (Points[1].Location - EntityLocation).GetSafeNormal();
 	}
 
-	const auto DistanceFromNextMovePoint = (EntityLocation - NextMovePoint).Size();
+	const auto DistanceFromNextMovePoint = (EntityLocation - CurrentMovePoint).Size();
 	MoveTargetFragmentToModify.DistanceToGoal = DistanceFromNextMovePoint;
 	const bool bAtNextMovePoint = DistanceFromNextMovePoint < AgentRadius;
 	bool bAllSquadMembersAtNextMovePoint = true;
 	if (bAtNextMovePoint)
 	{
+		NavMeshMoveFragment.ReachedPathPointIndex = NavMeshMoveFragment.CurrentPathPointIndex;
 		UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
 		check(MilitaryStructureSubsystem);
 		UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
 		if (IsSquadMember(EntityUnit))
 		{
-			bAllSquadMembersAtNextMovePoint = HaveAllSquadMembersReachedNextNavPoint(NavMeshMoveFragment.CurrentPathPointIndex, EntityUnit->SquadMilitaryUnit, EntitySubsystem, EntityUnit);
+			bAllSquadMembersAtNextMovePoint = HaveAllSquadMembersReachedNextNavPoint(NavMeshMoveFragment.ReachedPathPointIndex, EntityUnit->SquadMilitaryUnit, EntitySubsystem, EntityUnit);
 		}
 	}
 	const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward) : bAtNextMovePoint && bAllSquadMembersAtNextMovePoint;
@@ -119,12 +120,17 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 	}
 
 	// We are at the next move point but we haven't reached the final move point, so update FMassMoveTargetFragment.
-	NextMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
+	CurrentMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex].Location;
+	const FVector* NextMovePoint = nullptr;
+	if (NavMeshMoveFragment.CurrentPathPointIndex + 1 < Points.Num())
+	{
+		NextMovePoint = &Points[NavMeshMoveFragment.CurrentPathPointIndex + 1].Location;
+	}
 
 	MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Move, *World);
-	MoveTargetFragmentToModify.Center = NextMovePoint;
-	MoveTargetFragmentToModify.Forward = (NextMovePoint - EntityLocation).GetSafeNormal();
-	const float Distance = (EntityLocation - NextMovePoint).Size();
+	MoveTargetFragmentToModify.Center = CurrentMovePoint;
+	MoveTargetFragmentToModify.Forward = NextMovePoint ? (*NextMovePoint - CurrentMovePoint).GetSafeNormal() : (CurrentMovePoint - EntityLocation).GetSafeNormal();
+	const float Distance = (EntityLocation - CurrentMovePoint).Size();
 	MoveTargetFragmentToModify.DistanceToGoal = Distance;
 	MoveTargetFragmentToModify.bOffBoundaries = true;
 	MoveTargetFragmentToModify.DesiredSpeed.Set(MovementSpeed);
