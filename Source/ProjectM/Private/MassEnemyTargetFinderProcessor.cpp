@@ -241,11 +241,17 @@ struct FPotentialTarget
 	bool bIsSoldier;
 };
 
+bool IsValidVector(const FVector& Vector)
+{
+	const bool bHasAnyInvalidComponents = FMath::IsNaN(Vector.X) || FMath::IsNaN(Vector.Y) || FMath::IsNaN(Vector.Z);
+	return !bHasAnyInvalidComponents;
+}
+
 void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const UMassTargetFinderSubsystem& TargetFinderSubsystem, const FTransform& EntityTransform, const bool& IsEntityOnTeam1, const FTargetEntityFragment& TargetEntityFragment, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& OutPotentialTargetsNeedingSphereTrace)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces);
 
-  const UWorld* World = EntitySubsystem.GetWorld();
+	const UWorld* World = EntitySubsystem.GetWorld();
 
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	const FVector& EntityForwardVector = EntityTransform.GetRotation().GetForwardVector();
@@ -261,7 +267,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 	CloseEntities.Reserve(300);
 
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces.TargetGridQuery");
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces.TargetGridQuery);
 		TargetFinderSubsystem.GetTargetGrid().Query(SearchBounds, CloseEntities);
 	}
 
@@ -276,7 +282,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.GetPotentialTargetSphereTraces.ProcessCloseEntities);
 
-	  for (const FMassTargetGridItem& OtherEntity : CloseEntities)
+		for (const FMassTargetGridItem& OtherEntity : CloseEntities)
 		{
 			// Skip self.
 			if (OtherEntity.Entity == Entity)
@@ -327,8 +333,15 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 
 			const FCapsule& ProjectileTraceCapsule = GetProjectileTraceCapsuleToTarget(bIsEntitySoldier, OtherEntity.bIsSoldier, EntityTransform, OtherEntityLocation);
 
-			OutPotentialTargetsNeedingSphereTrace.Enqueue(FPotentialTargetSphereTraceData(Entity, OtherEntity.Entity, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, OtherEntity.MinCaliberForDamage, OtherEntityLocation, OtherEntity.bIsSoldier));
-			NumPotentialTargetsNeedingSphereTraceEnqueued++;
+			if (IsValidVector(ProjectileTraceCapsule.a) && IsValidVector(ProjectileTraceCapsule.b))
+			{
+				OutPotentialTargetsNeedingSphereTrace.Enqueue(FPotentialTargetSphereTraceData(Entity, OtherEntity.Entity, ProjectileTraceCapsule.a, ProjectileTraceCapsule.b, OtherEntity.MinCaliberForDamage, OtherEntityLocation, OtherEntity.bIsSoldier));
+				NumPotentialTargetsNeedingSphereTraceEnqueued++;
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Got invalid vector."));
+			}
 		}
 	}
 

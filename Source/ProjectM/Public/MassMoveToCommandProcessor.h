@@ -75,6 +75,9 @@ struct PROJECTM_API FMassNavMeshMoveFragment : public FMassFragment
 	int32 CurrentPathPointIndex = 0; // This gets incremented when reaching the next point and all squad members have reached as well.
 	int32 ReachedPathPointIndex = 0; // This gets incremented when reaching the next point.
 	int8 SquadMemberIndex = -1;
+	
+	/** Current progress distance to next nav mesh point. */
+	float ProgressDistance = 0.0f;
 };
 
 UCLASS()
