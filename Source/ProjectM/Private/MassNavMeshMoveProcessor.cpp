@@ -65,7 +65,17 @@ bool HaveAllSquadMembersReachedNextNavPoint(int32 NextNavPointIndex, const UMili
 	return true;
 }
 
-void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float& MovementSpeed, const float& AgentRadius, const UMassEntitySubsystem& EntitySubsystem)
+void SetUpMoveTargetToPoint(FMassMoveTargetFragment& MoveTargetFragmentToModify, const FVector& CurrentMovePoint, UWorld* World, const float MovementSpeed, FMassNavMeshMoveFragment& NavMeshMoveFragment, const EMassMovementAction IntentAtGoal)
+{
+	MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Move, *World);
+	MoveTargetFragmentToModify.Center = CurrentMovePoint;
+	MoveTargetFragmentToModify.DistanceToGoal = 0.f; // We can set to 0 since it'll get set in next tick.
+	MoveTargetFragmentToModify.bOffBoundaries = true;
+	MoveTargetFragmentToModify.DesiredSpeed.Set(MovementSpeed);
+	NavMeshMoveFragment.ProgressDistance = 0.f;
+}
+
+void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float MovementSpeed, const float AgentRadius, const UMassEntitySubsystem& EntitySubsystem)
 {
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 	const bool& bIsTrackedVehicle = Context.DoesArchetypeHaveTag<FMassTrackedVehicleOrientationTag>();
@@ -83,41 +93,37 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 		MoveTargetFragmentToModify.Forward = (Points[1].Location - EntityLocation).GetSafeNormal();
 	}
 
-	//const float DistanceFromNextMovePoint = (EntityLocation - CurrentMovePoint).Size();
-	//const bool bAtNextMovePoint = DistanceFromNextMovePoint < AgentRadius;
-	//bool bAllSquadMembersAtNextMovePoint = true;
-	//if (bAtNextMovePoint)
-	//{
-	//	MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
-	//	MoveTargetFragmentToModify.DistanceToGoal = 0.f;
-	//	MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
-
-	//	NavMeshMoveFragment.ReachedPathPointIndex = NavMeshMoveFragment.CurrentPathPointIndex;
-	//	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
-	//	check(MilitaryStructureSubsystem);
-	//	UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
-	//	if (IsSquadMember(EntityUnit))
-	//	{
-	//		bAllSquadMembersAtNextMovePoint = HaveAllSquadMembersReachedNextNavPoint(NavMeshMoveFragment.ReachedPathPointIndex, EntityUnit->SquadMilitaryUnit, EntitySubsystem, EntityUnit);
-	//	}
-	//}
-	//const bool bFinishedNextMovePoint = bIsTrackedVehicle ? bAtNextMovePoint && IsTransformFacingDirection(EntityTransform, MoveTargetFragment.Forward) : bAtNextMovePoint && bAllSquadMembersAtNextMovePoint;
-
-	if (!MoveTargetFragmentToModify.bSteeringFallingBehind && !bUseStashedMoveTarget)
+	if (!MoveTargetFragmentToModify.bSteeringFallingBehind && !bUseStashedMoveTarget && MoveTargetFragmentToModify.GetCurrentAction() == EMassMovementAction::Move)
 	{
 		NavMeshMoveFragment.ProgressDistance += MoveTargetFragmentToModify.DesiredSpeed.Get() * Context.GetDeltaTimeSeconds();
 	}
 
-	bool bAtNextMovePoint = false;
+	const bool bIsStanding = MoveTargetFragmentToModify.GetCurrentAction() == EMassMovementAction::Stand;
+	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
+	check(MilitaryStructureSubsystem);
+	UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+	const bool bIsSquadMember = IsSquadMember(EntityUnit);
+	if (bIsSquadMember && bIsStanding) // If waiting for squad mates to reach next move point.
+	{
+		const bool bAllSquadMembersAtNextMovePoint = HaveAllSquadMembersReachedNextNavPoint(NavMeshMoveFragment.ReachedPathPointIndex, EntityUnit->SquadMilitaryUnit, EntitySubsystem, EntityUnit);
+
+		if (bAllSquadMembersAtNextMovePoint)
+		{
+			const bool bIsLastMoveTarget = NavMeshMoveFragment.CurrentPathPointIndex + 1 >= Points.Num();
+			const EMassMovementAction IntentAtGoal = (bIsLastMoveTarget || bIsTrackedVehicle) ? EMassMovementAction::Stand : EMassMovementAction::Move;
+			SetUpMoveTargetToPoint(MoveTargetFragmentToModify, CurrentMovePoint, World, MovementSpeed, NavMeshMoveFragment, IntentAtGoal);
+			if (bUseStashedMoveTarget) {
+				Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
+			}
+		}
+
+		return;
+	}
+
+	bool bNeedsNextMovePoint = false;
 	if (NavMeshMoveFragment.CurrentPathPointIndex == 0)
 	{
-		bAtNextMovePoint = true;
-		/*const FVector& NextMovePoint = Points[NavMeshMoveFragment.CurrentPathPointIndex + 1].Location;
-		MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
-		MoveTargetFragmentToModify.Center = CurrentMovePoint;
-		MoveTargetFragmentToModify.Forward = (NextMovePoint - CurrentMovePoint).GetSafeNormal();
-		MoveTargetFragmentToModify.DistanceToGoal = 0.f;
-		MoveTargetFragmentToModify.bOffBoundaries = true;*/
+		bNeedsNextMovePoint = true;
 	}
 	else
 	{
@@ -138,42 +144,55 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld *World, c
 			MoveTargetFragmentToModify.Center = FMath::Lerp(PreviousMovePoint, CurrentMovePoint, PercentMoveTargetCompleted);
 			const FVector& NextTangent = (NextMovePoint - CurrentMovePoint).GetSafeNormal();
 			MoveTargetFragmentToModify.Forward = FMath::Lerp(CurrentTangent, NextTangent, PercentMoveTargetCompleted).GetSafeNormal();
-			MoveTargetFragmentToModify.DistanceToGoal = LengthOfCurrentLine - FMath::Lerp(0.f, LengthOfCurrentLine, PercentMoveTargetCompleted);
+			MoveTargetFragmentToModify.DistanceToGoal = LengthOfCurrentLine * (1 - PercentMoveTargetCompleted);
 		}
-		else
+		else // progress > 100%
 		{
-			bAtNextMovePoint = true;
+			bNeedsNextMovePoint = true;
 		}
 	}
 
-	if (!bAtNextMovePoint)
+	if (bNeedsNextMovePoint)
 	{
-		return;
+		NavMeshMoveFragment.ReachedPathPointIndex = NavMeshMoveFragment.CurrentPathPointIndex;
+		NavMeshMoveFragment.CurrentPathPointIndex++;
+
+		const bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentPathPointIndex >= Points.Num();
+		if (bFinishedNavMeshMove)
+		{
+			MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
+			MoveTargetFragmentToModify.DistanceToGoal = 0.f;
+			MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
+
+			Context.Defer().RemoveTag<FMassNeedsNavMeshMoveTag>(Entity);
+			if (bUseStashedMoveTarget) {
+				Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
+			}
+			return;
+		}
+
+		// We are at the next move point but we haven't reached the final move point, so update FMassMoveTargetFragment.
+
+		bool bAllSquadMembersAtNextMovePoint = true;
+
+		if (bIsSquadMember)
+		{
+			bAllSquadMembersAtNextMovePoint = HaveAllSquadMembersReachedNextNavPoint(NavMeshMoveFragment.ReachedPathPointIndex, EntityUnit->SquadMilitaryUnit, EntitySubsystem, EntityUnit);
+		}
+
+		if (bAllSquadMembersAtNextMovePoint)
+		{
+			const bool bIsLastMoveTarget = NavMeshMoveFragment.CurrentPathPointIndex + 1 >= Points.Num();
+			const EMassMovementAction IntentAtGoal = (bIsLastMoveTarget || bIsTrackedVehicle) ? EMassMovementAction::Stand : EMassMovementAction::Move;
+			SetUpMoveTargetToPoint(MoveTargetFragmentToModify, CurrentMovePoint, World, MovementSpeed, NavMeshMoveFragment, IntentAtGoal);
+		}
+		else // Stand and wait for squad mates.
+		{
+			MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
+			MoveTargetFragmentToModify.DistanceToGoal = 0.f;
+			MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
+		}
 	}
-
-	NavMeshMoveFragment.CurrentPathPointIndex++;
-
-	const bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentPathPointIndex >= Points.Num();
-	if (bFinishedNavMeshMove)
-	{
-		MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
-		MoveTargetFragmentToModify.DistanceToGoal = 0.f;
-		MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
-
-		Context.Defer().RemoveTag<FMassNeedsNavMeshMoveTag>(Entity);
-		return;
-	}
-
-	// We are at the next move point but we haven't reached the final move point, so update FMassMoveTargetFragment.
-
-	MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Move, *World);
-	MoveTargetFragmentToModify.Center = CurrentMovePoint;
-	MoveTargetFragmentToModify.DistanceToGoal = 0.f;
-	MoveTargetFragmentToModify.bOffBoundaries = true;
-	MoveTargetFragmentToModify.DesiredSpeed.Set(MovementSpeed);
-	const bool& bIsLastMoveTarget = NavMeshMoveFragment.CurrentPathPointIndex + 1 >= Points.Num();
-	MoveTargetFragmentToModify.IntentAtGoal = (bIsLastMoveTarget || bIsTrackedVehicle) ? EMassMovementAction::Stand : EMassMovementAction::Move;
-	NavMeshMoveFragment.ProgressDistance = 0.f;
 
 	if (bUseStashedMoveTarget) {
 		Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);

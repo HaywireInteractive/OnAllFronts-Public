@@ -1,3 +1,5 @@
+// Adapted from GameplayDebuggerCategory_Mass.h.
+
 #pragma once
 
 #if WITH_GAMEPLAY_DEBUGGER
@@ -20,8 +22,19 @@ public:
 
 protected:
 	void DrawTargetEntityLocations(const TArray<FVector>& TargetEntityLocations, const FColor& Color, const FVector& EntityLocation);
-	void CollectDataForNavMeshMoveProcessor(const APlayerController* OwnerPC);
-	void DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform);
+	void CollectDataForNavMeshMoveProcessor(const APlayerController* OwnerPC, const FVector& ViewLocation, const FVector& ViewDirection);
+	void DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance);
+
+	struct FEntityDescription
+	{
+		FEntityDescription() = default;
+		FEntityDescription(const float InScore, const FVector& InLocation, const FString& InDescription) : Score(InScore), Location(InLocation), Description(InDescription) {}
+
+		float Score = 0.0f;
+		FVector Location = FVector::ZeroVector;
+		FString Description;
+	};
+	TArray<FEntityDescription> NearEntityDescriptions;
 };
 
 #endif // WITH_GAMEPLAY_DEBUGGER
