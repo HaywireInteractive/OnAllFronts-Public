@@ -127,7 +127,6 @@ These ideas below would be explored in one of the phases above.
     1. Third Person > Add to project.
 1. Add Unreal Engine Marketplace free content to project. Note that some of this content hasn't been migrated to UE5 yet, so when you try to add it from the Epic Games Launcher, check "Show all projects" after clicking "Add to Project". Then in the "Select Version" dropdown select the newest version in the list.
     1. [Military Weapons Silver](https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver)
-        1. Then open M_WeaponMaster_01 > Used with Instanced Static Meshes > Apply > Save
     1. [M1A1 Abrams Tank](https://www.unrealengine.com/marketplace/en-US/product/m1a1-abrams-tank)
     1. [Realistic Starter VFX Pack Vol 2](https://www.unrealengine.com/marketplace/en-US/product/realistic-starter-vfx-pack-vol)
     1. [Animation Starter Pack](https://www.unrealengine.com/marketplace/en-US/product/animation-starter-pack)
