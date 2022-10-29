@@ -90,19 +90,47 @@ These ideas below would be explored in one of the phases above.
 
 # Development Environment Setup
 
-1. Install [Git for Windows](https://gitforwindows.org/). Use the default options.
+## Prerequisites
+1. Install Git. Two recommended options:
+    1. For Git beginners, [GitHub Desktop](https://desktop.github.com/) is recommended.
+    1. For more advanced users, [Git for Windows](https://gitforwindows.org/) is recommended. Use the default options in installer.
 1. Install Unreal Engine 5.0.3 from [Epic Games Launcher](https://store.epicgames.com/en-US/download).
 1. Install [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/).
     1. Follow steps [here](https://docs.unrealengine.com/5.0/en-US/setting-up-visual-studio-development-environment-for-cplusplus-projects-in-unreal-engine/#optionsforanewvisualstudioinstallation) for which options to choose when installing.
     1. If you don't have it installed, install latest .NET Core 3.1: https://dotnet.microsoft.com/en-us/download/dotnet?cid=getdotnetcore
-1. Create a new project using one of the two options below:
-    1. If you want to use the [City Sample project](https://www.unrealengine.com/marketplace/en-US/product/city-sample) for developing in a large level, get the project from UE Marketplace and then create a project using that template.
-    1. If you want to quickly develop in a smaller project, in UE create a new empty C++ project.
-1. If there is no .sln in the project folder, generate VS project from right clicking .uproject in project folder.
-1. Open .sln in Visual Studio if it isn't already open.
-1. Visual Studio > Tools > Options
+1. If you plan to modify ProjectM C++ code: Launch Visual Studio > Tools > Options
     1. Text Editor > C/C++ > Tabs > select Keep tabs
     1. Text Editor > Advanced > uncheck "Use adaptive formatting"
+
+## Quick Start
+ProjectM is structured as an Unreal Engine plugin. To quickly get started, we have an Unreal Engine starter project that already includes a reference to ProjectM. To use it:
+1. In GitHub Desktop:
+    1. File > Clone repository > URL tab
+    1. URL: https://github.com/LeroyTechnologies/ProjectMStarter.git
+    1. Local path: choose a folder on your machine where you want the Unreal Engine project created
+    1. Click Clone
+1. In Windows Explorer double click the .uproject at the root of the folder where you cloned the project.
+1. You should get a prompt about missing modules. Click Yes to build them.
+1. Note that you won't see any progress while it's building, just be patient. If you want to make sure it's building, open Task Manager and you should see Microsoft C++ Compiler using CPU. On an Intel Core i7-9700K CPU @ 3.60GHz this took about 3 minutes.
+1. When it's done, it should open the project in Unreal Engine. Now move onto the next section below.
+
+### Add Assets
+1. First confirm that the ProjectM folder shows up in your Content Drawer under Plugins. If you don't see Plugins, click Settings button on top right of Content Drawer > Show Plugin Content.
+1. Add Content Packs from Content Drawer > Add > Add Feature or Content Pack > Blueprint
+    1. First Person > Add to project.
+    1. Third Person > Add to project.
+1. Add Unreal Engine Marketplace free content to project. Note that some of this content hasn't been migrated to UE5 yet, so when you try to add it from the Epic Games Launcher, check "Show all projects" after clicking "Add to Project". Then in the "Select Version" dropdown select the newest version in the list.
+    1. [Military Weapons Silver](https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver)
+    1. [M1A1 Abrams Tank](https://www.unrealengine.com/marketplace/en-US/product/m1a1-abrams-tank)
+    1. [Realistic Starter VFX Pack Vol 2](https://www.unrealengine.com/marketplace/en-US/product/realistic-starter-vfx-pack-vol)
+    1. [Animation Starter Pack](https://www.unrealengine.com/marketplace/en-US/product/animation-starter-pack)
+1. Now in Content Drawer open "Plugins/ProjectM Content/Playgrounds/Maps/L_MediumWithTanks" level and use PIE to test out the project.
+    1. You might have to build NavMesh paths via menu for move commands to work: Build > Build Paths.
+    
+## Adding ProjectM Plugin to Existing Project
+1. If you want to use the [City Sample project](https://www.unrealengine.com/marketplace/en-US/product/city-sample) for developing in a large level, get the project from UE Marketplace and then create a project using that template.
+1. If there is no .sln in the project folder, generate VS project from right clicking .uproject in project folder.
+1. Open .sln in Visual Studio if it isn't already open.
 1. If project isn't open yet in UE, run the project from VS.
 1. Enable the required plugins in UE project if they are not already:
     1. Edit > Plugins
@@ -121,15 +149,6 @@ These ideas below would be explored in one of the phases above.
     1. In VS Solution Explorer, right click the project under Games folder > Properties.
     1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
 1. Rerun project from VS.
-1. At this point you should confirm that the ProjectM folder shows up in your Content Drawer under Plugins. If you don't see Plugins, click Settings button on top right of Content Drawer > Show Plugin Content.
-1. Add Content Packs from Content Drawer > Add > Add Feature or Content Pack > Blueprint
-    1. First Person > Add to project.
-    1. Third Person > Add to project.
-1. Add Unreal Engine Marketplace free content to project. Note that some of this content hasn't been migrated to UE5 yet, so when you try to add it from the Epic Games Launcher, check "Show all projects" after clicking "Add to Project". Then in the "Select Version" dropdown select the newest version in the list.
-    1. [Military Weapons Silver](https://www.unrealengine.com/marketplace/en-US/product/military-weapons-silver)
-    1. [M1A1 Abrams Tank](https://www.unrealengine.com/marketplace/en-US/product/m1a1-abrams-tank)
-    1. [Realistic Starter VFX Pack Vol 2](https://www.unrealengine.com/marketplace/en-US/product/realistic-starter-vfx-pack-vol)
-    1. [Animation Starter Pack](https://www.unrealengine.com/marketplace/en-US/product/animation-starter-pack)
 1. Edit > Project Settings
     1. Engine - Input > Bindings
         1. Add Action Mappings:
@@ -155,8 +174,7 @@ These ideas below would be explored in one of the phases above.
     1. Engine - Navigation System > Agents > Supported Agents > Add 2 elements:
         1. Name: Soldier, Nav Agent Radius: 50.0, Nav Agent Height: 200.0
         1. Name: Tank, Nav Agent Radius: 500.0, Nav Agent Height: 200.0
-1. Now in Content Drawer open "Plugins/ProjectM Content/Playgrounds/Maps/L_MediumWithTanks" level and use PIE to test out the project.
-    1. You might have to build NavMesh paths via menu for move commands to work: Build > Build Paths.
+1. Follow steps above in "Add Assets" section.
 
 ## To add soldiers to City Sample Level
 1. Duplicate Small_City_LVL and call it Small_City_ProjectM_LVL
