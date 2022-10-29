@@ -151,6 +151,7 @@ These ideas below would be explored in one of the phases above.
     1. Engine - Mass
 		1. Search for "MassUpdateISMProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassUpdateISMProcessor) > Auto Register with Processing Phases > uncheck. Note this will already be unchecked in the City Sample project.
 		1. Search for "MassGenericUpdateISMVertexAnimationProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassGenericUpdateISMVertexAnimationProcessor) > Auto Register with Processing Phases > check
+		1. Do the same as previous for "MassSimpleUpdateISMProcessor".
     1. Engine - Navigation System > Agents > Supported Agents > Add 2 elements:
         1. Name: Soldier, Nav Agent Radius: 50.0, Nav Agent Height: 200.0
         1. Name: Tank, Nav Agent Radius: 500.0, Nav Agent Height: 200.0
