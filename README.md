@@ -151,22 +151,7 @@ ProjectM is structured as an Unreal Engine plugin. To quickly get started, we ha
 1. Rerun project from VS.
 1. Edit > Project Settings
     1. Engine - Input > Bindings
-        1. Add Action Mappings:
-            1. "MoveToCommand": T key
-            1. "Spectate": F key
-            1. "Respawn": K key
-            1. "Map": M key
-            1. "Shoot": Left Mouse Button
-            1. "Aim": Right Mouse Button
-            1. "Crouch": Left Ctrl key
-            1. "Sprint": Left Shift key
-            1. "Reload": R key
-            1. "Prone": Z key
-            1. "Stabilize": Left Alt key
-            1. "Pickup Items": G key
-            1. "Switch Weapons": 1 key
-        1. Add Axis Mappings:
-            1. "Move Up/Down": E=1.0, Q=-1.0
+        1. Ensure you have all the AxisMappings and ActionMappings from here: https://github.com/LeroyTechnologies/ProjectMStarter/blob/main/Config/DefaultInput.ini
     1. Engine - Mass
 		1. Search for "MassUpdateISMProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassUpdateISMProcessor) > Auto Register with Processing Phases > uncheck. Note this will already be unchecked in the City Sample project.
 		1. Search for "MassGenericUpdateISMVertexAnimationProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassGenericUpdateISMVertexAnimationProcessor) > Auto Register with Processing Phases > check
