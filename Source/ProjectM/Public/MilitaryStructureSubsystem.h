@@ -98,6 +98,7 @@ public:
 	void RemoveFromParent();
 	FMassEntityHandle GetMassEntityHandle() const;
 	bool IsChildOfUnit(const UMilitaryUnit* ParentUnit);
+	bool IsSquadLeader() const;
 
 	UFUNCTION(BlueprintCallable)
 	bool IsLeafUnit() const;
