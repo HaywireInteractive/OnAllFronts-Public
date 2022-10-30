@@ -158,7 +158,7 @@ ProjectM is structured as an Unreal Engine plugin. To quickly get started, we ha
 		1. Do the same as previous for "MassSimpleUpdateISMProcessor".
     1. Engine - Navigation System > Agents > Supported Agents > Add agents based on the "SupportedAgents" towards bottom of this file: https://github.com/LeroyTechnologies/ProjectMStarter/blob/main/Config/DefaultEngine.ini
         1. Only the Name, Nav Agent Radius, and Nav Agent Height need to be set.
-1. Follow steps above in "Add Assets" section.
+1. Follow steps above in [Add Assets](#add-assets) section.
 
 ## To add soldiers to City Sample Level
 1. Duplicate Small_City_LVL and call it Small_City_ProjectM_LVL
