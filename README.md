@@ -97,6 +97,8 @@ These ideas below would be explored in one of the phases above.
 1. Install Unreal Engine 5.0.3 from [Epic Games Launcher](https://store.epicgames.com/en-US/download).
 1. Install [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/).
     1. Follow steps [here](https://docs.unrealengine.com/5.0/en-US/setting-up-visual-studio-development-environment-for-cplusplus-projects-in-unreal-engine/#optionsforanewvisualstudioinstallation) for which options to choose when installing.
+    1. In Visual Studio Installer make sure to select a .NET Framework SDK version, at least 4.6. ![image](https://user-images.githubusercontent.com/108254625/198902032-370cc297-1a42-4b91-9c29-f37ee5922ce3.png)
+
     1. If you don't have it installed, install latest .NET Core 3.1: https://dotnet.microsoft.com/en-us/download/dotnet?cid=getdotnetcore
 1. If you plan to modify ProjectM C++ code: Launch Visual Studio > Tools > Options
     1. Text Editor > C/C++ > Tabs > select Keep tabs
