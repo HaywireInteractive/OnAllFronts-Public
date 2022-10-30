@@ -145,9 +145,9 @@ ProjectM is structured as an Unreal Engine plugin. To quickly get started, we ha
 	1. If in City Sample: `rmdir -recurse AnimToTexture`
 	1. `git clone --branch projectm https://github.com/LeroyTechnologies/AnimToTexture.git`
 1. Right click the .uproject file again and re-generate the solution to get the new files from the Plugins folder to show in VS.
-1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing argument to editor on launch:
+1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing an argument to editor on launch:
     1. In VS Solution Explorer, right click the project under Games folder > Properties.
-    1. Debugging > Command Arguments > Add "-ParallelMassQueries=1" to the end.
+    1. Debugging > Command Arguments > Add " -ParallelMassQueries=1" to the end (without quotes).
 1. Rerun project from VS.
 1. Edit > Project Settings
     1. Engine - Input > Bindings
