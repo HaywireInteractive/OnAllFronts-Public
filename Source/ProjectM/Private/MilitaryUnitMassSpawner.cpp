@@ -18,12 +18,13 @@
 AMilitaryUnitMassSpawner::AMilitaryUnitMassSpawner()
 {
 	bAutoSpawnOnBeginPlay = false;
-	OnSpawningFinishedEvent.AddDynamic(this, &AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits);
 }
 
 void AMilitaryUnitMassSpawner::BeginPlay()
 {
 	Super::BeginPlay();
+
+	OnSpawningFinishedEvent.AddDynamic(this, &AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits);
 
 	const UMassSimulationSubsystem* MassSimulationSubsystem = UWorld::GetSubsystem<UMassSimulationSubsystem>(GetWorld());
 	if (MassSimulationSubsystem == nullptr || MassSimulationSubsystem->IsSimulationStarted())
@@ -176,6 +177,11 @@ void AMilitaryUnitMassSpawner::OnMilitaryUnitSpawnDataGenerationFinished(TConstA
 	{
 		const FMassEntitySpawnDataGeneratorResult& Result = Data[i];
 		FMassEntitySpawnDataGeneratorResult SquadResult;
+		if (!Result.SpawnData.IsValid())
+		{
+			UE_VLOG_UELOG(this, LogTemp, Error, TEXT("AMilitaryUnitMassSpawner: Invalid spawn data."));
+			return;
+		}
 		const TArray<FTransform>& ResultTransforms = Result.SpawnData.GetMutable<FMassTransformsSpawnData>().Transforms;
 		SquadResult.NumEntities = UnitCounts.SoldierCount;
 		SquadResult.EntityConfigIndex = Result.EntityConfigIndex;
