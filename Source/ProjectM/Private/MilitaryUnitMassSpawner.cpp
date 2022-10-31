@@ -24,7 +24,11 @@ void AMilitaryUnitMassSpawner::BeginPlay()
 {
 	Super::BeginPlay();
 
-	OnSpawningFinishedEvent.AddDynamic(this, &AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits);
+	// We need this check because it seems that this binding may have been serialized to disk on older versions of this actor in certain levels.
+	if (!OnSpawningFinishedEvent.IsAlreadyBound(this, &AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits))
+	{
+		OnSpawningFinishedEvent.AddDynamic(this, &AMilitaryUnitMassSpawner::BeginAssignEntitiesToMilitaryUnits);
+	}
 
 	const UMassSimulationSubsystem* MassSimulationSubsystem = UWorld::GetSubsystem<UMassSimulationSubsystem>(GetWorld());
 	if (MassSimulationSubsystem == nullptr || MassSimulationSubsystem->IsSimulationStarted())
