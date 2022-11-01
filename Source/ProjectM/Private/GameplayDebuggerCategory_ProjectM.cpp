@@ -151,7 +151,7 @@ void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFr
 			// Red = point not yet reached. Green = point already reached.
 			const FColor& Color = ActionIndex < NavMeshMoveFragment.CurrentActionIndex ? FColor::Green : FColor::Red;
 			const FVector StringLocation = Action.TargetLocation + FVector(0.f, 0.f, 50.f);
-			AddShape(FGameplayDebuggerShape::MakePoint(Action.TargetLocation, 3.f, Color, FString::Printf(TEXT("SI %d, AI %d"), NavMeshMoveFragment.SquadMemberIndex, ActionIndex)));
+			AddShape(FGameplayDebuggerShape::MakePoint(Action.TargetLocation, 3.f, Color, FString::Printf(TEXT("{white}SI %d, AI %d"), NavMeshMoveFragment.SquadMemberIndex, ActionIndex)));
 			AddShape(FGameplayDebuggerShape::MakeArrow(Action.TargetLocation, Action.TargetLocation + Action.Forward * AgentRadius, 10.f, 2.f, FColor::Purple));
 		}
 		ActionIndex++;
@@ -160,7 +160,7 @@ void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFr
 	if (DistanceToEntitySq < FMath::Square(MaxViewDistance * 0.5f))
 	{
 		FString Status;
-		Status += FString::Printf(TEXT("{orange}SquadMemberIndex: %d {white}\nCurrentActionIndex: %d\n{yellow}ActionsRemaining: %d\n{turquoise}ActionsNum: %d\n"), NavMeshMoveFragment.SquadMemberIndex, NavMeshMoveFragment.CurrentActionIndex, NavMeshMoveFragment.ActionsRemaining, NavMeshMoveFragment.ActionList.Get()->Actions.Num());
+		Status += FString::Printf(TEXT("{orange}SquadMemberIndex: %d {white}\nCurrentActionIndex: %d\n{yellow}ActionsRemaining: %d\n{turquoise}ActionsNum: %d\n{cyan}IsWaitingOnSquadMates: %d"), NavMeshMoveFragment.SquadMemberIndex, NavMeshMoveFragment.CurrentActionIndex, NavMeshMoveFragment.ActionsRemaining, NavMeshMoveFragment.ActionList.Get()->Actions.Num(), NavMeshMoveFragment.bIsWaitingOnSquadMates);
 
 		FVector BasePos = EntityLocation + FVector(0.0f, 0.0f, 25.0f);
 		constexpr float ViewWeight = 0.6f; // Higher the number the more the view angle affects the score.
@@ -185,7 +185,7 @@ void FGameplayDebuggerCategory_ProjectM::DrawData(APlayerController* OwnerPC, FG
 	if (DebugEntityData.IsEntitySearching)
 	{
 		const FVector2D EntityScreenLocation = CanvasContext.ProjectLocation(DebugEntityData.EntityLocation);
-		CanvasContext.PrintAt(EntityScreenLocation.X, EntityScreenLocation.Y, FColor::Purple, 1.f, FString::Printf(TEXT("{Purple}Number of close entities: %d"), DebugEntityData.NumCloseEntities));
+		CanvasContext.PrintAt(EntityScreenLocation.X, EntityScreenLocation.Y, FColor::Purple, 1.f, FString::Printf(TEXT("{purple}Number of close entities: %d"), DebugEntityData.NumCloseEntities));
 	}
 
 	struct FEntityLayoutRect
