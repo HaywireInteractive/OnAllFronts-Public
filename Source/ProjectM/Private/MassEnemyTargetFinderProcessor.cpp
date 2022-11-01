@@ -614,14 +614,15 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor);
 
+	// Do this even if we skip finding targets so that if we just enabled skip finding targets we'll reset.
+#if WITH_MASSGAMEPLAY_DEBUG
+	UMassEnemyTargetFinderProcessor_DebugEntityData.Reset();
+#endif
+
 	if (UMassEnemyTargetFinderProcessor_SkipFindingTargets)
 	{
 		return;
 	}
-
-#if WITH_MASSGAMEPLAY_DEBUG
-	UMassEnemyTargetFinderProcessor_DebugEntityData.Reset();
-#endif
 
 	TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc> PotentialTargetsNeedingSphereTrace;
 
@@ -667,7 +668,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 		while (!TargetFinderEntityQueue.IsEmpty())
 		{
 			FMassEntityHandle TargetFinderEntity;
-      const bool bSuccess = TargetFinderEntityQueue.Dequeue(TargetFinderEntity);
+			const bool bSuccess = TargetFinderEntityQueue.Dequeue(TargetFinderEntity);
 			check(bSuccess);
 
 			Context.Defer().AddTag<FMassWillNeedEnemyTargetTag>(TargetFinderEntity);
