@@ -23,7 +23,7 @@ public:
 protected:
 	void DrawTargetEntityLocations(const TArray<FVector>& TargetEntityLocations, const FColor& Color, const FVector& EntityLocation);
 	void CollectDataForNavMeshMoveProcessor(const APlayerController* OwnerPC, const FVector& ViewLocation, const FVector& ViewDirection);
-	void DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const struct FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius);
+	void DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const struct FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity);
 
 	struct FEntityDescription
 	{

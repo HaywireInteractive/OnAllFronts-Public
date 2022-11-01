@@ -101,13 +101,18 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(cons
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius);
+			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius, Context.GetEntity(EntityIndex));
 		}
 	});
 }
 
-void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius)
+void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity)
 {
+	if (!UE::Mass::Debug::IsDebuggingEntity(Entity))
+	{
+		return;
+	}
+
 	const FVector& EntityLocation = Transform.GetLocation();
 
 	// Cull entity if needed
