@@ -68,14 +68,13 @@ struct PROJECTM_API FMassStashedMoveTargetFragment : public FMassMoveTargetFragm
 
 struct FNavigationAction
 {
-	FNavigationAction(const FVector TargetLocation, const FVector Forward, const EMassMovementAction Action = EMassMovementAction::Move, const bool bShouldFollowLeader = false)
-		: TargetLocation(TargetLocation), Forward(Forward), Action(Action), bShouldFollowLeader(bShouldFollowLeader)
+	FNavigationAction(const FVector TargetLocation, const FVector Forward, const EMassMovementAction Action = EMassMovementAction::Move)
+		: TargetLocation(TargetLocation), Forward(Forward), Action(Action)
 	{
 	}
 	FVector TargetLocation;
 	FVector Forward;
 	EMassMovementAction Action;
-	bool bShouldFollowLeader;
 };
 
 struct FNavigationActionList

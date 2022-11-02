@@ -66,33 +66,6 @@ bool HaveAllSquadMembersReachedSameAction(int32 ActionsRemaining, const UMilitar
 	return true;
 }
 
-FVector GetExpectedLocationRelativeToSquadLeader(int32 SquadMemberIndex, UMilitaryUnit* SquadMilitaryUnit, const UMassEntitySubsystem& EntitySubsystem)
-{
-	UMilitaryUnit* SquadLeaderMilitaryUnit = nullptr;
-	for (UMilitaryUnit* SubUnit : SquadMilitaryUnit->SubUnits)
-	{
-		if (SubUnit->IsSquadLeader())
-		{
-			SquadLeaderMilitaryUnit = SubUnit;
-		}
-	}
-	if (!SquadLeaderMilitaryUnit)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("GetExpectedLocationRelativeToSquadLeader: Cannot find military unit for squad leader"));
-		return FVector::ZeroVector;
-	}
-
-	const FMassNavMeshMoveFragment& SquadLeaderNavMeshMoveFragment = GetNavMeshMoveFragmentForSoldier(SquadLeaderMilitaryUnit, EntitySubsystem);
-	const FNavigationAction& SquadLeaderCurrentAction = SquadLeaderNavMeshMoveFragment.ActionList.Get()->Actions[SquadLeaderNavMeshMoveFragment.CurrentActionIndex];
-
-	const float ForwardToNextPointHeadingDegrees = FMath::RadiansToDegrees(UE::MassNavigation::GetYawFromDirection(SquadLeaderCurrentAction.Forward));
-	FVector2D UnrotatedOffset = GSquadMemberOffsetsMeters[SquadMemberIndex] * 100.f * GSquadSpacingScalingFactor;
-	UnrotatedOffset = FVector2D(UnrotatedOffset.Y, UnrotatedOffset.X);
-	const FVector2D RotatedOffset = UnrotatedOffset.GetRotated(ForwardToNextPointHeadingDegrees);
-	const FVector& SquadMemberExpectedLocation = SquadLeaderCurrentAction.TargetLocation + FVector(RotatedOffset, 0.f);
-	return SquadMemberExpectedLocation;
-}
-
 void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float MovementSpeed, const float AgentRadius, const UMassEntitySubsystem& EntitySubsystem)
 {
 	const FVector& EntityLocation = EntityTransform.GetLocation();
@@ -122,14 +95,6 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, c
 		{
 			// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
 			MoveTargetFragmentToModify.DistanceToGoal = DistanceFromTarget;
-
-			if (CurrentAction.bShouldFollowLeader)
-			{
-				UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
-				check(MilitaryStructureSubsystem);
-				UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
-				MoveTargetFragmentToModify.Center = GetExpectedLocationRelativeToSquadLeader(NavMeshMoveFragment.SquadMemberIndex, EntityUnit->SquadMilitaryUnit, EntitySubsystem);
-			}
 			return;
 		}
 

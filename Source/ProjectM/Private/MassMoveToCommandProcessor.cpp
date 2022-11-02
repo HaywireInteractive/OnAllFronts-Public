@@ -98,11 +98,14 @@ void SetSquadMemberPaths(const UMilitaryUnit* MilitaryUnit, const UMassEntitySub
 		const FVector& SoldierFirstMoveTarget = GetSoldierOffsetFromSquadLeader(MilitaryUnit->SquadMemberIndex, SquadLeaderActions[0].TargetLocation, SquadLeaderActions[0].Forward);
 		const FVector& SquadMemberFirstForward = (SoldierFirstMoveTarget - SoldierLocation).GetSafeNormal();
 		SquadMemberActions.Add(FNavigationAction(SoldierLocation, SquadMemberFirstForward, EMassMovementAction::Stand));
-		SquadMemberActions.Add(FNavigationAction(SoldierFirstMoveTarget, SquadMemberFirstForward, EMassMovementAction::Move, true));
-		for (const FNavigationAction& SquadLeaderAction : SquadLeaderActions)
+		SquadMemberActions.Add(FNavigationAction(SoldierFirstMoveTarget, SquadMemberFirstForward, EMassMovementAction::Move));
+		for (int32 i = 0; i < SquadLeaderActions.Num(); i++)
 		{
-			const FVector& SoldierOffset = GetSoldierOffsetFromSquadLeader(MilitaryUnit->SquadMemberIndex, SquadLeaderAction.TargetLocation, SquadLeaderAction.Forward);
-			SquadMemberActions.Add(FNavigationAction(SoldierOffset, SquadLeaderAction.Forward, SquadLeaderAction.Action, SquadLeaderAction.Action == EMassMovementAction::Move));
+			const FNavigationAction& SquadLeaderAction = SquadLeaderActions[i];
+			const FNavigationAction& NextSquadLeaderAction = i + 1 < SquadLeaderActions.Num() ? SquadLeaderActions[i + 1] : SquadLeaderActions.Last();
+			const FVector& Forward = SquadLeaderAction.Action == EMassMovementAction::Move ? NextSquadLeaderAction.Forward : SquadLeaderAction.Forward;
+			const FVector& SoldierOffset = GetSoldierOffsetFromSquadLeader(MilitaryUnit->SquadMemberIndex, SquadLeaderAction.TargetLocation, Forward);
+			SquadMemberActions.Add(FNavigationAction(SoldierOffset, SquadLeaderAction.Forward, SquadLeaderAction.Action));
 		}
 
 		check(SquadLeaderActions.Num() + 2 == SquadMemberActions.Num());
