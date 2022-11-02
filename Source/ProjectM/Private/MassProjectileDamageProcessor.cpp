@@ -156,7 +156,7 @@ static void FindCloseObstacles(const FVector& Center, const float SearchRadius, 
 // Returns true if found at least one close entity that is not Entity. Note that OutCloseEntities may include Entity if it is a navigation obstacle.
 bool GetClosestEntities(const FMassEntityHandle& Entity, const UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FVector& Location, const float Radius, TProjectileDamageObstacleItemArray& OutCloseEntities)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor_GetClosestEntity");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor.GetClosestEntity);
 
 	FindCloseObstacles(Location, Radius, AvoidanceObstacleGrid, OutCloseEntities);
 
@@ -181,7 +181,7 @@ bool GetClosestEntities(const FMassEntityHandle& Entity, const UMassEntitySubsys
 
 bool DidCollideViaLineTrace(const UWorld &World, const FVector& StartLocation, const FVector &EndLocation, const bool& DrawLineTraces)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor_DidCollideViaLineTrace");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor.DidCollideViaLineTrace);
 
 	FHitResult HitResult;
 	bool const bSuccess = World.LineTraceSingleByChannel(HitResult, StartLocation, EndLocation, ECollisionChannel::ECC_Visibility);
@@ -215,7 +215,7 @@ FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_DrawCapsules(TEXT("pm
 
 bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocation, const float Radius, const bool& DrawCapsules, const UWorld& World, const FMassEntityView& OtherEntityView)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor_DidCollideWithEntity");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor.DidCollideWithEntity);
 
   const FCapsule ProjectileCapsule(StartLocation, EndLocation, Radius);
 	const FCapsule& OtherEntityCapsule = MakeCapsuleForEntity(OtherEntityView);
@@ -447,13 +447,13 @@ FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_UseParallelForEachEnt
 
 void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, const UWorld* World, const FMassExecutionContext& Context)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor_ProcessQueues");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor.ProcessQueues);
 
 	// Destroy projectiles.
 	while (!ProjectilesToDestroy.IsEmpty())
 	{
 		FMassEntityHandle EntityToDestroy;
-    const bool bSuccess = ProjectilesToDestroy.Dequeue(EntityToDestroy);
+		const bool bSuccess = ProjectilesToDestroy.Dequeue(EntityToDestroy);
 		check(bSuccess);
 		Context.Defer().DestroyEntity(EntityToDestroy);
 	}
@@ -464,7 +464,7 @@ void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDes
 	while (!SoldiersToDestroy.IsEmpty())
 	{
 		FMassEntityHandle EntityToDestroy;
-    const bool bSuccess = SoldiersToDestroy.Dequeue(EntityToDestroy);
+		const bool bSuccess = SoldiersToDestroy.Dequeue(EntityToDestroy);
 		check(bSuccess);
 		Context.Defer().DestroyEntity(EntityToDestroy);
 		MilitaryStructureSubsystem->DestroyEntity(EntityToDestroy);
@@ -476,7 +476,7 @@ void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDes
 	while (!PlayersToDestroy.IsEmpty())
 	{
 		FMassEntityHandle EntityToDestroy;
-    const bool bSuccess = PlayersToDestroy.Dequeue(EntityToDestroy);
+		const bool bSuccess = PlayersToDestroy.Dequeue(EntityToDestroy);
 		check(bSuccess);
 		AActor* OtherActor = PlayerSubsystem->GetActorForEntity(EntityToDestroy);
 		check(OtherActor);
@@ -490,7 +490,7 @@ void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDes
 
 void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassProjectileDamageProcessor");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor);
 
 	if (!NavigationSubsystem)
 	{
