@@ -66,6 +66,19 @@ struct PROJECTM_API FMassStashedMoveTargetFragment : public FMassMoveTargetFragm
 	GENERATED_BODY()
 };
 
+static constexpr uint8 MaxActionsPerGroup = 3;
+
+struct FNavigationActionGroup
+{
+	FNavigationActionGroup(const TStaticArray<FNavigationAction, MaxActionsPerGroup> Actions, const uint8 NumActions)
+		: Actions(Actions), NumActions(NumActions)
+	{
+	}
+	FNavigationActionGroup() = default;
+	const TStaticArray<FNavigationAction, MaxActionsPerGroup> Actions;
+	uint8 NumActions = 0;
+};
+
 struct FNavigationAction
 {
 	FNavigationAction(const FVector TargetLocation, const FVector Forward, const EMassMovementAction Action = EMassMovementAction::Move)
@@ -79,12 +92,12 @@ struct FNavigationAction
 
 struct FNavigationActionList
 {
-	FNavigationActionList(const TArray<FNavigationAction> Actions)
-		: Actions(Actions)
+	FNavigationActionList(const TArray<FNavigationActionGroup> ActionGroups)
+		: ActionGroups(ActionGroups)
 	{
 	}
 	FNavigationActionList() = default;
-	const TArray<FNavigationAction> Actions;
+	const TArray<FNavigationActionGroup> ActionGroups;
 };
 
 typedef TSharedPtr<FNavigationActionList, ESPMode::ThreadSafe> FNavActionListSharedPtr;
@@ -102,15 +115,15 @@ struct PROJECTM_API FMassNavMeshMoveFragment : public FMassFragment
 	void Reset()
 	{
 		ActionList = MakeShareable(new FNavigationActionList());
-		CurrentActionIndex = 0;
-		ActionsRemaining = -1;
+		CurrentActionGroupIndex = 0;
+		ReachedActionGroupIndex = 0;
 		SquadMemberIndex = -1;
 		bIsWaitingOnSquadMates = false;
 	}
 
 	FNavActionListSharedPtr ActionList;
-	int32 CurrentActionIndex = 0; // This gets incremented when completing the next action AND all squad members have completed that action as well.
-	int32 ActionsRemaining = -1; // This gets decremented when completing the next action BEFORE all squad members have completed that action as well.
+	int32 CurrentActionGroupIndex = 0; // This gets incremented when completing the next action AND all squad members have completed that action group as well.
+	int32 ReachedActionGroupIndex = 0; // This gets incremented when completing the next action BEFORE all squad members have completed that action group as well.
 	int8 SquadMemberIndex = -1;
 	bool bIsWaitingOnSquadMates = false;
 };

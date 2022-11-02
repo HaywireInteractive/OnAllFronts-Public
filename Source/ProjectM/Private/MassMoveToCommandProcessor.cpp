@@ -92,26 +92,24 @@ void SetSquadMemberPaths(const UMilitaryUnit* MilitaryUnit, const UMassEntitySub
 		FMassNavMeshMoveFragment& SoldierNavMeshMoveFragment = SoldierEntityView.GetFragmentData<FMassNavMeshMoveFragment>();
 		SoldierNavMeshMoveFragment.Reset();
 		FTransformFragment& SoldierTransformFragment = SoldierEntityView.GetFragmentData<FTransformFragment>();
-		const TArray<FNavigationAction>& SquadLeaderActions = SquadLeaderActionList.Get()->Actions;
-		TArray<FNavigationAction> SquadMemberActions;
+		const TArray<FNavigationActionGroup>& SquadLeaderActionGroups = SquadLeaderActionList.Get()->ActionGroups;
 		const FVector& SoldierLocation = SoldierTransformFragment.GetTransform().GetLocation();
-		const FVector& SoldierFirstMoveTarget = GetSoldierOffsetFromSquadLeader(MilitaryUnit->SquadMemberIndex, SquadLeaderActions[0].TargetLocation, SquadLeaderActions[0].Forward);
-		const FVector& SquadMemberFirstForward = (SoldierFirstMoveTarget - SoldierLocation).GetSafeNormal();
-		SquadMemberActions.Add(FNavigationAction(SoldierLocation, SquadMemberFirstForward, EMassMovementAction::Stand));
-		SquadMemberActions.Add(FNavigationAction(SoldierFirstMoveTarget, SquadMemberFirstForward, EMassMovementAction::Move));
-		for (int32 i = 0; i < SquadLeaderActions.Num(); i++)
+		TArray<FNavigationActionGroup> SoldierActionGroups;
+		for (const FNavigationActionGroup& SquadLeaderActionGroup : SquadLeaderActionGroups)
 		{
-			const FNavigationAction& SquadLeaderAction = SquadLeaderActions[i];
-			const FNavigationAction& NextSquadLeaderAction = i + 1 < SquadLeaderActions.Num() ? SquadLeaderActions[i + 1] : SquadLeaderActions.Last();
-			const FVector& Forward = SquadLeaderAction.Action == EMassMovementAction::Move ? NextSquadLeaderAction.Forward : SquadLeaderAction.Forward;
-			const FVector& SoldierOffset = GetSoldierOffsetFromSquadLeader(MilitaryUnit->SquadMemberIndex, SquadLeaderAction.TargetLocation, Forward);
-			SquadMemberActions.Add(FNavigationAction(SoldierOffset, SquadLeaderAction.Forward, SquadLeaderAction.Action));
+			const FVector& SoldierMoveTarget = GetSoldierOffsetFromSquadLeader(MilitaryUnit->SquadMemberIndex, SquadLeaderActionGroup.Actions[0].TargetLocation, SquadLeaderActionGroup.Actions[0].Forward);
+			const FVector& SoldierForward = (SoldierMoveTarget - SoldierLocation).GetSafeNormal();
+			TArray<FNavigationAction> SoldierActions;
+			SoldierActions.Add(FNavigationAction(SoldierLocation, SoldierForward, EMassMovementAction::Stand));
+			SoldierActions.Add(FNavigationAction(SoldierMoveTarget, SoldierForward, EMassMovementAction::Move, true));
+			const FVector& SoldierOffset = GetSoldierOffsetFromSquadLeader(MilitaryUnit->SquadMemberIndex, SquadLeaderAction.TargetLocation, SquadLeaderAction.Forward);
+			SoldierActions.Add(FNavigationAction(SoldierOffset, SquadLeaderAction.Forward, SquadLeaderAction.Action, SquadLeaderAction.Action == EMassMovementAction::Move));
 		}
 
-		check(SquadLeaderActions.Num() + 2 == SquadMemberActions.Num());
-		SoldierNavMeshMoveFragment.ActionList = MakeShareable(new FNavigationActionList(SquadMemberActions));
-		SoldierNavMeshMoveFragment.CurrentActionIndex = 0;
-		SoldierNavMeshMoveFragment.ActionsRemaining = SquadMemberActions.Num();
+		check(SquadLeaderActions.Num() + 2 == SoldierActions.Num());
+		SoldierNavMeshMoveFragment.ActionList = MakeShareable(new FNavigationActionList(SoldierActions));
+		SoldierNavMeshMoveFragment.CurrentActionGroupIndex = 0;
+		SoldierNavMeshMoveFragment.ReachedActionGroupIndex = 0;
 		SoldierNavMeshMoveFragment.SquadMemberIndex = MilitaryUnit->SquadMemberIndex;
 
 		Context.Defer().AddTag<FMassNeedsNavMeshMoveTag>(MilitaryUnit->GetMassEntityHandle());
@@ -125,8 +123,8 @@ void SetSquadMemberPaths(const UMilitaryUnit* MilitaryUnit, const UMassEntitySub
 FNavActionListSharedPtr CreateNavActionList(FNavPathSharedPtr NavPath)
 {
 	const TArray<FNavPathPoint>& PathPoints = NavPath.Get()->GetPathPoints();
-	TArray<FNavigationAction> Actions;
-	Actions.Reserve(PathPoints.Num() * 2);
+	TArray<FNavigationActionGroup> ActionGroups;
+	ActionGroups.Reserve(PathPoints.Num() - 1);
 
 	// We skip the first point since it's where entity is currently located.
 	for (int32 Index = 1; Index < PathPoints.Num(); Index++)
