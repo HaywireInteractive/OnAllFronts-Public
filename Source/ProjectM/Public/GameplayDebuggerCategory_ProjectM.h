@@ -25,6 +25,10 @@ protected:
 	void CollectDataForNavMeshMoveProcessor(const APlayerController* OwnerPC, const FVector& ViewLocation, const FVector& ViewDirection);
 	void DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const struct FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity, const UWorld* World);
 
+	void OnToggleEnemyTargetFinderDetails() { bShowEnemyTargetFinderDetails = !bShowEnemyTargetFinderDetails; }
+
+	bool bShowEnemyTargetFinderDetails = false;
+
 	struct FEntityDescription
 	{
 		FEntityDescription() = default;

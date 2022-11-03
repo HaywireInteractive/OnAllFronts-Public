@@ -66,12 +66,25 @@ bool HaveAllSquadMembersReachedSameAction(int32 ActionsRemaining, const UMilitar
 	return true;
 }
 
+void CompleteNavMeshMove(FMassMoveTargetFragment& MoveTargetFragmentToModify, UWorld* World, const FMassExecutionContext& Context, const FMassEntityHandle& Entity, const bool bUseStashedMoveTarget)
+{
+	MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
+	MoveTargetFragmentToModify.DistanceToGoal = 0.f;
+	MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
+
+	Context.Defer().RemoveTag<FMassNeedsNavMeshMoveTag>(Entity);
+
+	if (bUseStashedMoveTarget) {
+		Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
+	}
+}
+
 void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float MovementSpeed, const float AgentRadius, const UMassEntitySubsystem& EntitySubsystem)
 {
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 
 	// TODO: would it be faster to have two separate entity queries instead of checking tag here?
-	const bool& bUseStashedMoveTarget = Context.DoesArchetypeHaveTag<FMassTrackTargetTag>() || Context.DoesArchetypeHaveTag<FMassTrackSoundTag>();
+	const bool bUseStashedMoveTarget = Context.DoesArchetypeHaveTag<FMassTrackTargetTag>() || Context.DoesArchetypeHaveTag<FMassTrackSoundTag>();
 	FMassMoveTargetFragment& MoveTargetFragmentToModify = bUseStashedMoveTarget ? StashedMoveTargetFragment : MoveTargetFragment;
 
 	const TArray<FNavigationAction>& Actions = NavMeshMoveFragment.ActionList.Get()->Actions;
@@ -93,6 +106,14 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, c
 
 		if (!bFinishedCurrentAction)
 		{
+			const FVector& DeltaToMoveTargetNormal = (MoveTargetFragmentToModify.Center - EntityLocation).GetSafeNormal();
+			const bool bIsStuck = FMath::IsNearlyZero((MoveTargetFragmentToModify.Forward + DeltaToMoveTargetNormal).SizeSquared());
+			if (bIsStuck)
+			{
+				UE_LOG(LogTemp, Error, TEXT("UMassNavMeshMoveProcessor: Entity got stuck, stopping nav mesh move."));
+				CompleteNavMeshMove(MoveTargetFragmentToModify, World, Context, Entity, bUseStashedMoveTarget);
+				return;
+			}
 			// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
 			MoveTargetFragmentToModify.DistanceToGoal = DistanceFromTarget;
 			return;
@@ -120,15 +141,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, c
 	const bool bFinishedNavMeshMove = NavMeshMoveFragment.CurrentActionIndex >= Actions.Num();
 	if (bFinishedNavMeshMove)
 	{
-		MoveTargetFragmentToModify.CreateNewAction(EMassMovementAction::Stand, *World);
-		MoveTargetFragmentToModify.DistanceToGoal = 0.f;
-		MoveTargetFragmentToModify.DesiredSpeed.Set(0.f);
-
-		Context.Defer().RemoveTag<FMassNeedsNavMeshMoveTag>(Entity);
-
-		if (bUseStashedMoveTarget) {
-			Context.Defer().AddTag<FMassHasStashedMoveTargetTag>(Entity);
-		}
+		CompleteNavMeshMove(MoveTargetFragmentToModify, World, Context, Entity, bUseStashedMoveTarget);
 		return;
 	}
 
@@ -152,7 +165,7 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, c
 
 void UMassNavMeshMoveProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassNavMeshMoveProcessor_Execute");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassNavMeshMoveProcessor.Execute);
 
 	EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, [this, &EntitySubsystem](FMassExecutionContext& Context)
 	{

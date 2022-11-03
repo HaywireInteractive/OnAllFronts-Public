@@ -18,6 +18,8 @@
 FGameplayDebuggerCategory_ProjectM::FGameplayDebuggerCategory_ProjectM()
 {
   bShowOnlyWithDebugActor = false;
+
+  BindKeyPress(EKeys::T.GetFName(), FGameplayDebuggerInputModifier::Shift, this, &FGameplayDebuggerCategory_ProjectM::OnToggleEnemyTargetFinderDetails, EGameplayDebuggerInputMode::Replicated);
 }
 
 // Warning: This gets called on every tick before UMassProcessor::Execute.
@@ -37,24 +39,22 @@ void FGameplayDebuggerCategory_ProjectM::CollectData(APlayerController* OwnerPC,
 	CollectDataForNavMeshMoveProcessor(OwnerPC, ViewLocation, ViewDirection);
 
 	const FDebugEntityData& DebugEntityData = UMassEnemyTargetFinderProcessor_DebugEntityData;
-	if (!DebugEntityData.IsEntitySearching)
+	if (DebugEntityData.IsEntitySearching  && bShowEnemyTargetFinderDetails)
 	{
-		return;
-	}
+		AddShape(FGameplayDebuggerShape::MakeBox(DebugEntityData.SearchCenter, DebugEntityData.SearchExtent, FColor::Purple));
 
-	AddShape(FGameplayDebuggerShape::MakeBox(DebugEntityData.SearchCenter, DebugEntityData.SearchExtent, FColor::Purple));
+		DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToSameTeam, FColor::Red, DebugEntityData.EntityLocation);
+		DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToOtherEntityBlocking, FColor::Yellow, DebugEntityData.EntityLocation);
+		DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToImpenetrable, FColor::Orange, DebugEntityData.EntityLocation);
+		DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToOutOfRange, FColor::Blue, DebugEntityData.EntityLocation);
+		DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToNoLineOfSight, FColor::Black, DebugEntityData.EntityLocation);
 
-	DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToSameTeam, FColor::Red, DebugEntityData.EntityLocation);
-	DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToOtherEntityBlocking, FColor::Yellow, DebugEntityData.EntityLocation);
-	DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToImpenetrable, FColor::Orange, DebugEntityData.EntityLocation);
-	DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToOutOfRange, FColor::Blue, DebugEntityData.EntityLocation);
-	DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToNoLineOfSight, FColor::Black, DebugEntityData.EntityLocation);
-
-	if (DebugEntityData.HasTargetEntity)
-	{
-		TArray<FVector> TargetEntityLocationArray;
-		TargetEntityLocationArray.Add(DebugEntityData.TargetEntityLocation);
-		DrawTargetEntityLocations(TargetEntityLocationArray, FColor::Green, DebugEntityData.EntityLocation);
+		if (DebugEntityData.HasTargetEntity)
+		{
+			TArray<FVector> TargetEntityLocationArray;
+			TargetEntityLocationArray.Add(DebugEntityData.TargetEntityLocation);
+			DrawTargetEntityLocations(TargetEntityLocationArray, FColor::Green, DebugEntityData.EntityLocation);
+		}
 	}
 }
 
@@ -185,10 +185,13 @@ void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFr
 
 void FGameplayDebuggerCategory_ProjectM::DrawData(APlayerController* OwnerPC, FGameplayDebuggerCanvasContext& CanvasContext)
 {
+	CanvasContext.Printf(TEXT("\n[{yellow}%s{white}] %s Enemy Target Finder details"), *GetInputHandlerDescription(0), bShowEnemyTargetFinderDetails ? TEXT("Hide") : TEXT("Show"));
+
+
 	const FDebugEntityData& DebugEntityData = UMassEnemyTargetFinderProcessor_DebugEntityData;
 	if (DebugEntityData.IsEntitySearching)
 	{
-		const FVector2D EntityScreenLocation = CanvasContext.ProjectLocation(DebugEntityData.EntityLocation);
+		const FVector2D EntityScreenLocation = CanvasContext.ProjectLocation(DebugEntityData.EntityLocation + FVector(0.f, 0.f, 300.f));
 		CanvasContext.PrintAt(EntityScreenLocation.X, EntityScreenLocation.Y, FColor::Purple, 1.f, FString::Printf(TEXT("{purple}Number of close entities: %d"), DebugEntityData.NumCloseEntities));
 	}
 
