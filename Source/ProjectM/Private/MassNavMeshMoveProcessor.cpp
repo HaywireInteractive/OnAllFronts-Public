@@ -101,7 +101,8 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, c
 		NavMeshMoveFragment.ActionsRemaining = NavMeshMoveFragment.ActionList.Get()->Actions.Num() - (NavMeshMoveFragment.CurrentActionIndex + 1);
 	}
 
-	if (NavMeshMoveFragment.IsSquadMember())
+	const bool bIsNextActionMove = NavMeshMoveFragment.CurrentActionIndex + 1 < Actions.Num() ? Actions[NavMeshMoveFragment.CurrentActionIndex + 1].Action == EMassMovementAction::Move : false;
+	if (NavMeshMoveFragment.IsSquadMember() && bIsNextActionMove) // Only wait on squad mates if next action is move.
 	{
 		UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
 		check(MilitaryStructureSubsystem);
