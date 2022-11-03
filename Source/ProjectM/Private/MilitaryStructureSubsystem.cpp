@@ -190,12 +190,74 @@ void UMilitaryStructureSubsystem::BindUnitToMassEntity(UMilitaryUnit* MilitaryUn
 
 void UMilitaryStructureSubsystem::DestroyEntity(FMassEntityHandle Entity)
 {
-	UMilitaryUnit** MilitaryUnit = EntityToUnitMap.Find(Entity);
-	if (MilitaryUnit)
+	UMilitaryUnit** MilitaryUnitPtr = EntityToUnitMap.Find(Entity);
+	if (!MilitaryUnitPtr)
 	{
-		(*MilitaryUnit)->RemoveFromParent();
-		EntityToUnitMap.Remove(Entity);
+		return;
 	}
+
+	UMilitaryUnit* MilitaryUnit = *MilitaryUnitPtr;
+	if (MilitaryUnit->SquadMilitaryUnit)
+	{
+		PromoteNewLeaderIfNeeded(MilitaryUnit);
+	}
+	MilitaryUnit->RemoveFromParent();
+	EntityToUnitMap.Remove(Entity);
+}
+
+UMilitaryUnit* FindBestReplacementForLeader(UMilitaryUnit* Leader, UMilitaryUnit* LeaderParentUnit)
+{
+	TQueue<UMilitaryUnit*> UnitsToConsider;
+	UnitsToConsider.Enqueue(LeaderParentUnit);
+	// BFS to find first soldier.
+	while (!UnitsToConsider.IsEmpty())
+	{
+		UMilitaryUnit* Unit;
+		const bool bDidDequeue = UnitsToConsider.Dequeue(Unit);
+		check(bDidDequeue);
+
+		if (Unit->bIsSoldier && Unit != Leader)
+		{
+			return Unit;
+		}
+
+		for (UMilitaryUnit* SubUnit : Unit->SubUnits)
+		{
+			UnitsToConsider.Enqueue(SubUnit);
+		}
+
+	}
+
+	return nullptr;
+}
+
+void UMilitaryStructureSubsystem::PromoteNewLeaderIfNeeded(UMilitaryUnit* SoldierToRemoveFromUnit)
+{
+	if (!SoldierToRemoveFromUnit->bIsCommander)
+	{
+		return;
+	}
+
+	UMilitaryUnit* SoldierToRemoveParentUnit = SoldierToRemoveFromUnit->Parent;
+	UMilitaryUnit* NewLeader = FindBestReplacementForLeader(SoldierToRemoveFromUnit, SoldierToRemoveParentUnit);
+	if (!NewLeader)
+	{
+		return;
+	}
+
+	if (NewLeader->bIsCommander)
+	{
+		PromoteNewLeaderIfNeeded(NewLeader);
+	}
+
+	NewLeader->RemoveFromParent();
+	NewLeader->Parent = SoldierToRemoveParentUnit;
+	NewLeader->bIsCommander = true;
+	NewLeader->SquadMemberIndex = SoldierToRemoveFromUnit->SquadMemberIndex;
+	NewLeader->Depth = SoldierToRemoveFromUnit->Depth;
+	NewLeader->Name = SoldierToRemoveFromUnit->Name;
+	SoldierToRemoveParentUnit->SubUnits.Add(NewLeader);
+	SoldierToRemoveParentUnit->Commander = NewLeader;
 }
 
 UMilitaryUnit* UMilitaryStructureSubsystem::GetRootUnitForTeam(const bool bIsTeam1)

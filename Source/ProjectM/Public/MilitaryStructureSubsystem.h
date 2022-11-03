@@ -93,6 +93,7 @@ public:
 	bool bIsPlayer = false;
 
 	int8 SquadMemberIndex = -1; // Index into GSquadMemberOffsetsMeters
+	int8 SquadIndex = -1;
 	UMilitaryUnit* SquadMilitaryUnit;
 
 	void RemoveFromParent();
@@ -116,6 +117,8 @@ private:
 	bool bDidCompleteAssigningEntitiesToMilitaryUnitsForTeam2;
 
 protected:
+	void PromoteNewLeaderIfNeeded(UMilitaryUnit* SoldierMilitaryUnitToDestroy);
+
 	UPROPERTY()
 	TMap<FMassEntityHandle, UMilitaryUnit*> EntityToUnitMap;
 
@@ -134,7 +137,7 @@ public:
 
 	void BindUnitToMassEntity(UMilitaryUnit* MilitaryUnit, FMassEntityHandle Entity);
 	void DestroyEntity(FMassEntityHandle Entity);
-	
+
 	UMilitaryUnit* GetUnitForEntity(const FMassEntityHandle Entity);
 	UMilitaryUnit* GetRootUnitForTeam(const bool bIsTeam1);
 

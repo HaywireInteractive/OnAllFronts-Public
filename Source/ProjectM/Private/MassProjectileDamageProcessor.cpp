@@ -259,7 +259,7 @@ void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDea
 		return;
 	}
 
-  const FTransformFragment* EntityToDealDamageToTransformFragment = EntityToDealDamageToView.GetFragmentDataPtr<FTransformFragment>();
+	const FTransformFragment* EntityToDealDamageToTransformFragment = EntityToDealDamageToView.GetFragmentDataPtr<FTransformFragment>();
 	if (!EntityToDealDamageToTransformFragment)
 	{
 		return;
@@ -285,7 +285,7 @@ void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDea
 	// Handle health reaching 0.
 	if (EntityToDealDamageToHealthFragment->Value <= 0)
 	{
-    const bool bHasPlayerTag = EntityToDealDamageToView.HasTag<FMassPlayerControllableCharacterTag>();
+		const bool bHasPlayerTag = EntityToDealDamageToView.HasTag<FMassPlayerControllableCharacterTag>();
 		if (!bHasPlayerTag)
 		{
 			SoldiersToDestroy.Enqueue(EntityToDealDamageToView.GetEntity());
@@ -311,8 +311,8 @@ void HandleProjectImpactSoundPerception(UWorld* World, const FVector& Location, 
 
 	if (bHasCollidedEntity)
 	{
-    const FMassEntityView CollidedEntityView(EntitySubsystem, CollidedEntity);
-    const FTeamMemberFragment* CollidedEntityTeamMemberFragment = CollidedEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
+		const FMassEntityView CollidedEntityView(EntitySubsystem, CollidedEntity);
+		const FTeamMemberFragment* CollidedEntityTeamMemberFragment = CollidedEntityView.GetFragmentDataPtr<FTeamMemberFragment>();
 		if (CollidedEntityTeamMemberFragment)
 		{
 			bIsCollidedEntityOnTeam1 = CollidedEntityTeamMemberFragment->IsOnTeam1;

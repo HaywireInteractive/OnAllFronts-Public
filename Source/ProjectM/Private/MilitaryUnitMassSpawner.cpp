@@ -317,8 +317,10 @@ void AMilitaryUnitMassSpawner::SafeBindSoldier(UMilitaryUnit* SoldierMilitaryUni
 void AMilitaryUnitMassSpawner::AssignEntitiesToMilitaryUnits(TArray<UMilitaryUnit*>& Squads, TArray<UMilitaryUnit*>& HigherCommandSoldiers)
 {
 	int32 SoldierIndex = 0;
-	for (UMilitaryUnit* Squad : Squads)
+	for (int32 SquadIndex = 0; SquadIndex < Squads.Num(); SquadIndex++)
 	{
+		UMilitaryUnit* Squad = Squads[SquadIndex];
+		Squad->SquadIndex = SquadIndex;
 		int32 SquadMemberIndex = 0;
 		AssignEntitiesToSquad(SoldierIndex, Squad, Squad, SquadMemberIndex);
 	}
@@ -336,6 +338,7 @@ void AMilitaryUnitMassSpawner::AssignEntitiesToSquad(int32& SoldierIndex, UMilit
 		SafeBindSoldier(MilitaryUnit, AllSpawnedEntities[AllSpawnedEntitiesSoldierIndex].Entities, SoldierIndex);
 		MilitaryUnit->SquadMemberIndex = SquadMemberIndex++;
 		MilitaryUnit->SquadMilitaryUnit = SquadMilitaryUnit;
+		MilitaryUnit->SquadIndex = SquadMilitaryUnit->SquadIndex;
 	}
 	else
 	{

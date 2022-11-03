@@ -87,7 +87,7 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(cons
 
 	FMassExecutionContext Context(0.0f);
 
-	EntityQuery.ForEachEntityChunk(*EntitySystem, Context, [this, &ViewLocation, &ViewDirection](FMassExecutionContext& Context)
+	EntityQuery.ForEachEntityChunk(*EntitySystem, Context, [this, &ViewLocation, &ViewDirection, World](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 		const TConstArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetFragmentView<FMassNavMeshMoveFragment>();
@@ -101,12 +101,12 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(cons
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius, Context.GetEntity(EntityIndex));
+			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius, Context.GetEntity(EntityIndex), World);
 		}
 	});
 }
 
-void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity)
+void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity, const UWorld* World)
 {
 	if (!UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
@@ -159,8 +159,12 @@ void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFr
 
 	if (DistanceToEntitySq < FMath::Square(MaxViewDistance * 0.5f))
 	{
+		UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
+		check(MilitaryStructureSubsystem);
+		UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+
 		FString Status;
-		Status += FString::Printf(TEXT("{orange}SquadMemberIndex: %d {white}\nCurrentActionIndex: %d\n{yellow}ActionsRemaining: %d\n{turquoise}ActionsNum: %d\n{cyan}IsWaitingOnSquadMates: %d"), NavMeshMoveFragment.SquadMemberIndex, NavMeshMoveFragment.CurrentActionIndex, NavMeshMoveFragment.ActionsRemaining, NavMeshMoveFragment.ActionList.Get()->Actions.Num(), NavMeshMoveFragment.bIsWaitingOnSquadMates);
+		Status += FString::Printf(TEXT("{red}SquadIndex: %d\n{orange}SquadMemberIndex: %d {white}\nCurrentActionIndex: %d\n{yellow}ActionsRemaining: %d\n{turquoise}ActionsNum: %d\n{cyan}IsWaitingOnSquadMates: %d"), EntityUnit->SquadIndex, NavMeshMoveFragment.SquadMemberIndex, NavMeshMoveFragment.CurrentActionIndex, NavMeshMoveFragment.ActionsRemaining, NavMeshMoveFragment.ActionList.Get()->Actions.Num(), NavMeshMoveFragment.bIsWaitingOnSquadMates);
 
 		FVector BasePos = EntityLocation + FVector(0.0f, 0.0f, 25.0f);
 		constexpr float ViewWeight = 0.6f; // Higher the number the more the view angle affects the score.
