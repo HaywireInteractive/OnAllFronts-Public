@@ -9,30 +9,19 @@
 #include "MassComponentHitTypes.h"
 #include <MilitaryStructureSubsystem.h>
 
-const FVector* UMassMoveToCommandSubsystem::GetLastMoveToCommandTarget() const
+bool UMassMoveToCommandSubsystem::DequeueMoveToCommand(FMoveToCommand& OutMoveToCommand)
 {
-  return bHasMoveToCommand ? &MoveToCommandTarget : nullptr;
+	if (MoveToCommandQueue.IsEmpty())
+	{
+		return false;
+	}
+
+	const bool bDidDequeue = MoveToCommandQueue.Dequeue(OutMoveToCommand);
+	check(bDidDequeue);
+	return true;
 }
 
-const bool UMassMoveToCommandSubsystem::IsLastMoveToCommandForTeam1() const
+void UMassMoveToCommandSubsystem::EnqueueMoveToCommand(UMilitaryUnit* MilitaryUnit, const FVector Target, const bool bIsOnTeam1)
 {
-	return bIsLastMoveToCommandForTeam1;
-}
-
-const UMilitaryUnit* UMassMoveToCommandSubsystem::GetLastMoveToCommandMilitaryUnit() const
-{
-	return MoveToCommandMilitaryUnit;
-}
-
-void UMassMoveToCommandSubsystem::SetMoveToCommandTarget(UMilitaryUnit* MilitaryUnit, const FVector target, const bool bIsOnTeam1)
-{
-	bHasMoveToCommand = true;
-	MoveToCommandTarget = target;
-	MoveToCommandMilitaryUnit = MilitaryUnit;
-	bIsLastMoveToCommandForTeam1 = bIsOnTeam1;
-}
-
-void UMassMoveToCommandSubsystem::ResetLastMoveToCommand()
-{
-	bHasMoveToCommand = false;
+	MoveToCommandQueue.Enqueue(FMoveToCommand(MilitaryUnit, Target, bIsOnTeam1));
 }

@@ -212,8 +212,8 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 		return;
 	}
 
-	const FVector* LastMoveToCommandTarget = MoveToCommandSubsystem->GetLastMoveToCommandTarget();
-	if (!LastMoveToCommandTarget)
+	FMoveToCommand MoveToCommand;
+	if (!MoveToCommandSubsystem->DequeueMoveToCommand(MoveToCommand))
 	{
 		return;
 	}
@@ -221,8 +221,9 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 	int32 NumEntitiesSetMoveTarget = 0;
 	int32 NumEntitiesAttemptedSetMoveTarget = 0;
 
-	const bool& IsLastMoveToCommandForTeam1 = MoveToCommandSubsystem->IsLastMoveToCommandForTeam1();
-	const UMilitaryUnit* LastMoveToCommandMilitaryUnit = MoveToCommandSubsystem->GetLastMoveToCommandMilitaryUnit();
+	const bool IsLastMoveToCommandForTeam1 = MoveToCommand.bIsOnTeam1;
+	const UMilitaryUnit* LastMoveToCommandMilitaryUnit = MoveToCommand.MilitaryUnit;
+	const FVector LastMoveToCommandTarget = MoveToCommand.Target;
 
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 
@@ -238,7 +239,7 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 		{
 			// Change move to command target Z to make current entity's Z value since we don't know ground height.
 			const FVector& EntityLocation = TransformList[i].GetTransform().GetLocation();
-			FVector MoveToCommandTarget = *LastMoveToCommandTarget;
+			FVector MoveToCommandTarget = LastMoveToCommandTarget;
 			MoveToCommandTarget.Z = EntityLocation.Z;
 
 			const FTeamMemberFragment& TeamMemberFragment = TeamMemberList[i];
@@ -271,6 +272,4 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 	});
 
 	UE_LOG(LogTemp, Log, TEXT("UMassMoveToCommandProcessor: Set move target to %d/%d entities."), NumEntitiesSetMoveTarget, NumEntitiesAttemptedSetMoveTarget);
-
-	MoveToCommandSubsystem->ResetLastMoveToCommand();
 }
