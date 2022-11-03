@@ -205,7 +205,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 
 void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassMoveToCommandProcessor_Execute");
+	TRACE_CPUPROFILER_EVENT_SCOPE(UMassMoveToCommandProcessor.Execute);
 
 	if (!MoveToCommandSubsystem)
 	{
