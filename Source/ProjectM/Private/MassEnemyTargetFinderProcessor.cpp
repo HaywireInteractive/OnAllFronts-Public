@@ -576,14 +576,14 @@ struct FSelectBestTargetContext
 {
 	FSelectBestTargetContext(FMassEntityQuery& EntityQuery, UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& TargetFinderEntityQueue)
     : EntityQuery(EntityQuery), EntitySubsystem(EntitySubsystem), Context(Context), EntityToPotentialTargetEntities(EntityToPotentialTargetEntities), TargetFinderEntityQueue(TargetFinderEntityQueue)
-  {
-  }
+	{
+	}
 
 	void Execute() const
-  {
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FSelectBestTargetContext.Execute");
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FSelectBestTargetContext.Execute);
 
-	  EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [this](FMassExecutionContext& Context)
+		EntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [this](FMassExecutionContext& Context)
 		{
 			const int32 NumEntities = Context.GetNumEntities();
 
