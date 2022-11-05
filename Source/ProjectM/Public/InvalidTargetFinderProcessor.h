@@ -31,6 +31,7 @@ protected:
 
 private:
 	FMassEntityQuery BuildQueueEntityQuery;
+	FMassEntityQuery BuildQueueForTrackTargetEntityQuery;
 	FMassEntityQuery InvalidateTargetsEntityQuery;
 
 	// Frame buffer, it gets reset every frame.

@@ -32,7 +32,7 @@ bool StashCurrentMoveTargetIfNeeded(const FMassMoveTargetFragment& MoveTargetFra
 
 	if(Context.DoesArchetypeHaveTag<FMassHasStashedMoveTargetTag>())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Stashing move target when entity (idx=%d,sn=%d) already has stashed move target"), Entity.Index, Entity.SerialNumber);
+		UE_LOG(LogTemp, Warning, TEXT("Stashing move target when entity (idx=%d,sn=%d) already has stashed move target"), Entity.Index, Entity.SerialNumber);
 	}
 
 	CopyMoveTarget(MoveTargetFragment, StashedMoveTargetFragment, World);

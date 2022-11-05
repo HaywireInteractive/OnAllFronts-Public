@@ -45,10 +45,12 @@ void UInvalidTargetFinderProcessor::ConfigureQueries()
 	BuildQueueEntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 	BuildQueueEntityQuery.AddTagRequirement<FMassWillNeedEnemyTargetTag>(EMassFragmentPresence::All);
 
+	BuildQueueForTrackTargetEntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
+	BuildQueueForTrackTargetEntityQuery.AddTagRequirement<FMassTrackTargetTag>(EMassFragmentPresence::All);
+
 	InvalidateTargetsEntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
 	InvalidateTargetsEntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	InvalidateTargetsEntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
-	InvalidateTargetsEntityQuery.AddTagRequirement<FMassWillNeedEnemyTargetTag>(EMassFragmentPresence::All);
 }
 
 bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle Entity, const bool bIsEntitySoldier)
@@ -149,7 +151,7 @@ static FAutoConsoleCommand InvalidateAllTargetsCmd(
 	FConsoleCommandDelegate::CreateStatic(InvalidateAllTargets)
 );
 
-bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& TargetEntity, const UMassEntitySubsystem& EntitySubsystem, const float TargetMinCaliberForDamage, const UMassTargetFinderSubsystem& TargetFinderSubsystem, const bool& IsEntityOnTeam1, const bool bIsEntitySoldier, const FTransform& EntityTransform, const bool bInvalidateAllTargets)
+bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& TargetEntity, const UMassEntitySubsystem& EntitySubsystem, const float TargetMinCaliberForDamage, const UMassTargetFinderSubsystem& TargetFinderSubsystem, const bool& IsEntityOnTeam1, const bool bIsEntitySoldier, const FTransform& EntityTransform, const bool bInvalidateAllTargets, const bool bOnlyCheckIfTargetEntityValidInEntitySubsystem)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.IsTargetValid);
 
@@ -163,6 +165,11 @@ bool IsTargetValid(const FMassEntityHandle& Entity, const FMassEntityHandle& Tar
 	if (!EntitySubsystem.IsEntityValid(TargetEntity))
 	{
 		return false;
+	}
+
+	if (bOnlyCheckIfTargetEntityValidInEntitySubsystem)
+	{
+		return true;
 	}
 
 	const FMassEntityView TargetEntityView(EntitySubsystem, TargetEntity);
@@ -188,6 +195,7 @@ struct FProcessEntityData
 	FTransform EntityTransform;
 	bool bIsEntityOnTeam1;
 	bool bIsEntitySoldier;
+	bool bOnlyCheckIfTargetEntityValidInEntitySubsystem = false;
 };
 
 /** Returns true if entity has invalid target. */
@@ -196,7 +204,7 @@ bool ProcessEntity(const FProcessEntityData& ProcessEntityData, const bool bInva
 	TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.ProcessEntity);
 
 	const FMassEntityHandle& TargetEntity = ProcessEntityData.TargetEntity;
-	if (!IsTargetValid(ProcessEntityData.Entity, TargetEntity, EntitySubsystem, ProcessEntityData.TargetMinCaliberForDamage, TargetFinderSubsystem, ProcessEntityData.bIsEntityOnTeam1, ProcessEntityData.bIsEntitySoldier, ProcessEntityData.EntityTransform, bInvalidateAllTargets))
+	if (!IsTargetValid(ProcessEntityData.Entity, TargetEntity, EntitySubsystem, ProcessEntityData.TargetMinCaliberForDamage, TargetFinderSubsystem, ProcessEntityData.bIsEntityOnTeam1, ProcessEntityData.bIsEntitySoldier, ProcessEntityData.EntityTransform, bInvalidateAllTargets, ProcessEntityData.bOnlyCheckIfTargetEntityValidInEntitySubsystem))
 	{
 		EntitiesWithInvalidTargetQueue.Enqueue(ProcessEntityData.Entity);
 		return true;
@@ -236,6 +244,27 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 				ProcessEntityData.EntityTransform = TransformList[EntityIndex].GetTransform();
 				ProcessEntityData.bIsEntityOnTeam1 = TeamMemberList[EntityIndex].IsOnTeam1;
 				ProcessEntityData.bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+				EntitiesToCheckQueue.Enqueue(ProcessEntityData);
+				TotalNumEntities++;
+			}
+		});
+	}
+
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UInvalidTargetFinderProcessor.Execute.BuildQueueForTrackTarget);
+
+		BuildQueueForTrackTargetEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&EntitiesToCheckQueue, &TotalNumEntities](FMassExecutionContext& Context)
+		{
+			const int32 NumEntities = Context.GetNumEntities();
+
+			const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
+
+			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+			{
+				FProcessEntityData ProcessEntityData;
+				ProcessEntityData.Entity = Context.GetEntity(EntityIndex);
+				ProcessEntityData.TargetEntity = TargetEntityList[EntityIndex].Entity;
+				ProcessEntityData.bOnlyCheckIfTargetEntityValidInEntitySubsystem = true;
 				EntitiesToCheckQueue.Enqueue(ProcessEntityData);
 				TotalNumEntities++;
 			}
