@@ -32,7 +32,7 @@ bool StashCurrentMoveTargetIfNeeded(const FMassMoveTargetFragment& MoveTargetFra
 
 	if(Context.DoesArchetypeHaveTag<FMassHasStashedMoveTargetTag>())
 	{
-	  UE_LOG(LogTemp, Error, TEXT("Stashing move target when entity (idx=%d,sn=%d) already has stashed move target"), Entity.Index, Entity.SerialNumber);
+		UE_LOG(LogTemp, Error, TEXT("Stashing move target when entity (idx=%d,sn=%d) already has stashed move target"), Entity.Index, Entity.SerialNumber);
 	}
 
 	CopyMoveTarget(MoveTargetFragment, StashedMoveTargetFragment, World);
@@ -55,7 +55,7 @@ EStateTreeRunStatus FMassLookAtViaMoveTargetTask::EnterState(FStateTreeExecution
 	if (TargetEntity == nullptr || !TargetEntity->IsSet()) {
 		return EStateTreeRunStatus::Failed;
 	}
-  const UMassEntitySubsystem& EntitySubsystem = MassContext.GetEntitySubsystem();
+	const UMassEntitySubsystem& EntitySubsystem = MassContext.GetEntitySubsystem();
 	if (!EntitySubsystem.IsEntityValid(*TargetEntity)) {
 		return EStateTreeRunStatus::Failed;
 	}
