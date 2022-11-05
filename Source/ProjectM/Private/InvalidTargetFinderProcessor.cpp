@@ -221,24 +221,24 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 
 		BuildQueueEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, [&EntitiesToCheckQueue, &TotalNumEntities](FMassExecutionContext& Context)
 		{
-		  const int32 NumEntities = Context.GetNumEntities();
+			const int32 NumEntities = Context.GetNumEntities();
 
-		  const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
-		  const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
-		  const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
+			const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
+			const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
+			const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 
-				for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
-				{
-					FProcessEntityData ProcessEntityData;
-					ProcessEntityData.Entity = Context.GetEntity(EntityIndex);
-					ProcessEntityData.TargetEntity = TargetEntityList[EntityIndex].Entity;
-					ProcessEntityData.TargetMinCaliberForDamage = TargetEntityList[EntityIndex].TargetMinCaliberForDamage;
-					ProcessEntityData.EntityTransform = TransformList[EntityIndex].GetTransform();
-					ProcessEntityData.bIsEntityOnTeam1 = TeamMemberList[EntityIndex].IsOnTeam1;
-					ProcessEntityData.bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
-					EntitiesToCheckQueue.Enqueue(ProcessEntityData);
-					TotalNumEntities++;
-				}
+			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
+			{
+				FProcessEntityData ProcessEntityData;
+				ProcessEntityData.Entity = Context.GetEntity(EntityIndex);
+				ProcessEntityData.TargetEntity = TargetEntityList[EntityIndex].Entity;
+				ProcessEntityData.TargetMinCaliberForDamage = TargetEntityList[EntityIndex].TargetMinCaliberForDamage;
+				ProcessEntityData.EntityTransform = TransformList[EntityIndex].GetTransform();
+				ProcessEntityData.bIsEntityOnTeam1 = TeamMemberList[EntityIndex].IsOnTeam1;
+				ProcessEntityData.bIsEntitySoldier = Context.DoesArchetypeHaveTag<FMassProjectileDamagableSoldierTag>();
+				EntitiesToCheckQueue.Enqueue(ProcessEntityData);
+				TotalNumEntities++;
+			}
 		});
 	}
 
