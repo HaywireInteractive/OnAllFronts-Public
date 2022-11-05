@@ -121,6 +121,9 @@ class PROJECTM_API UMassMoveToCommandProcessor : public UMassProcessor
 	GENERATED_BODY()
 
 	UMassMoveToCommandProcessor();
+public:
+	static FVector2D GetSoldierOffsetFromSquadLeaderUnscaledMeters(const int8 SquadMemberIndex, const FVector& SquadLeaderForward);
+	static FVector GetSoldierOffsetFromSquadLeader(const int8 SquadMemberIndex, const FVector& SquadLeaderLocation, const FVector& SquadLeaderForward);
 
 protected:
 	virtual void ConfigureQueries() override;

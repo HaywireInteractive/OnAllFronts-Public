@@ -10,6 +10,7 @@
 #include <MassMoveToCommandProcessor.h>
 #include <MassTrackedVehicleOrientationProcessor.h>
 #include "MassEntityView.h"
+#include "MassMoveToCommandSubsystem.h"
 
 UMassNavMeshMoveProcessor::UMassNavMeshMoveProcessor()
 {
@@ -25,6 +26,7 @@ void UMassNavMeshMoveProcessor::ConfigureQueries()
 	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FMassCommandableMovementSpeedFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FAgentRadiusFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FMassNeedsNavMeshMoveTag>(EMassFragmentPresence::All);
 }
 
@@ -79,7 +81,30 @@ void CompleteNavMeshMove(FMassMoveTargetFragment& MoveTargetFragmentToModify, UW
 	}
 }
 
-void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float MovementSpeed, const float AgentRadius, const UMassEntitySubsystem& EntitySubsystem)
+void CompleteNavMeshMoveForAllSquadMembers(const UMilitaryUnit* MilitaryUnit, const UMassEntitySubsystem& EntitySubsystem, UWorld* World, const FMassExecutionContext& Context)
+{
+	if (MilitaryUnit->bIsSoldier)
+	{
+		const FMassEntityHandle& SoldierEntity = MilitaryUnit->GetMassEntityHandle();
+		FMassEntityView SoldierEntityView(EntitySubsystem, SoldierEntity);
+		const bool bUseStashedMoveTarget = SoldierEntityView.HasTag<FMassTrackTargetTag>() || SoldierEntityView.HasTag<FMassTrackSoundTag>();
+		FMassMoveTargetFragment& MoveTargetFragmentToModify = bUseStashedMoveTarget ? SoldierEntityView.GetFragmentData<FMassStashedMoveTargetFragment>() : SoldierEntityView.GetFragmentData<FMassMoveTargetFragment>();
+		CompleteNavMeshMove(MoveTargetFragmentToModify, World, Context, SoldierEntity, bUseStashedMoveTarget);
+	}
+
+	for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
+	{
+		CompleteNavMeshMoveForAllSquadMembers(SubUnit, EntitySubsystem, World, Context);
+	}
+}
+
+void EnqueueNewMoveToCommand(const UMilitaryUnit* MilitaryUnit, UWorld* World, const FVector& Target, const bool bIsOnTeam1)
+{
+	UMassMoveToCommandSubsystem* MoveToCommandSubsystem = UWorld::GetSubsystem<UMassMoveToCommandSubsystem>(World);
+	MoveToCommandSubsystem->EnqueueMoveToCommand(MilitaryUnit, Target, bIsOnTeam1);
+}
+
+void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, const FTransform& EntityTransform, const FMassExecutionContext& Context, FMassStashedMoveTargetFragment& StashedMoveTargetFragment, const FMassEntityHandle& Entity, FMassNavMeshMoveFragment& NavMeshMoveFragment, const float MovementSpeed, const float AgentRadius, const UMassEntitySubsystem& EntitySubsystem, const FTeamMemberFragment& TeamMemberFragment)
 {
 	const FVector& EntityLocation = EntityTransform.GetLocation();
 
@@ -107,11 +132,26 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, c
 		if (!bFinishedCurrentAction)
 		{
 			const FVector& DeltaToMoveTargetNormal = (MoveTargetFragmentToModify.Center - EntityLocation).GetSafeNormal();
-			const bool bIsStuck = FMath::IsNearlyZero((MoveTargetFragmentToModify.Forward + DeltaToMoveTargetNormal).SizeSquared());
+			const bool bIsStuck = FMath::IsNearlyZero((MoveTargetFragmentToModify.Forward + DeltaToMoveTargetNormal).SizeSquared()) || (CurrentAction.Action == EMassMovementAction::Move && MoveTargetFragmentToModify.GetCurrentAction() == EMassMovementAction::Stand);
 			if (bIsStuck)
 			{
-				UE_LOG(LogTemp, Error, TEXT("UMassNavMeshMoveProcessor: Entity got stuck, stopping nav mesh move."));
-				CompleteNavMeshMove(MoveTargetFragmentToModify, World, Context, Entity, bUseStashedMoveTarget);
+				UE_LOG(LogTemp, Log, TEXT("UMassNavMeshMoveProcessor: Entity (i: %d sn: %d) got stuck, restarting nav mesh move."), Entity.Index, Entity.SerialNumber);
+				UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
+				check(MilitaryStructureSubsystem);
+				UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
+				if (NavMeshMoveFragment.IsSquadMember())
+				{
+					CompleteNavMeshMoveForAllSquadMembers(EntityUnit->SquadMilitaryUnit, EntitySubsystem, World, Context);
+					const FVector& SoldierOffsetFromSquadLeader = UMassMoveToCommandProcessor::GetSoldierOffsetFromSquadLeader(NavMeshMoveFragment.SquadMemberIndex, FVector::ZeroVector, Actions.Last().Forward);
+					// We have to negate below because we're calculating squad leader's target, not soldier's.
+					const FVector& SquadLeaderNavMeshFinalTarget = Actions.Last().TargetLocation - SoldierOffsetFromSquadLeader;
+					EnqueueNewMoveToCommand(EntityUnit->SquadMilitaryUnit, World, SquadLeaderNavMeshFinalTarget, TeamMemberFragment.IsOnTeam1);
+				}
+				else
+				{
+					CompleteNavMeshMove(MoveTargetFragmentToModify, World, Context, Entity, bUseStashedMoveTarget);
+					EnqueueNewMoveToCommand(EntityUnit, World, Actions.Last().TargetLocation, TeamMemberFragment.IsOnTeam1);
+				}
 				return;
 			}
 			// Wait for UMassSteerToMoveTargetProcessor to move entity to next point.
@@ -176,10 +216,11 @@ void UMassNavMeshMoveProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, F
 		const TArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetMutableFragmentView<FMassStashedMoveTargetFragment>();
 		const TArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetMutableFragmentView<FMassNavMeshMoveFragment>();
 		const TConstArrayView<FAgentRadiusFragment> AgentRadiusList = Context.GetFragmentView<FAgentRadiusFragment>();
+		const TConstArrayView<FTeamMemberFragment> TeamMemberList = Context.GetFragmentView<FTeamMemberFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
-			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i], MovementSpeedList[i].MovementSpeed, AgentRadiusList[i].Radius, EntitySubsystem);
+			ProcessEntity(MoveTargetList[i], GetWorld(), TransformList[i].GetTransform(), Context, StashedMoveTargetList[i], Context.GetEntity(i), NavMeshMoveList[i], MovementSpeedList[i].MovementSpeed, AgentRadiusList[i].Radius, EntitySubsystem, TeamMemberList[i]);
 		}
 	});
 }

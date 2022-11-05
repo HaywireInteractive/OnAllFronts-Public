@@ -546,12 +546,13 @@ struct FSelectBestTargetProcessEntityContext
 	}
 
 	float GetVerticalAimOffset(const FVector& TargetEntityLocation, const bool bIsTargetEntitySoldier) const
-  {
+	{
 		const bool bShouldAimAtFeet = !bIsEntitySoldier && bIsTargetEntitySoldier;
 		const FVector ProjectileSpawnLocation = EntityLocation + UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationOffset(EntityTransform, bIsEntitySoldier);
 		const FVector ProjectileTargetLocation = bShouldAimAtFeet ? TargetEntityLocation : FVector(TargetEntityLocation.X, TargetEntityLocation.Y, ProjectileSpawnLocation.Z);
 		const float XYDistanceToTarget = (FVector2D(ProjectileTargetLocation) - FVector2D(ProjectileSpawnLocation)).Size();
 		const float ProjectileInitialXYVelocityMagnitude = GetProjectileInitialXYVelocityMagnitude(bIsEntitySoldier);
+		const UWorld* World = EntitySubsystem.GetWorld();
 		const float TimeToTarget = XYDistanceToTarget / ProjectileInitialXYVelocityMagnitude;
 		const float VerticalDistanceToTravel = ProjectileTargetLocation.Z - UMassEnemyTargetFinderProcessor::GetProjectileSpawnLocationZOffset(bIsEntitySoldier);
 		const float& GravityZ = EntitySubsystem.GetWorld()->GetGravityZ();

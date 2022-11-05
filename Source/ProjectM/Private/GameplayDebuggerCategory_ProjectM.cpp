@@ -114,19 +114,7 @@ void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFr
 	}
 
 	const FVector& EntityLocation = Transform.GetLocation();
-
-	// Cull entity if needed
-	const FVector DirToEntity = EntityLocation - ViewLocation;
-	const float DistanceToEntitySq = DirToEntity.SquaredLength();
-	if (DistanceToEntitySq > FMath::Square(MaxViewDistance))
-	{
-		return;
-	}
-	const float ViewDot = FVector::DotProduct(DirToEntity.GetSafeNormal(), ViewDirection);
-	if (ViewDot < MinViewDirDot)
-	{
-		return;
-	}
+	AddShape(FGameplayDebuggerShape::MakeArrow(EntityLocation, MoveTargetFragment.Center, 10.f, 2.f, FColor::Black));
 
 	const TArray<FNavigationAction>& Actions = NavMeshMoveFragment.ActionList.Get()->Actions;
 	int32 LineEndIndex = 1;
@@ -151,10 +139,23 @@ void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFr
 			// Red = point not yet reached. Green = point already reached.
 			const FColor& Color = ActionIndex < NavMeshMoveFragment.CurrentActionIndex ? FColor::Green : FColor::Red;
 			const FVector StringLocation = Action.TargetLocation + FVector(0.f, 0.f, 50.f);
-			AddShape(FGameplayDebuggerShape::MakePoint(Action.TargetLocation, 3.f, Color, FString::Printf(TEXT("{white}SI %d, AI %d"), NavMeshMoveFragment.SquadMemberIndex, ActionIndex)));
+			AddShape(FGameplayDebuggerShape::MakePoint(Action.TargetLocation, 3.f, Color, FString::Printf(TEXT("{white}SMI %d, AI %d"), NavMeshMoveFragment.SquadMemberIndex, ActionIndex)));
 			AddShape(FGameplayDebuggerShape::MakeArrow(Action.TargetLocation, Action.TargetLocation + Action.Forward * AgentRadius, 10.f, 2.f, FColor::Purple));
 		}
 		ActionIndex++;
+	}
+
+	// Cull entity if needed
+	const FVector DirToEntity = EntityLocation - ViewLocation;
+	const float DistanceToEntitySq = DirToEntity.SquaredLength();
+	if (DistanceToEntitySq > FMath::Square(MaxViewDistance))
+	{
+		return;
+	}
+	const float ViewDot = FVector::DotProduct(DirToEntity.GetSafeNormal(), ViewDirection);
+	if (ViewDot < MinViewDirDot)
+	{
+		return;
 	}
 
 	if (DistanceToEntitySq < FMath::Square(MaxViewDistance * 0.5f))
@@ -179,8 +180,6 @@ void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFr
 	{
 		NearEntityDescriptions.RemoveAt(MaxLabels, NearEntityDescriptions.Num() - MaxLabels);
 	}
-
-	AddShape(FGameplayDebuggerShape::MakeArrow(EntityLocation, MoveTargetFragment.Center, 10.f, 2.f, FColor::Black));
 }
 
 void FGameplayDebuggerCategory_ProjectM::DrawData(APlayerController* OwnerPC, FGameplayDebuggerCanvasContext& CanvasContext)

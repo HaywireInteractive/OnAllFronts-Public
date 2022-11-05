@@ -12,12 +12,12 @@ class UMilitaryUnit;
 
 struct FMoveToCommand
 {
-	FMoveToCommand(UMilitaryUnit* MilitaryUnit, FVector Target, bool bIsOnTeam1)
+	FMoveToCommand(const UMilitaryUnit* MilitaryUnit, FVector Target, bool bIsOnTeam1)
 		: MilitaryUnit(MilitaryUnit), Target(Target), bIsOnTeam1(bIsOnTeam1)
 	{
 	}
 	FMoveToCommand() = default;
-	UMilitaryUnit* MilitaryUnit;
+	const UMilitaryUnit* MilitaryUnit;
 	FVector Target;
 	bool bIsOnTeam1;
 };
@@ -28,8 +28,8 @@ class PROJECTM_API UMassMoveToCommandSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
+	void EnqueueMoveToCommand(const UMilitaryUnit* MilitaryUnit, const FVector Target, const bool bIsOnTeam1);
 	bool DequeueMoveToCommand(FMoveToCommand& OutMoveToCommand);
-	void EnqueueMoveToCommand(UMilitaryUnit* MilitaryUnit, const FVector Target, const bool bIsOnTeam1);
 
 protected:
 	TQueue<FMoveToCommand> MoveToCommandQueue;

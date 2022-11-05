@@ -3,11 +3,12 @@
 
 #include "MassMoveToCommandSubsystem.h"
 
-#include "MassAgentComponent.h"
-#include "MassAgentSubsystem.h"
-#include "MassSignalSubsystem.h"
-#include "MassComponentHitTypes.h"
 #include <MilitaryStructureSubsystem.h>
+
+void UMassMoveToCommandSubsystem::EnqueueMoveToCommand(const UMilitaryUnit* MilitaryUnit, const FVector Target, const bool bIsOnTeam1)
+{
+	MoveToCommandQueue.Enqueue(FMoveToCommand(MilitaryUnit, Target, bIsOnTeam1));
+}
 
 bool UMassMoveToCommandSubsystem::DequeueMoveToCommand(FMoveToCommand& OutMoveToCommand)
 {
@@ -19,9 +20,4 @@ bool UMassMoveToCommandSubsystem::DequeueMoveToCommand(FMoveToCommand& OutMoveTo
 	const bool bDidDequeue = MoveToCommandQueue.Dequeue(OutMoveToCommand);
 	check(bDidDequeue);
 	return true;
-}
-
-void UMassMoveToCommandSubsystem::EnqueueMoveToCommand(UMilitaryUnit* MilitaryUnit, const FVector Target, const bool bIsOnTeam1)
-{
-	MoveToCommandQueue.Enqueue(FMoveToCommand(MilitaryUnit, Target, bIsOnTeam1));
 }
