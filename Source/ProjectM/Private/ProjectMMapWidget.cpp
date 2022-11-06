@@ -7,6 +7,7 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/TreeView.h"
 #include "Components/SceneCaptureComponent2D.h"
@@ -227,6 +228,18 @@ void UProjectMMapWidget::NativeOnInitialized()
       UCanvasPanelSlot* BorderSlot = CastChecked<UCanvasPanelSlot>(Border->Slot.Get());
       BorderSlot->SetSize(MapRect.Size());
     }
+
+	if (MapImage)
+	{
+		// Set the brush size to match the render target dimensions
+		MapImage->Brush.SetImageSize(MapRect.Size());
+
+		if (UMaterialInstanceDynamic* MapMaterial = MapImage->GetDynamicMaterial())
+		{
+			// Set the texture on the map image to the scene capture render target
+			MapMaterial->SetTextureParameterValue(MapTextureParameterName, Texture);
+		}
+	}
   }
 }
 

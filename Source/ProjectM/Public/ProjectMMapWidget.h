@@ -9,6 +9,7 @@
 #include "ProjectMMapWidget.generated.h"
 
 class USceneCaptureComponent2D;
+class UImage;
 
 typedef TFunction< void(const FVector& /*EntityLocation*/, const bool& /*bIsOnTeam1*/, const bool& /*bIsPlayer*/, const FMassEntityHandle& /*Entity*/) > FMapDisplayableEntityFunction;
 
@@ -59,6 +60,14 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	FVector MapPositionToWorldPosition(const FVector2D& MapPosition) const;
+
+	/** The UImage widget whose material is used when setting the scene render target as a texture parameter. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, meta = (BindWidget), Category = "Map Widget")
+	UImage* MapImage;
+
+	/** Name of the texture parameter on the image material to be set to the scene render target texture. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map Widget")
+	FName MapTextureParameterName;
 
 private:
 	FVector2D WorldPositionToMapPosition(const FVector& WorldLocation);
