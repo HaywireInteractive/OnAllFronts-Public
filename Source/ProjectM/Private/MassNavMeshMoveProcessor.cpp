@@ -132,7 +132,9 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, c
 		if (!bFinishedCurrentAction)
 		{
 			const FVector& DeltaToMoveTargetNormal = (MoveTargetFragmentToModify.Center - EntityLocation).GetSafeNormal();
-			const bool bIsStuck = FMath::IsNearlyZero((MoveTargetFragmentToModify.Forward + DeltaToMoveTargetNormal).SizeSquared()) || (CurrentAction.Action == EMassMovementAction::Move && MoveTargetFragmentToModify.GetCurrentAction() == EMassMovementAction::Stand);
+			const bool bHasInvalidMoveTarget = FMath::IsNearlyZero((FVector2D(MoveTargetFragmentToModify.Forward) + FVector2D(DeltaToMoveTargetNormal)).SizeSquared(), KINDA_SMALL_NUMBER); // Note we can't use default tolerance as there are cases where SizeSquared returns kinda small numbers when invalid (not extremely small).
+			const bool bHasActionMismatch = CurrentAction.Action != MoveTargetFragmentToModify.GetCurrentAction();
+			const bool bIsStuck = bHasInvalidMoveTarget || bHasActionMismatch;
 			if (bIsStuck)
 			{
 				UE_LOG(LogTemp, Log, TEXT("UMassNavMeshMoveProcessor: Entity (i: %d sn: %d) got stuck, restarting nav mesh move."), Entity.Index, Entity.SerialNumber);
