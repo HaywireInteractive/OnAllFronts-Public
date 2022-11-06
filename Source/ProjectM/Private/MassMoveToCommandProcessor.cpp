@@ -156,7 +156,15 @@ FNavActionListSharedPtr CreateNavActionList(FNavPathSharedPtr NavPath)
 bool UMassMoveToCommandProcessor_ProjectMoveToCommandTarget = false;
 FAutoConsoleVariableRef CVar_UMassMoveToCommandProcessor_ProjectMoveToCommandTarget(TEXT("pm.UMassMoveToCommandProcessor_ProjectMoveToCommandTarget"), UMassMoveToCommandProcessor_ProjectMoveToCommandTarget, TEXT("UMassMoveToCommandProcessor_ProjectMoveToCommandTarget"));
 
-bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FTransform& EntityTransform, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, const FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& NavMeshRadius, const UMassEntitySubsystem& EntitySubsystem)
+UENUM()
+enum class EMoveToCommandProcessEntityResult : uint8
+{
+	Error,
+	Success,
+	SkippedDueToSquadMember,
+};
+
+EMoveToCommandProcessEntityResult ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemberFragment& TeamMemberFragment, const bool& IsLastMoveToCommandForTeam1, const FVector& LastMoveToCommandTarget, const FTransform& EntityTransform, const FMassEntityHandle &Entity, UNavigationSystemV1* NavSys, FMassNavMeshMoveFragment& NavMeshMoveFragment, const FMassExecutionContext& Context, const UMilitaryUnit* LastMoveToCommandMilitaryUnit, const UWorld* World, const float& NavMeshRadius, const UMassEntitySubsystem& EntitySubsystem)
 {
 	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
 	check(MilitaryStructureSubsystem);
@@ -170,7 +178,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 	}
 	else if (IsSquadMember(EntityUnit))
 	{
-		return false; // return since squad leader will have set NavMeshMoveFragment on squad members
+		return EMoveToCommandProcessEntityResult::SkippedDueToSquadMember; // return since squad leader will have set NavMeshMoveFragment on squad members
 	}
 	else {
 		NavMeshMoveFragment.Reset();
@@ -184,7 +192,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 	if (!NavData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not get navigation data. Likely there is no NavMesh in level."));
-		return false;
+		return EMoveToCommandProcessEntityResult::Error;
 	}
 
 	FVector CommandTarget = LastMoveToCommandTarget;
@@ -198,7 +206,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 		if (!bProjectResult)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find closest valid location to move to command location from %s to %s"), *EntityLocation.ToString(), *LastMoveToCommandTarget.ToString());
-			return false;
+			return EMoveToCommandProcessEntityResult::Error;
 		}
 
 		const float ProjectedDeltaSquared = (ClosestValidLocation.Location - LastMoveToCommandTarget).SizeSquared();
@@ -219,7 +227,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 	if (!Result.IsSuccessful())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UMassMoveToCommandProcessor: Could not find path to target. NavMeshRadius = %.0f, Start = %s, End = %s"), NavMeshRadius, *EntityLocation.ToString(), *CommandTarget.ToString());
-		return false;
+		return EMoveToCommandProcessEntityResult::Error;
 	}
 
 	NavMeshMoveFragment.ActionList = CreateNavActionList(Result.Path);
@@ -234,7 +242,7 @@ bool ProcessEntity(const UMassMoveToCommandProcessor* Processor, const FTeamMemb
 
 	Context.Defer().AddTag<FMassNeedsNavMeshMoveTag>(Entity);
 
-	return true;
+	return EMoveToCommandProcessEntityResult::Success;
 }
 
 void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
@@ -290,15 +298,10 @@ void UMassMoveToCommandProcessor::Execute(UMassEntitySubsystem& EntitySubsystem,
 			}
 
 			FMassNavMeshMoveFragment& NavMeshMoveFragment = NavMeshMoveList[i];
-			const bool& bDidSetMoveTarget = ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, TransformList[i].GetTransform(), Entity, NavSys, NavMeshMoveFragment, Context, LastMoveToCommandMilitaryUnit, World, NavMeshParams.NavMeshRadius, EntitySubsystem);
+			const EMoveToCommandProcessEntityResult Result = ProcessEntity(this, TeamMemberList[i], IsLastMoveToCommandForTeam1, MoveToCommandTarget, TransformList[i].GetTransform(), Entity, NavSys, NavMeshMoveFragment, Context, LastMoveToCommandMilitaryUnit, World, NavMeshParams.NavMeshRadius, EntitySubsystem);
 
-			// Skip squad members that aren't squad leaders.
-			const bool bIsNonSquadLeaderSquadMember = NavMeshMoveFragment.SquadMemberIndex > 0;
-			if (!bIsNonSquadLeaderSquadMember)
-			{
-				NumEntitiesAttemptedSetMoveTarget++;
-			}
-			if (bDidSetMoveTarget)
+			NumEntitiesAttemptedSetMoveTarget++;
+			if (Result != EMoveToCommandProcessEntityResult::Error)
 			{
 				NumEntitiesSetMoveTarget++;
 			}
