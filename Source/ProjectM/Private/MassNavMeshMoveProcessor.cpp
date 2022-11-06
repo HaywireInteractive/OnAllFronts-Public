@@ -86,10 +86,13 @@ void CompleteNavMeshMoveForAllSquadMembers(const UMilitaryUnit* MilitaryUnit, co
 	if (MilitaryUnit->bIsSoldier)
 	{
 		const FMassEntityHandle& SoldierEntity = MilitaryUnit->GetMassEntityHandle();
-		FMassEntityView SoldierEntityView(EntitySubsystem, SoldierEntity);
-		const bool bUseStashedMoveTarget = SoldierEntityView.HasTag<FMassTrackTargetTag>() || SoldierEntityView.HasTag<FMassTrackSoundTag>();
-		FMassMoveTargetFragment& MoveTargetFragmentToModify = bUseStashedMoveTarget ? SoldierEntityView.GetFragmentData<FMassStashedMoveTargetFragment>() : SoldierEntityView.GetFragmentData<FMassMoveTargetFragment>();
-		CompleteNavMeshMove(MoveTargetFragmentToModify, World, Context, SoldierEntity, bUseStashedMoveTarget);
+		if (EntitySubsystem.IsEntityValid(SoldierEntity))
+		{
+			FMassEntityView SoldierEntityView(EntitySubsystem, SoldierEntity);
+			const bool bUseStashedMoveTarget = SoldierEntityView.HasTag<FMassTrackTargetTag>() || SoldierEntityView.HasTag<FMassTrackSoundTag>();
+			FMassMoveTargetFragment& MoveTargetFragmentToModify = bUseStashedMoveTarget ? SoldierEntityView.GetFragmentData<FMassStashedMoveTargetFragment>() : SoldierEntityView.GetFragmentData<FMassMoveTargetFragment>();
+			CompleteNavMeshMove(MoveTargetFragmentToModify, World, Context, SoldierEntity, bUseStashedMoveTarget);
+		}
 	}
 
 	for (UMilitaryUnit* SubUnit : MilitaryUnit->SubUnits)
