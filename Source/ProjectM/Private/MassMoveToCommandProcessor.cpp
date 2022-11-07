@@ -97,7 +97,7 @@ void SetSquadMemberPaths(const UMilitaryUnit* MilitaryUnit, const UMassEntitySub
 {
 	const bool bIsSquadLeader = MilitaryUnit->SquadMemberIndex == 0;
 	const bool bIsValidSquadMember = MilitaryUnit->SquadMemberIndex >= 0;
-	if (MilitaryUnit->bIsSoldier && !bIsSquadLeader && bIsValidSquadMember)
+	if (MilitaryUnit->bIsSoldier && !MilitaryUnit->bIsPlayer && !bIsSquadLeader && bIsValidSquadMember)
 	{
 		FMassEntityView SoldierEntityView(EntitySubsystem, MilitaryUnit->GetMassEntityHandle());
 		FMassNavMeshMoveFragment& SoldierNavMeshMoveFragment = SoldierEntityView.GetFragmentData<FMassNavMeshMoveFragment>();

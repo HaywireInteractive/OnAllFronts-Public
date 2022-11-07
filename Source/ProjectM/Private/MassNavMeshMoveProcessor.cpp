@@ -30,15 +30,15 @@ void UMassNavMeshMoveProcessor::ConfigureQueries()
 	EntityQuery.AddTagRequirement<FMassNeedsNavMeshMoveTag>(EMassFragmentPresence::All);
 }
 
-const FMassNavMeshMoveFragment& GetNavMeshMoveFragmentForSoldier(const UMilitaryUnit* SoldierMilitaryUnit, const UMassEntitySubsystem& EntitySubsystem)
-{
-	FMassEntityView SoldierEntityView(EntitySubsystem, SoldierMilitaryUnit->GetMassEntityHandle());
-	return SoldierEntityView.GetFragmentData<FMassNavMeshMoveFragment>();
-}
-
 bool DoesSoldierHaveSameActionsRemaining(int32 ActionsRemaining, const UMilitaryUnit* SoldierMilitaryUnit, const UMassEntitySubsystem& EntitySubsystem)
 {
-	const FMassNavMeshMoveFragment& NavMeshMoveFragment = GetNavMeshMoveFragmentForSoldier(SoldierMilitaryUnit, EntitySubsystem);
+	const FMassEntityHandle& SoldierEntity = SoldierMilitaryUnit->GetMassEntityHandle();
+	if (!EntitySubsystem.IsEntityValid(SoldierEntity))
+	{
+		return true;
+	}
+	FMassEntityView SoldierEntityView(EntitySubsystem, SoldierEntity);
+	const FMassNavMeshMoveFragment& NavMeshMoveFragment = SoldierEntityView.GetFragmentData<FMassNavMeshMoveFragment>();
 	return NavMeshMoveFragment.ActionsRemaining <= ActionsRemaining;
 }
 
@@ -49,7 +49,7 @@ bool HaveAllSquadMembersReachedSameAction(int32 ActionsRemaining, const UMilitar
 		return true;
 	}
 
-	if (MilitaryUnit->bIsSoldier)
+	if (MilitaryUnit->bIsSoldier && !MilitaryUnit->bIsPlayer)
 	{
 		if (!DoesSoldierHaveSameActionsRemaining(ActionsRemaining, MilitaryUnit, EntitySubsystem))
 		{
@@ -83,7 +83,7 @@ void CompleteNavMeshMove(FMassMoveTargetFragment& MoveTargetFragmentToModify, UW
 
 void CompleteNavMeshMoveForAllSquadMembers(const UMilitaryUnit* MilitaryUnit, const UMassEntitySubsystem& EntitySubsystem, UWorld* World, const FMassExecutionContext& Context)
 {
-	if (MilitaryUnit->bIsSoldier)
+	if (MilitaryUnit->bIsSoldier && !MilitaryUnit->bIsPlayer)
 	{
 		const FMassEntityHandle& SoldierEntity = MilitaryUnit->GetMassEntityHandle();
 		if (EntitySubsystem.IsEntityValid(SoldierEntity))
