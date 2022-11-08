@@ -23,19 +23,19 @@ const FVector& GetEntityLocationViaTargetFinderSubsystem(const FMassEntityHandle
 
 struct FPotentialTargetSphereTraceData
 {
-  FPotentialTargetSphereTraceData(FMassEntityHandle InEntity, FMassEntityHandle InTargetEntity, FVector InTraceStart, FVector InTraceEnd, float InMinCaliberForDamage, FVector InLocation, bool bInIsSoldier)
-    : Entity(InEntity), TargetEntity(InTargetEntity), TraceStart(InTraceStart), TraceEnd(InTraceEnd), MinCaliberForDamage(InMinCaliberForDamage), Location(InLocation), bIsSoldier(bInIsSoldier)
-  {
-  }
+	FPotentialTargetSphereTraceData(FMassEntityHandle InEntity, FMassEntityHandle InTargetEntity, FVector InTraceStart, FVector InTraceEnd, float InMinCaliberForDamage, FVector InLocation, bool bInIsSoldier)
+		: Entity(InEntity), TargetEntity(InTargetEntity), TraceStart(InTraceStart), TraceEnd(InTraceEnd), MinCaliberForDamage(InMinCaliberForDamage), Location(InLocation), bIsSoldier(bInIsSoldier)
+	{
+	}
 
 	FPotentialTargetSphereTraceData() = default;
 
-  FMassEntityHandle Entity;
-  FMassEntityHandle TargetEntity;
+	FMassEntityHandle Entity;
+	FMassEntityHandle TargetEntity;
 	FVector TraceStart;
 	FVector TraceEnd;
-  float MinCaliberForDamage;
-  FVector Location;
+	float MinCaliberForDamage;
+	FVector Location;
 	bool bIsSoldier;
 };
 
@@ -104,7 +104,7 @@ FCapsule GetProjectileTraceCapsuleToTarget(const bool bIsEntitySoldier, const bo
 
 	const bool bShouldAimAtFeet = !bIsEntitySoldier && bIsTargetEntitySoldier;
 	static constexpr float VerticalBuffer = 50.f; // This is needed because otherwise for tanks we always hit the ground when doing trace. TODO: Come up with a better way to handle this.
-  const FVector ProjectileTargetLocation = bShouldAimAtFeet ? TargetEntityLocation + FVector(0.f, 0.f, ProjectileRadius + VerticalBuffer) : TargetEntityLocation + ProjectileZOffset;
+	const FVector ProjectileTargetLocation = bShouldAimAtFeet ? TargetEntityLocation + FVector(0.f, 0.f, ProjectileRadius + VerticalBuffer) : TargetEntityLocation + ProjectileZOffset;
 	return FCapsule(ProjectileSpawnLocation, ProjectileTargetLocation, ProjectileRadius);
 }
 
@@ -133,44 +133,44 @@ bool AreEntitiesBlockingTarget(const FCapsule& ProjectileTraceCapsule, const FMa
 	GetSearchPointsAlongTrace(ProjectileTraceCapsule, SearchPoints);
 
 	bool bDidAnyCapsulesCollide(false);
-  {
-    TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.For);
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.For);
 		for (int32 i = 0; i < SearchPoints.Num() - 1; i++)
-    {
-      TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ForBody);
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ForBody);
 
-      const FVector& SearchBoxStart = SearchPoints[i];
-      const FVector& SearchBoxEnd = SearchPoints[i + 1];
-      const FBox SearchBounds(SearchBoxStart.ComponentMin(SearchBoxEnd), SearchBoxStart.ComponentMax(SearchBoxEnd));
+			const FVector& SearchBoxStart = SearchPoints[i];
+			const FVector& SearchBoxEnd = SearchPoints[i + 1];
+			const FBox SearchBounds(SearchBoxStart.ComponentMin(SearchBoxEnd), SearchBoxStart.ComponentMax(SearchBoxEnd));
 
 			TArray<FMassTargetGridItem> EntitiesInSearchBox;
 			EntitiesInSearchBox.Reserve(5);
 
-      {
-        TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ForBody.TargetGridQuery);
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.AreEntitiesBlockingTarget.ForBody.TargetGridQuery);
 				TargetFinderSubsystem.GetTargetGrid().Query(SearchBounds, EntitiesInSearchBox);
-      }
+			}
 
-      for (const FMassTargetGridItem& TargetGridItem : EntitiesInSearchBox)
-      {
-        if (TargetGridItem.Entity == Entity || TargetGridItem.Entity == TargetEntity)
-        {
-          continue;
-        }
+			for (const FMassTargetGridItem& TargetGridItem : EntitiesInSearchBox)
+			{
+				if (TargetGridItem.Entity == Entity || TargetGridItem.Entity == TargetEntity)
+				{
+					continue;
+				}
 				const FCapsule& TargetGridItemCapsule = TargetFinderSubsystem.GetTargetDynamicData()[TargetGridItem.Entity].Capsule;
-        if (DidCapsulesCollide(ProjectileTraceCapsule, TargetGridItemCapsule, Entity, World))
-        {
+				if (DidCapsulesCollide(ProjectileTraceCapsule, TargetGridItemCapsule, Entity, World))
+				{
 					bDidAnyCapsulesCollide = true;
 					break;
-        }
-      }
+				}
+			}
 
 			if (bDidAnyCapsulesCollide)
 			{
 				break;
 			}
-    }
-  }
+		}
+	}
 
 #if WITH_MASSGAMEPLAY_DEBUG
 	if (UE::Mass::Debug::IsDebuggingEntity(Entity) && bDidAnyCapsulesCollide)
@@ -190,7 +190,7 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor_IsTargetEntityVisibleViaSphereTrace);
 	FHitResult Result;
 	static constexpr float Radius = 20.f; // TODO: don't hard-code
-  const bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
+	const bool bFoundBlockingHit = UKismetSystemLibrary::SphereTraceSingle(World.GetLevel(0)->Actors[0], StartLocation, EndLocation, Radius, TraceTypeQuery1, false, TArray<AActor*>(), EDrawDebugTrace::Type::None, Result, false);
 
 #if WITH_MASSGAMEPLAY_DEBUG
 	// We can't use SphereTraceSingle's ability to draw trace because this function may run in a background thread which isn't allowed to draw. So we do it ourselves async.
@@ -205,12 +205,12 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	}
 #endif
 
-  return !bFoundBlockingHit;
+	return !bFoundBlockingHit;
 }
 
 float GetEntityRange(const bool bIsEntitySoldier)
 {
-	return 5000.f * (bIsEntitySoldier ?  2.f : 4.f); // TODO: Don't hard-code, get from data asset.
+	return 5000.f * (bIsEntitySoldier ? 2.f : 4.f); // TODO: Don't hard-code, get from data asset.
 }
 
 bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntitySoldier, const FVector& TargetEntityLocation)
@@ -231,9 +231,9 @@ bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntit
 struct FPotentialTarget
 {
 	FPotentialTarget(FMassEntityHandle InEntity, FVector InLocation, float InMinCaliberForDamage, bool bIsSoldier)
-    : Entity(InEntity), Location(InLocation), MinCaliberForDamage(InMinCaliberForDamage), bIsSoldier(bIsSoldier)
-  {
-  }
+		: Entity(InEntity), Location(InLocation), MinCaliberForDamage(InMinCaliberForDamage), bIsSoldier(bIsSoldier)
+	{
+	}
 
 	FMassEntityHandle Entity;
 	FVector Location;
@@ -385,10 +385,10 @@ FAutoConsoleVariableRef CVarUMassEnemyTargetFinderProcessor_SkipUpdatingTargetEn
 
 struct FProcessSphereTracesContext
 {
-  FProcessSphereTracesContext(TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTraceQueue, UWorld& World, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& OutEntityToPotentialTargetEntities, const UMassTargetFinderSubsystem& TargetFinderSubsystem)
-    : PotentialTargetsNeedingSphereTraceQueue(PotentialTargetsNeedingSphereTraceQueue), World(World), EntityToPotentialTargetEntities(OutEntityToPotentialTargetEntities), TargetFinderSubsystem(TargetFinderSubsystem)
-  {
-  }
+	FProcessSphereTracesContext(TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTraceQueue, UWorld& World, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& OutEntityToPotentialTargetEntities, const UMassTargetFinderSubsystem& TargetFinderSubsystem)
+		: PotentialTargetsNeedingSphereTraceQueue(PotentialTargetsNeedingSphereTraceQueue), World(World), EntityToPotentialTargetEntities(OutEntityToPotentialTargetEntities), TargetFinderSubsystem(TargetFinderSubsystem)
+	{
+	}
 
 	void Execute()
 	{
@@ -408,19 +408,19 @@ private:
 		while (!PotentialTargetsNeedingSphereTraceQueue.IsEmpty())
 		{
 			FPotentialTargetSphereTraceData PotentialTarget;
-      const bool bSuccess = PotentialTargetsNeedingSphereTraceQueue.Dequeue(PotentialTarget);
+			const bool bSuccess = PotentialTargetsNeedingSphereTraceQueue.Dequeue(PotentialTarget);
 			check(bSuccess);
 			PotentialTargetsNeedingSphereTrace.Add(PotentialTarget);
 		}
 	}
 
 	void ProcessSphereTraces()
-  {
+	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FProcessSphereTracesContext.ProcessSphereTraces");
 
-	  ParallelFor(PotentialTargetsNeedingSphereTrace.Num(), [&](const int32 JobIndex)
+		ParallelFor(PotentialTargetsNeedingSphereTrace.Num(), [&](const int32 JobIndex)
 		{
-	    const FCapsule TraceCapsule(PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, 1.f);
+			const FCapsule TraceCapsule(PotentialTargetsNeedingSphereTrace[JobIndex].TraceStart, PotentialTargetsNeedingSphereTrace[JobIndex].TraceEnd, 1.f);
 			const bool bAreEntitiesBlockingTarget = AreEntitiesBlockingTarget(TraceCapsule, PotentialTargetsNeedingSphereTrace[JobIndex].Entity, PotentialTargetsNeedingSphereTrace[JobIndex].TargetEntity, World, TargetFinderSubsystem);
 			if (!bAreEntitiesBlockingTarget)
 			{
@@ -442,7 +442,7 @@ private:
 #endif
 			}
 		});
-  }
+	}
 
 	void ConvertPotentialVisibleTargetsQueueToMap()
 	{
@@ -477,7 +477,7 @@ struct FSelectBestTargetProcessEntityContext
 	}
 
 	void ProcessEntity() const
-  {
+	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FSelectBestTargetProcessEntityContext.ProcessEntity");
 
 		TSortedMap<float, TArray<FPotentialTarget>> PotentialTargetsByCaliber;
@@ -509,7 +509,7 @@ struct FSelectBestTargetProcessEntityContext
 	}
 
 	void GroupByCaliber(TSortedMap<float, TArray<FPotentialTarget>>& OutPotentialTargetsByCaliber) const
-  {
+	{
 		for (FPotentialTarget& PotentialTarget : PotentialTargets)
 		{
 			if (!OutPotentialTargetsByCaliber.Contains(PotentialTarget.MinCaliberForDamage))
@@ -521,7 +521,7 @@ struct FSelectBestTargetProcessEntityContext
 	}
 
 	bool SelectBestTarget(TSortedMap<float, TArray<FPotentialTarget>>& PotentialTargetsByCaliber, FMassEntityHandle& OutTargetEntity, FVector& OutTargetEntityLocation, bool& bIsTargetEntitySoldier) const
-  {
+	{
 		if (PotentialTargetsByCaliber.Num() == 0)
 		{
 			OutTargetEntity = UMassEntitySubsystem::InvalidEntity;
@@ -576,7 +576,7 @@ private:
 struct FSelectBestTargetContext
 {
 	FSelectBestTargetContext(FMassEntityQuery& EntityQuery, UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context, TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& TargetFinderEntityQueue)
-    : EntityQuery(EntityQuery), EntitySubsystem(EntitySubsystem), Context(Context), EntityToPotentialTargetEntities(EntityToPotentialTargetEntities), TargetFinderEntityQueue(TargetFinderEntityQueue)
+		: EntityQuery(EntityQuery), EntitySubsystem(EntitySubsystem), Context(Context), EntityToPotentialTargetEntities(EntityToPotentialTargetEntities), TargetFinderEntityQueue(TargetFinderEntityQueue)
 	{
 	}
 
@@ -604,7 +604,7 @@ struct FSelectBestTargetContext
 	}
 
 private:
-  FMassEntityQuery& EntityQuery;
+	FMassEntityQuery& EntityQuery;
 	UMassEntitySubsystem& EntitySubsystem;
 	FMassExecutionContext& Context;
 	TMap<FMassEntityHandle, TArray<FPotentialTarget>>& EntityToPotentialTargetEntities;
@@ -649,7 +649,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.ParallelForEachEntityChunk);
 
-	  PreSphereTraceEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
+		PreSphereTraceEntityQuery.ParallelForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
 	} else {
 		PreSphereTraceEntityQuery.ForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
 	}
