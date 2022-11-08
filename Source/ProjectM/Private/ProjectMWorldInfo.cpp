@@ -48,6 +48,8 @@ void AProjectMWorldInfo::BeginPlay()
 
 	InitializeMapSceneCapture();
 	InitializeSunlightSettings();
+
+	SetSunlightAngle(0.f);
 }
 
 void AProjectMWorldInfo::InitializeMapSceneCapture()
