@@ -2,7 +2,7 @@
 
 ## Latest Demo
 
-2,000 soldier and tank city battle:
+2,000 soldier city battle:
 
 [![2,000 soldier city battle](https://img.youtube.com/vi/THMR3Jf4Tjo/0.jpg)](https://youtu.be/THMR3Jf4Tjo)
 
