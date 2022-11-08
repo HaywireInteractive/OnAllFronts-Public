@@ -74,14 +74,14 @@ void UMassEnemyTargetFinderProcessor::ConfigureQueries()
 {
 	FMassEntityQuery BaseEntityQuery;
 
-  BaseEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	BaseEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	BaseEntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
 	BaseEntityQuery.AddTagRequirement<FMassNeedsEnemyTargetTag>(EMassFragmentPresence::All);
 
 	PreSphereTraceEntityQuery = BaseEntityQuery;
 	PreSphereTraceEntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
 
-  PostSphereTraceEntityQuery = BaseEntityQuery;
+	PostSphereTraceEntityQuery = BaseEntityQuery;
 }
 
 void UMassEnemyTargetFinderProcessor::Initialize(UObject& Owner)
