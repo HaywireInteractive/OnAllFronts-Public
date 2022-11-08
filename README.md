@@ -173,6 +173,10 @@ ProjectM is structured as an Unreal Engine plugin. To quickly get started, we ha
 1. Open L_Template
 1. Copy PM_* actors
 1. Paste in Small_City_ProjectM_LVL. Ensure locations of all actors were preserved.
+1. Set up world info
+    1. Select actor "PM_WorldInfo"
+    1. Details pane > Sim > Sunlight > set "Sun Light" to "DirectionalLight_WP"
+    1. Set "Sky Dome" to "SM_dome"
 1. From menu: Build > Build ZoneGraph
 1. Select each PM_MilitaryUnitMassSpawner* actor > Details > World Partition > Is Spatially Loaded > uncheck
 1. World Settings > GameMode Override > BP_FirstPersonGameModeCommander
