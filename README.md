@@ -4,13 +4,13 @@
 
 2,000 soldier and tank city battle:
 
-[![2,000 soldier and tank city battle](https://img.youtube.com/vi/NDfSpPRgOHg/0.jpg)](https://youtu.be/NDfSpPRgOHg)
+[![2,000 soldier city battle](https://img.youtube.com/vi/THMR3Jf4Tjo/0.jpg)](https://youtu.be/THMR3Jf4Tjo)
 
-https://youtu.be/NDfSpPRgOHg
+https://youtu.be/THMR3Jf4Tjo
 
 ## What is this?
 
-ProjectM is a proof of concept [MilSim](https://en.wikipedia.org/wiki/MilSim) FPS / RTS game developed with [Unreal Engine 5](https://www.unrealengine.com/en-US/unreal-engine-5), leveraging the new [Mass Entity](https://docs.unrealengine.com/5.0/en-US/overview-of-mass-entity-in-unreal-engine/) ([ECS](https://en.wikipedia.org/wiki/Entity_component_system)) framework to have a very large number of entities not seen in traditional FPS games (tens or hundreds of thousands). Think [Squad](https://joinsquad.com/) meets [Foxhole](https://www.foxholegame.com/) meets [PlanetSide 2](https://www.planetside2.com/home) mixed in with massive number of AI controlled soldiers.
+ProjectM is a proof of concept tactical shooter and strategy FPS / RTS game developed with [Unreal Engine 5](https://www.unrealengine.com/en-US/unreal-engine-5), leveraging the new [Mass Entity](https://docs.unrealengine.com/5.0/en-US/overview-of-mass-entity-in-unreal-engine/) ([ECS](https://en.wikipedia.org/wiki/Entity_component_system)) framework to have a very large number of entities not seen in traditional FPS games (tens or hundreds of thousands). Think [Squad](https://joinsquad.com/) meets [Foxhole](https://www.foxholegame.com/) meets [PlanetSide 2](https://www.planetside2.com/home) mixed in with massive number of AI controlled soldiers.
 
 The project is open sourced to make it easy for others to contribute and to help others learn the Mass Entity system which is not very well-documented/supported yet.
 
