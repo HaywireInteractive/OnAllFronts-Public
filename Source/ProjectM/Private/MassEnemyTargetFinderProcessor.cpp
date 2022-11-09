@@ -211,7 +211,7 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 // TODO: Don't hard-code, get from data asset.
 float GetEntityRange(const bool bIsEntitySoldier)
 {
-	constexpr float SoldierMaxRangeMeters = 300.f; 
+	constexpr float SoldierMaxRangeMeters = 100.f; 
 	constexpr float SoldierMaxRangeCm = SoldierMaxRangeMeters * 100.f;
 	return bIsEntitySoldier ? SoldierMaxRangeCm : SoldierMaxRangeCm * 2.f;
 }
