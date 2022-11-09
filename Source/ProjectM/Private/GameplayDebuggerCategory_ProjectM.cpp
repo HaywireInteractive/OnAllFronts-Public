@@ -83,11 +83,10 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(cons
 	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FAgentRadiusFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddTagRequirement<FMassNeedsNavMeshMoveTag>(EMassFragmentPresence::All);
 
 	FMassExecutionContext Context(0.0f);
 
-	EntityQuery.ForEachEntityChunk(*EntitySystem, Context, [this, &ViewLocation, &ViewDirection, World](FMassExecutionContext& Context)
+	EntityQuery.ForEachEntityChunk(*EntitySystem, Context, [this, &ViewLocation, &ViewDirection, World, &EntitySystem](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 		const TConstArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetFragmentView<FMassNavMeshMoveFragment>();
@@ -101,51 +100,47 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(cons
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius, Context.GetEntity(EntityIndex), World);
+			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius, Context.GetEntity(EntityIndex), World, Context.DoesArchetypeHaveTag<FMassNeedsNavMeshMoveTag>());
 		}
 	});
 }
 
-void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity, const UWorld* World)
+void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity, const UWorld* World, const bool bNeedsNavMeshMove)
 {
-	if (!UE::Mass::Debug::IsDebuggingEntity(Entity))
+	if (bNeedsNavMeshMove && UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
-		return;
-	}
-
-	const FVector& EntityLocation = Transform.GetLocation();
-	AddShape(FGameplayDebuggerShape::MakeArrow(EntityLocation, MoveTargetFragment.Center, 10.f, 2.f, FColor::Black));
-
-	const TArray<FNavigationAction>& Actions = NavMeshMoveFragment.ActionList.Get()->Actions;
-	int32 LineEndIndex = 1;
-	int32 ActionIndex = 0;
-	// Draw lines.
-	for (const FNavigationAction& Action : Actions)
-	{
-		if (Action.Action == EMassMovementAction::Move)
+		const TArray<FNavigationAction>& Actions = NavMeshMoveFragment.ActionList.Get()->Actions;
+		int32 LineEndIndex = 1;
+		int32 ActionIndex = 0;
+		// Draw lines.
+		for (const FNavigationAction& Action : Actions)
 		{
-			const FNavigationAction& LineStartAction = Actions[ActionIndex - 1];
-			const FColor& LineColor = ActionIndex < NavMeshMoveFragment.CurrentActionIndex ? FColor::Green : FColor::Red;
-			AddShape(FGameplayDebuggerShape::MakeSegment(LineStartAction.TargetLocation, Action.TargetLocation, LineColor));
+			if (Action.Action == EMassMovementAction::Move)
+			{
+				const FNavigationAction& LineStartAction = Actions[ActionIndex - 1];
+				const FColor& LineColor = ActionIndex < NavMeshMoveFragment.CurrentActionIndex ? FColor::Green : FColor::Red;
+				AddShape(FGameplayDebuggerShape::MakeSegment(LineStartAction.TargetLocation, Action.TargetLocation, LineColor));
+			}
+			ActionIndex++;
 		}
-		ActionIndex++;
-	}
-	ActionIndex = 0;
-	// Draw points and forwards.
-	for (const FNavigationAction& Action : Actions) 
-	{
-		if (Action.Action == EMassMovementAction::Stand)
+		ActionIndex = 0;
+		// Draw points and forwards.
+		for (const FNavigationAction& Action : Actions)
 		{
-			// Red = point not yet reached. Green = point already reached.
-			const FColor& Color = ActionIndex < NavMeshMoveFragment.CurrentActionIndex ? FColor::Green : FColor::Red;
-			const FVector StringLocation = Action.TargetLocation + FVector(0.f, 0.f, 50.f);
-			AddShape(FGameplayDebuggerShape::MakePoint(Action.TargetLocation, 3.f, Color, FString::Printf(TEXT("{white}SMI %d, AI %d"), NavMeshMoveFragment.SquadMemberIndex, ActionIndex)));
-			AddShape(FGameplayDebuggerShape::MakeArrow(Action.TargetLocation, Action.TargetLocation + Action.Forward * AgentRadius, 10.f, 2.f, FColor::Purple));
+			if (Action.Action == EMassMovementAction::Stand)
+			{
+				// Red = point not yet reached. Green = point already reached.
+				const FColor& Color = ActionIndex < NavMeshMoveFragment.CurrentActionIndex ? FColor::Green : FColor::Red;
+				const FVector StringLocation = Action.TargetLocation + FVector(0.f, 0.f, 50.f);
+				AddShape(FGameplayDebuggerShape::MakePoint(Action.TargetLocation, 3.f, Color, FString::Printf(TEXT("{white}SMI %d, AI %d"), NavMeshMoveFragment.SquadMemberIndex, ActionIndex)));
+				AddShape(FGameplayDebuggerShape::MakeArrow(Action.TargetLocation, Action.TargetLocation + Action.Forward * AgentRadius, 10.f, 2.f, FColor::Purple));
+			}
+			ActionIndex++;
 		}
-		ActionIndex++;
 	}
 
 	// Cull entity if needed
+	const FVector& EntityLocation = Transform.GetLocation();
 	const FVector DirToEntity = EntityLocation - ViewLocation;
 	const float DistanceToEntitySq = DirToEntity.SquaredLength();
 	if (DistanceToEntitySq > FMath::Square(MaxViewDistance))
@@ -160,12 +155,18 @@ void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFr
 
 	if (DistanceToEntitySq < FMath::Square(MaxViewDistance * 0.5f))
 	{
+		AddShape(FGameplayDebuggerShape::MakeArrow(EntityLocation, MoveTargetFragment.Center, 10.f, 2.f, FColor::Black));
+
 		UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
 		check(MilitaryStructureSubsystem);
 		UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
 
 		FString Status;
-		Status += FString::Printf(TEXT("{red}SquadIndex: %d\n{orange}SquadMemberIndex: %d {white}\nCurrentActionIndex: %d\n{yellow}ActionsRemaining: %d\n{turquoise}ActionsNum: %d\n{cyan}IsWaitingOnSquadMates: %d"), EntityUnit->SquadIndex, NavMeshMoveFragment.SquadMemberIndex, NavMeshMoveFragment.CurrentActionIndex, NavMeshMoveFragment.ActionsRemaining, NavMeshMoveFragment.ActionList.Get()->Actions.Num(), NavMeshMoveFragment.bIsWaitingOnSquadMates);
+		Status += FString::Printf(TEXT("{red}SquadIndex: %d\n{orange}SquadMemberIndex: %d\n"), EntityUnit->SquadIndex, NavMeshMoveFragment.SquadMemberIndex);
+		if (bNeedsNavMeshMove)
+		{
+			Status += FString::Printf(TEXT("{white}CurrentActionIndex: %d\n{yellow}ActionsRemaining: %d\n{turquoise}ActionsNum: %d\n{cyan}IsWaitingOnSquadMates: %d"), NavMeshMoveFragment.CurrentActionIndex, NavMeshMoveFragment.ActionsRemaining, NavMeshMoveFragment.ActionList.Get()->Actions.Num(), NavMeshMoveFragment.bIsWaitingOnSquadMates);
+		}
 
 		FVector BasePos = EntityLocation + FVector(0.0f, 0.0f, 25.0f);
 		constexpr float ViewWeight = 0.6f; // Higher the number the more the view angle affects the score.
