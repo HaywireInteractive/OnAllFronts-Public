@@ -208,9 +208,12 @@ bool IsTargetEntityVisibleViaSphereTrace(const UWorld& World, const FVector& Sta
 	return !bFoundBlockingHit;
 }
 
+// TODO: Don't hard-code, get from data asset.
 float GetEntityRange(const bool bIsEntitySoldier)
 {
-	return 5000.f * (bIsEntitySoldier ? 2.f : 4.f); // TODO: Don't hard-code, get from data asset.
+	constexpr float SoldierMaxRangeMeters = 300.f; 
+	constexpr float SoldierMaxRangeCm = SoldierMaxRangeMeters * 100.f;
+	return bIsEntitySoldier ? SoldierMaxRangeCm : SoldierMaxRangeCm * 2.f;
 }
 
 bool IsTargetEntityOutOfRange(const FVector& EntityLocation, const bool bIsEntitySoldier, const FVector& TargetEntityLocation)
@@ -614,11 +617,6 @@ private:
 void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor);
-
-	// Do this even if we skip finding targets so that if we just enabled skip finding targets we'll reset.
-#if WITH_MASSGAMEPLAY_DEBUG
-	UMassEnemyTargetFinderProcessor_DebugEntityData.Reset();
-#endif
 
 	if (UMassEnemyTargetFinderProcessor_SkipFindingTargets)
 	{

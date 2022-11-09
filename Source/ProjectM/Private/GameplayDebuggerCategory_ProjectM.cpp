@@ -36,10 +36,10 @@ void FGameplayDebuggerCategory_ProjectM::CollectData(APlayerController* OwnerPC,
 	FVector ViewDirection = FVector::ForwardVector;
 	ensureMsgf(GetViewPoint(OwnerPC, ViewLocation, ViewDirection), TEXT("GetViewPoint is expected to always succeed when passing a valid controller."));
 
-	CollectDataForNavMeshMoveProcessor(OwnerPC, ViewLocation, ViewDirection);
+	CollectDataForEntities(OwnerPC, ViewLocation, ViewDirection);
 
-	const FDebugEntityData& DebugEntityData = UMassEnemyTargetFinderProcessor_DebugEntityData;
-	if (DebugEntityData.IsEntitySearching  && bShowEnemyTargetFinderDetails)
+	FDebugEntityData& DebugEntityData = UMassEnemyTargetFinderProcessor_DebugEntityData;
+	if (DebugEntityData.IsEntitySearching && bShowEnemyTargetFinderDetails)
 	{
 		AddShape(FGameplayDebuggerShape::MakeBox(DebugEntityData.SearchCenter, DebugEntityData.SearchExtent, FColor::Purple));
 
@@ -56,6 +56,7 @@ void FGameplayDebuggerCategory_ProjectM::CollectData(APlayerController* OwnerPC,
 			DrawTargetEntityLocations(TargetEntityLocationArray, FColor::Green, DebugEntityData.EntityLocation);
 		}
 	}
+	DebugEntityData.Reset();
 }
 
 void FGameplayDebuggerCategory_ProjectM::DrawTargetEntityLocations(const TArray<FVector>& TargetEntityLocations, const FColor& Color, const FVector& EntityLocation)
@@ -68,7 +69,7 @@ void FGameplayDebuggerCategory_ProjectM::DrawTargetEntityLocations(const TArray<
 	}
 }
 
-void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(const APlayerController* OwnerPC, const FVector& ViewLocation, const FVector& ViewDirection)
+void FGameplayDebuggerCategory_ProjectM::CollectDataForEntities(const APlayerController* OwnerPC, const FVector& ViewLocation, const FVector& ViewDirection)
 {
 	UWorld* World = GetDataWorld(OwnerPC, nullptr);
 
@@ -100,12 +101,12 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(cons
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius, Context.GetEntity(EntityIndex), World, Context);
+			CollectDataForEntity(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius, Context.GetEntity(EntityIndex), World, Context);
 		}
 	});
 }
 
-void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity, const UWorld* World, FMassExecutionContext& Context)
+void FGameplayDebuggerCategory_ProjectM::CollectDataForEntity(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity, const UWorld* World, FMassExecutionContext& Context)
 {
 	const bool bNeedsNavMeshMove = Context.DoesArchetypeHaveTag<FMassNeedsNavMeshMoveTag>();
 	if (bNeedsNavMeshMove && UE::Mass::Debug::IsDebuggingEntity(Entity))
