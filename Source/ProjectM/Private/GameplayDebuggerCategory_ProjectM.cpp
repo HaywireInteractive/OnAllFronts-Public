@@ -100,13 +100,14 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForNavMeshMoveProcessor(cons
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius, Context.GetEntity(EntityIndex), World, Context.DoesArchetypeHaveTag<FMassNeedsNavMeshMoveTag>());
+			DrawEntityInfo(NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform(), MinViewDirDot, ViewLocation, ViewDirection, MaxViewDistance, MoveTargetList[EntityIndex], RadiusList[EntityIndex].Radius, Context.GetEntity(EntityIndex), World, Context);
 		}
 	});
 }
 
-void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity, const UWorld* World, const bool bNeedsNavMeshMove)
+void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& Transform, const float MinViewDirDot, const FVector& ViewLocation, const FVector& ViewDirection, const float MaxViewDistance, const FMassMoveTargetFragment& MoveTargetFragment, const float AgentRadius, const FMassEntityHandle& Entity, const UWorld* World, FMassExecutionContext& Context)
 {
+	const bool bNeedsNavMeshMove = Context.DoesArchetypeHaveTag<FMassNeedsNavMeshMoveTag>();
 	if (bNeedsNavMeshMove && UE::Mass::Debug::IsDebuggingEntity(Entity))
 	{
 		const TArray<FNavigationAction>& Actions = NavMeshMoveFragment.ActionList.Get()->Actions;
@@ -162,6 +163,10 @@ void FGameplayDebuggerCategory_ProjectM::DrawEntityInfo(const FMassNavMeshMoveFr
 		UMilitaryUnit* EntityUnit = MilitaryStructureSubsystem->GetUnitForEntity(Entity);
 
 		FString Status;
+		const bool bIsSearching = Context.DoesArchetypeHaveTag<FMassNeedsEnemyTargetTag>();
+		const bool bIsEngaging = Context.DoesArchetypeHaveTag<FMassWillNeedEnemyTargetTag>();
+		FString ContactState = FString(bIsSearching ? TEXT("Searching") : bIsEngaging ? TEXT("Engaging") : TEXT(""));
+		Status += FString::Printf(TEXT("{pink}ContactState: %s\n"), *ContactState);
 		Status += FString::Printf(TEXT("{red}SquadIndex: %d\n{orange}SquadMemberIndex: %d\n"), EntityUnit->SquadIndex, NavMeshMoveFragment.SquadMemberIndex);
 		if (bNeedsNavMeshMove)
 		{
