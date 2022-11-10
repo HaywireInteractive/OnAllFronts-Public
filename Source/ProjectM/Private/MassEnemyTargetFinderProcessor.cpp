@@ -369,7 +369,7 @@ void GetPotentialTargetSphereTraces(const FMassEntityHandle& Entity, const UMass
 
 float GetProjectileInitialXYVelocityMagnitude(const bool bIsEntitySoldier)
 {
-	return bIsEntitySoldier ? 6000.f : 10000.f; // TODO: make this configurable in data asset and get from there?
+	return bIsEntitySoldier ? 90525.6f : 10000.f; // TODO: make this configurable in data asset and get from there?
 }
 
 void ProcessEntityForVisualTarget(FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, const FTransformFragment& TransformFragment, const FTargetEntityFragment& TargetEntityFragment, const bool IsEntityOnTeam1, const UMassTargetFinderSubsystem& TargetFinderSubsystem, const bool bIsEntitySoldier, TQueue<FPotentialTargetSphereTraceData, EQueueMode::Mpsc>& PotentialTargetsNeedingSphereTrace)
