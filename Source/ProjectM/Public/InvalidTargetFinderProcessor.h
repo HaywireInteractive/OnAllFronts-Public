@@ -10,7 +10,9 @@
 class UMassTargetFinderSubsystem;
 class UMassSignalSubsystem;
 struct FCapsule;
+struct FMassNavMeshMoveFragment;
 
+void UnstashMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World, const FMassExecutionContext& Context, FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& EntityTransform);
 void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World);
 bool DidCapsulesCollide(const FCapsule& Capsule1, const FCapsule& Capsule2, const FMassEntityHandle& Entity, const UWorld& World);
 

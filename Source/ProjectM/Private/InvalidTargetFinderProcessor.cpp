@@ -11,6 +11,35 @@
 #include "MassEntityView.h"
 #include "MassProjectileDamageProcessor.h"
 #include "MassTargetFinderSubsystem.h"
+#include <MassNavMeshMoveProcessor.h>
+
+void UnstashMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World, const FMassExecutionContext& Context, FMassNavMeshMoveFragment& NavMeshMoveFragment, const FTransform& EntityTransform)
+{
+	const bool bIsInNavMeshMove = Context.DoesArchetypeHaveTag<FMassNeedsNavMeshMoveTag>();
+	// If entity is in a nav mesh move, add actions to get to the stashed move target instead of just copying since it might be impossible to get to directly.
+	if (bIsInNavMeshMove)
+	{
+		const FVector& EntityLocation = EntityTransform.GetLocation();
+		TArray<FNavigationAction>& Actions = NavMeshMoveFragment.ActionList.Get()->Actions;
+		const FVector& ForwardToNewMoveTarget = (Source.Center - EntityLocation).GetSafeNormal();
+		Actions.Insert(FNavigationAction(EntityLocation, ForwardToNewMoveTarget, EMassMovementAction::Stand), NavMeshMoveFragment.CurrentActionIndex);
+		Actions.Insert(FNavigationAction(Source.Center, ForwardToNewMoveTarget, EMassMovementAction::Move), NavMeshMoveFragment.CurrentActionIndex + 1);
+		Actions.Insert(FNavigationAction(Source.Center, Source.Forward, EMassMovementAction::Stand), NavMeshMoveFragment.CurrentActionIndex + 2);
+		NavMeshMoveFragment.ActionsRemaining += 3;
+
+		Destination.CreateNewAction(EMassMovementAction::Stand, World);
+		Destination.Center = EntityLocation;
+		Destination.Forward = ForwardToNewMoveTarget;
+		Destination.DistanceToGoal = 0.f;
+		Destination.bOffBoundaries = true;
+		Destination.DesiredSpeed.Set(0.f);
+		Destination.IntentAtGoal = EMassMovementAction::Move;
+	}
+	else
+	{
+		CopyMoveTarget(Source, Destination, World);
+	}
+}
 
 void CopyMoveTarget(const FMassMoveTargetFragment& Source, FMassMoveTargetFragment& Destination, const UWorld& World)
 {
@@ -51,6 +80,8 @@ void UInvalidTargetFinderProcessor::ConfigureQueries()
 	InvalidateTargetsEntityQuery.AddRequirement<FTargetEntityFragment>(EMassFragmentAccess::ReadWrite);
 	InvalidateTargetsEntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	InvalidateTargetsEntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
+	InvalidateTargetsEntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadWrite);
+	InvalidateTargetsEntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 }
 
 bool IsTargetEntityOutOfRange(const FVector& TargetEntityLocation, const FVector &EntityLocation, const UMassEntitySubsystem& EntitySubsystem, const FMassEntityHandle Entity, const bool bIsEntitySoldier)
@@ -329,6 +360,8 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 			const TArrayView<FTargetEntityFragment> TargetEntityList = Context.GetMutableFragmentView<FTargetEntityFragment>();
 			const TConstArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetFragmentView<FMassStashedMoveTargetFragment>();
 			const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
+			const TArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetMutableFragmentView<FMassNavMeshMoveFragment>();
+			const TConstArrayView<FTransformFragment> TransformList = Context.GetFragmentView<FTransformFragment>();
 
 			for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 			{
@@ -337,12 +370,11 @@ void UInvalidTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsyste
 				if (bIsInvalid)
 				{
 					TargetEntityList[EntityIndex].Entity.Reset();
-					// Unstash move target if needed.
 					const FMassStashedMoveTargetFragment* StashedMoveTargetFragment = StashedMoveTargetList.Num() > 0 ? &StashedMoveTargetList[EntityIndex] : nullptr;
 					FMassMoveTargetFragment* MoveTargetFragment = MoveTargetList.Num() > 0 ? &MoveTargetList[EntityIndex] : nullptr;
 					if (Context.DoesArchetypeHaveTag<FMassHasStashedMoveTargetTag>() && StashedMoveTargetFragment && MoveTargetFragment)
 					{
-						CopyMoveTarget(*StashedMoveTargetFragment, *MoveTargetFragment, World);
+						UnstashMoveTarget(*StashedMoveTargetFragment, *MoveTargetFragment, World, Context, NavMeshMoveList[EntityIndex], TransformList[EntityIndex].GetTransform());
 						EntitiesWithUnstashedMoveTargetQueue.Enqueue(Entity);
 					}
 				}

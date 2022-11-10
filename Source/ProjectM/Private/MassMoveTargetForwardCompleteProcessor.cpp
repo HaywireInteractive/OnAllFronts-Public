@@ -31,6 +31,7 @@ void UMassMoveTargetForwardCompleteProcessor::ConfigureQueries()
 	EntityQuery.AddRequirement<FMassStashedMoveTargetFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	EntityQuery.AddRequirement<FMassMoveTargetFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FMassMoveForwardCompleteSignalFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FMassNavMeshMoveFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FMassNeedsMoveTargetForwardCompleteSignalTag>(EMassFragmentPresence::All);
 }
 
@@ -48,6 +49,7 @@ void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& Enti
 		const TConstArrayView<FMassMoveForwardCompleteSignalFragment> MoveForwardCompleteSignalList = Context.GetFragmentView<FMassMoveForwardCompleteSignalFragment>();
 		const TArrayView<FMassMoveTargetFragment> MoveTargetList = Context.GetMutableFragmentView<FMassMoveTargetFragment>();
 		const TConstArrayView<FMassStashedMoveTargetFragment> StashedMoveTargetList = Context.GetFragmentView<FMassStashedMoveTargetFragment>();
+		const TArrayView<FMassNavMeshMoveFragment> NavMeshMoveList = Context.GetMutableFragmentView<FMassNavMeshMoveFragment>();
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
@@ -63,8 +65,7 @@ void UMassMoveTargetForwardCompleteProcessor::Execute(UMassEntitySubsystem& Enti
 				}
 				else if (SignalType == EMassMoveForwardCompleteSignalType::TrackSoundComplete && StashedMoveTargetList.Num() > 0 && MoveTargetList.Num() > 0)
 				{
-					// Unstash move target.
-					CopyMoveTarget(StashedMoveTargetList[EntityIndex], MoveTargetList[EntityIndex], *EntitySubsystem.GetWorld());
+					UnstashMoveTarget(StashedMoveTargetList[EntityIndex], MoveTargetList[EntityIndex], *EntitySubsystem.GetWorld(), Context, NavMeshMoveList[EntityIndex], LocationList[EntityIndex].GetTransform());
 					Context.Defer().RemoveTag<FMassHasStashedMoveTargetTag>(Entity);
 				}
 				Context.Defer().RemoveTag<FMassTrackSoundTag>(Entity);

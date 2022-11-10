@@ -135,8 +135,9 @@ void ProcessEntity(FMassMoveTargetFragment& MoveTargetFragment, UWorld* World, c
 		if (!bFinishedCurrentAction)
 		{
 			const FVector& DeltaToMoveTargetNormal = (MoveTargetFragmentToModify.Center - EntityLocation).GetSafeNormal();
-			const bool bHasInvalidMoveTarget = FMath::IsNearlyZero((FVector2D(MoveTargetFragmentToModify.Forward) + FVector2D(DeltaToMoveTargetNormal)).SizeSquared(), KINDA_SMALL_NUMBER); // Note we can't use default tolerance as there are cases where SizeSquared returns kinda small numbers when invalid (not extremely small).
-			const bool bHasActionMismatch = CurrentAction.Action != MoveTargetFragmentToModify.GetCurrentAction();
+			const float SumSizeSquared = (FVector2D(MoveTargetFragmentToModify.Forward) + FVector2D(DeltaToMoveTargetNormal)).SizeSquared();
+			const bool bHasInvalidMoveTarget = MoveTargetFragmentToModify.GetCurrentAction() == EMassMovementAction::Move && FMath::IsNearlyZero(SumSizeSquared, 0.1f); // Note we can't use default tolerance as there are cases where SizeSquared returns kinda small numbers when invalid (not extremely small).
+			const bool bHasActionMismatch = !bUseStashedMoveTarget && CurrentAction.Action != MoveTargetFragmentToModify.GetCurrentAction();
 			const bool bIsStuck = bHasInvalidMoveTarget || bHasActionMismatch;
 			if (bIsStuck)
 			{

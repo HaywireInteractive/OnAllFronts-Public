@@ -84,7 +84,7 @@ struct FNavigationActionList
 	{
 	}
 	FNavigationActionList() = default;
-	const TArray<FNavigationAction> Actions;
+	TArray<FNavigationAction> Actions;
 };
 
 typedef TSharedPtr<FNavigationActionList, ESPMode::ThreadSafe> FNavActionListSharedPtr;
