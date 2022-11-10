@@ -395,7 +395,7 @@ struct FProcessSphereTracesContext
 
 	void Execute()
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FProcessSphereTracesContext.Execute");
+		TRACE_CPUPROFILER_EVENT_SCOPE(FProcessSphereTracesContext.Execute);
 
 		ConvertSphereTraceQueueToArray();
 		ProcessSphereTraces();
@@ -406,7 +406,7 @@ private:
 
 	void ConvertSphereTraceQueueToArray()
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FProcessSphereTracesContext.ConvertSphereTraceQueueToArray");
+		TRACE_CPUPROFILER_EVENT_SCOPE(FProcessSphereTracesContext.ConvertSphereTraceQueueToArray);
 
 		while (!PotentialTargetsNeedingSphereTraceQueue.IsEmpty())
 		{
@@ -419,7 +419,7 @@ private:
 
 	void ProcessSphereTraces()
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FProcessSphereTracesContext.ProcessSphereTraces");
+		TRACE_CPUPROFILER_EVENT_SCOPE(FProcessSphereTracesContext.ProcessSphereTraces);
 
 		ParallelFor(PotentialTargetsNeedingSphereTrace.Num(), [&](const int32 JobIndex)
 		{
@@ -449,7 +449,7 @@ private:
 
 	void ConvertPotentialVisibleTargetsQueueToMap()
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FProcessSphereTracesContext.ConvertPotentialVisibleTargetsQueueToMap");
+		TRACE_CPUPROFILER_EVENT_SCOPE(FProcessSphereTracesContext.ConvertPotentialVisibleTargetsQueueToMap);
 
 		while (!PotentialVisibleTargets.IsEmpty())
 		{
@@ -481,7 +481,7 @@ struct FSelectBestTargetProcessEntityContext
 
 	void ProcessEntity() const
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("FSelectBestTargetProcessEntityContext.ProcessEntity");
+		TRACE_CPUPROFILER_EVENT_SCOPE(FSelectBestTargetProcessEntityContext.ProcessEntity);
 
 		TSortedMap<float, TArray<FPotentialTarget>> PotentialTargetsByCaliber;
 		GroupByCaliber(PotentialTargetsByCaliber);
@@ -663,7 +663,7 @@ void UMassEnemyTargetFinderProcessor::Execute(UMassEntitySubsystem& EntitySubsys
 	FSelectBestTargetContext(PostSphereTraceEntityQuery, EntitySubsystem, Context, EntityToPotentialTargetEntities, TargetFinderEntityQueue).Execute();
 
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("UMassEnemyTargetFinderProcessor.ProcessQueues");
+		TRACE_CPUPROFILER_EVENT_SCOPE(UMassEnemyTargetFinderProcessor.ProcessQueues);
 		while (!TargetFinderEntityQueue.IsEmpty())
 		{
 			FMassEntityHandle TargetFinderEntity;
