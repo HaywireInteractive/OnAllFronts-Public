@@ -16,7 +16,7 @@ static constexpr uint32 GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind
 typedef TArray<FMassNavigationObstacleItem, TFixedAllocator<GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind>> TProjectileDamageObstacleItemArray;
 
 //----------------------------------------------------------------------//
-//  UMassProjectileWithDamageTrait
+//	UMassProjectileWithDamageTrait
 //----------------------------------------------------------------------//
 void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
@@ -54,7 +54,7 @@ void UMassProjectileWithDamageTrait::BuildTemplate(FMassEntityTemplateBuildConte
 }
 
 //----------------------------------------------------------------------//
-//  UMassProjectileDamagableTrait
+//	UMassProjectileDamagableTrait
 //----------------------------------------------------------------------//
 void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, UWorld& World) const
 {
@@ -68,7 +68,7 @@ void UMassProjectileDamagableTrait::BuildTemplate(FMassEntityTemplateBuildContex
 }
 
 //----------------------------------------------------------------------//
-//  UMassProjectileDamageProcessor
+//	UMassProjectileDamageProcessor
 //----------------------------------------------------------------------//
 UMassProjectileDamageProcessor::UMassProjectileDamageProcessor()
 {
@@ -192,7 +192,7 @@ bool DidCollideViaLineTrace(const UWorld &World, const FVector& StartLocation, c
 			static const FLinearColor TraceColor = FLinearColor::Red;
 			static const FLinearColor TraceHitColor = FLinearColor::Green;
 
-		  if (HitResult.bBlockingHit)
+			if (HitResult.bBlockingHit)
 			{
 				// Red up to the blocking hit, green thereafter
 				::DrawDebugLine(&World, HitResult.TraceStart, HitResult.ImpactPoint, TraceColor.ToFColor(true), true);
@@ -217,7 +217,7 @@ bool DidCollideWithEntity(const FVector& StartLocation, const FVector& EndLocati
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor.DidCollideWithEntity);
 
-  const FCapsule ProjectileCapsule(StartLocation, EndLocation, Radius);
+	const FCapsule ProjectileCapsule(StartLocation, EndLocation, Radius);
 	const FCapsule& OtherEntityCapsule = MakeCapsuleForEntity(OtherEntityView);
 	const bool& bDidCollide = TestCapsuleCapsule(ProjectileCapsule, OtherEntityCapsule);
 
@@ -382,7 +382,7 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& Project
 				DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World, true);
 				continue;
 			}
-      const FTransformFragment* OtherEntityTransformFragment = OtherEntityEntityView.GetFragmentDataPtr<FTransformFragment>();
+			const FTransformFragment* OtherEntityTransformFragment = OtherEntityEntityView.GetFragmentDataPtr<FTransformFragment>();
 			if (!OtherEntityTransformFragment)
 			{
 				continue;
@@ -397,7 +397,7 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& Project
 	}
 	else if (CollidedEntity.IsValid())
 	{
-    const FMassEntityView OtherEntityEntityView(EntitySubsystem, CollidedEntity);
+		const FMassEntityView OtherEntityEntityView(EntitySubsystem, CollidedEntity);
 		DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World);
 	}
 }
@@ -407,7 +407,7 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 	UWorld* World = EntitySubsystem.GetWorld();
 
 	const float CloseEntitiesRadius = ProjectileDamageFragment.SplashDamageRadius > 0 ? ProjectileDamageFragment.SplashDamageRadius : Radius.Radius;
-  const bool bHasCloseEntity = GetClosestEntities(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), CloseEntitiesRadius, OutCloseEntities);
+	const bool bHasCloseEntity = GetClosestEntities(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), CloseEntitiesRadius, OutCloseEntities);
 
 	// If collide via line trace, we hit the environment, so destroy projectile and deal splash damage if needed.
 	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
@@ -541,5 +541,5 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 		EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
 	}
 
-	ProcessQueues(ProjectilesToDestroy,  SoldiersToDestroy, PlayersToDestroy, EntitySubsystem.GetWorld(), Context);
+	ProcessQueues(ProjectilesToDestroy, SoldiersToDestroy, PlayersToDestroy, EntitySubsystem.GetWorld(), Context);
 }
