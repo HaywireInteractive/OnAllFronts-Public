@@ -158,6 +158,7 @@ bool GetClosestEntities(const FMassEntityHandle& Entity, const UMassEntitySubsys
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor.GetClosestEntity);
 
+	// TODO: Assumes that all avoidance obstacles are entities that could be damaged. Change instead to the same hash grid used for enemy target finder?
 	FindCloseObstacles(Location, Radius, AvoidanceObstacleGrid, OutCloseEntities);
 
 	for (const FNavigationObstacleHashGrid2D::ItemIDType OtherEntity : OutCloseEntities)
@@ -406,11 +407,11 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 {
 	UWorld* World = EntitySubsystem.GetWorld();
 
-	const float CloseEntitiesRadius = ProjectileDamageFragment.SplashDamageRadius > 0 ? ProjectileDamageFragment.SplashDamageRadius : Radius.Radius;
-	const bool bHasCloseEntity = GetClosestEntities(Entity, EntitySubsystem, AvoidanceObstacleGrid, Location.GetTransform().GetTranslation(), CloseEntitiesRadius, OutCloseEntities);
+	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
+	const float DistanceFromLastFrameToCurrentFrame = (CurrentLocation - PreviousLocationFragment.Location).Size();
+	const bool bHasCloseEntity = GetClosestEntities(Entity, EntitySubsystem, AvoidanceObstacleGrid, CurrentLocation, DistanceFromLastFrameToCurrentFrame, OutCloseEntities);
 
 	// If collide via line trace, we hit the environment, so destroy projectile and deal splash damage if needed.
-	const FVector& CurrentLocation = Location.GetTransform().GetLocation();
 	if (DidCollideViaLineTrace(*World, PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces))
 	{
 		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, OutCloseEntities, DrawLineTraces, EntitySubsystem, SoldiersToDestroy, PlayersToDestroy, FMassEntityHandle());

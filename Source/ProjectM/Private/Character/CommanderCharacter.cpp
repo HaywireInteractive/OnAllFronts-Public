@@ -274,9 +274,14 @@ bool ACommanderCharacter::IsCommander() const
 	return MyMilitaryUnit->bIsCommander;
 }
 
+float ACommanderCharacter_InitialProjectileVelocityZFudge = -2500.f;
+FAutoConsoleVariableRef CVar_ACommanderCharacter_InitialProjectileVelocityZFudge(TEXT("pm.ACommanderCharacter_InitialProjectileVelocityZFudge"), ACommanderCharacter_InitialProjectileVelocityZFudge, TEXT("ACommanderCharacter_InitialProjectileVelocityZFudge"));
+
 void ACommanderCharacter::SpawnProjectile(const FTransform SpawnTransform) const
 {
 	const UWorld* World = GetWorld();
-	const FVector InitialVelocity = SpawnTransform.GetRotation().Vector() * GetProjectileInitialXYVelocityMagnitude(true);
+	FVector InitialVelocity = SpawnTransform.GetRotation().Vector() * GetProjectileInitialXYVelocityMagnitude(true);
+	// TODO: For some reason we need to adjust the initial velocity for it to align with muzzle. We shouldn't have to do this.
+	InitialVelocity += FVector(0.f, 0.f, ACommanderCharacter_InitialProjectileVelocityZFudge);
 	::SpawnProjectile(World, SpawnTransform.GetLocation(), SpawnTransform.GetRotation(), InitialVelocity, ProjectileEntityConfig, IsPlayerOnTeam1());
 }
