@@ -41,6 +41,9 @@ void FGameplayDebuggerCategory_ProjectM::CollectData(APlayerController* OwnerPC,
 	FDebugEntityData& DebugEntityData = UMassEnemyTargetFinderProcessor_DebugEntityData;
 	if (DebugEntityData.IsEntitySearching && bShowEnemyTargetFinderDetails)
 	{
+		AddTextLine(FString::Printf(TEXT("Enemy Target Finder Legend:")));
+		AddTextLine(FString::Printf(TEXT("{red}Red: Same team\n{yellow}Yellow: Blocked by another entity\n{orange}Orange: Impenetrable\n{blue}Blue: Out of range\n{black}Black: No line of sight")));
+
 		AddShape(FGameplayDebuggerShape::MakeBox(DebugEntityData.SearchCenter, DebugEntityData.SearchExtent, FColor::Purple));
 
 		DrawTargetEntityLocations(DebugEntityData.TargetEntitiesCulledDueToSameTeam, FColor::Red, DebugEntityData.EntityLocation);
