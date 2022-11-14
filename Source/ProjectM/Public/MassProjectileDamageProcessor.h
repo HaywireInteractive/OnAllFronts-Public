@@ -6,9 +6,16 @@
 #include "MassMovementFragments.h"
 #include "MassEntityTypes.h"
 #include "MassNavigationSubsystem.h"
+
 #include "MassProjectileDamageProcessor.generated.h"
 
 class UMassNavigationSubsystem;
+
+USTRUCT()
+struct FMassSoldierIsDyingTag : public FMassTag
+{
+	GENERATED_BODY()
+};
 
 USTRUCT()
 struct FMassProjectileWithDamageTag : public FMassTag
@@ -116,7 +123,6 @@ protected:
 
 	UPROPERTY(Category = "Debug", EditAnywhere)
 	FDebugParameters DebugParameters;
-
 };
 
 UCLASS(meta = (DisplayName = "ProjectileDamagable"))

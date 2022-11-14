@@ -11,6 +11,13 @@
 #include "MassCollisionProcessor.h"
 #include <MassEnemyTargetFinderProcessor.h>
 #include <MassSoundPerceptionSubsystem.h>
+#include <MassDelayedDestructionProcessor.h>
+#include <MassTargetGridProcessors.h>
+#include <MassActorSubsystem.h>
+#include "Character/MassCharacter.h"
+#include "MassNavigationFragments.h"
+#include <MassNavMeshMoveProcessor.h>
+#include <MassMoveToCommandProcessor.h>
 
 static constexpr uint32 GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind = 20;
 typedef TArray<FMassNavigationObstacleItem, TFixedAllocator<GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind>> TProjectileDamageObstacleItemArray;
@@ -246,7 +253,23 @@ FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_SkipDealingDamage(TEX
 bool UMassProjectileDamageProcessor_DrawDamageDealt = false;
 FAutoConsoleVariableRef CVarUUMassProjectileDamageProcessor_DrawDamageDealt(TEXT("pm.UMassProjectileDamageProcessor_DrawDamageDealt"), UMassProjectileDamageProcessor_DrawDamageDealt, TEXT("UMassProjectileDamageProcessor: Debug draw damage dealt"));
 
-void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDealDamageToView, const FProjectileDamageFragment& ProjectileDamageFragment, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, UWorld* World, const bool OverrideSplashDamageWithRegularDamage = false)
+AMassCharacter* GetMassCharacterForEntity(const FMassEntityView EntityView)
+{
+	FMassActorFragment* ActorFragment = EntityView.GetFragmentDataPtr<FMassActorFragment>();
+	if (ActorFragment)
+	{
+		AActor* Actor = ActorFragment->GetMutable();
+
+		if (AMassCharacter* MassCharacter = Cast<AMassCharacter>(Actor))
+		{
+			return MassCharacter;
+		}
+	}
+
+	return nullptr;
+}
+
+void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDealDamageToView, const FProjectileDamageFragment& ProjectileDamageFragment, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersThatHaveDied, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, UWorld* World, const bool OverrideSplashDamageWithRegularDamage = false)
 {
 	FMassHealthFragment* EntityToDealDamageToHealthFragment = EntityToDealDamageToView.GetFragmentDataPtr<FMassHealthFragment>();
 	if (!EntityToDealDamageToHealthFragment)
@@ -289,7 +312,13 @@ void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDea
 		const bool bHasPlayerTag = EntityToDealDamageToView.HasTag<FMassPlayerControllableCharacterTag>();
 		if (!bHasPlayerTag)
 		{
-			SoldiersToDestroy.Enqueue(EntityToDealDamageToView.GetEntity());
+			// TODO: Trigger death animation if actor
+			if (AMassCharacter* MassCharacter = GetMassCharacterForEntity(EntityToDealDamageToView))
+			{
+				MassCharacter->BP_OnCharacterDeath();
+			}
+			// TODO: Trigger vertex animation if ISM
+			SoldiersThatHaveDied.Enqueue(EntityToDealDamageToView.GetEntity());
 		}
 		else {
 			PlayersToDestroy.Enqueue(EntityToDealDamageToView.GetEntity());
@@ -339,7 +368,7 @@ void HandleProjectImpactSoundPerception(UWorld* World, const FVector& Location, 
 	});
 }
 
-void HandleProjectileImpact(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, const FMassEntityHandle Entity, UWorld* World, const FProjectileDamageFragment& ProjectileDamageFragment, const FVector& Location, const TProjectileDamageObstacleItemArray& CloseEntities, const bool& DrawLineTraces, const UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, const FMassEntityHandle& CollidedEntity)
+void HandleProjectileImpact(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, const FMassEntityHandle Entity, UWorld* World, const FProjectileDamageFragment& ProjectileDamageFragment, const FVector& Location, const TProjectileDamageObstacleItemArray& CloseEntities, const bool& DrawLineTraces, const UMassEntitySubsystem& EntitySubsystem, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersThatHaveDied, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, const FMassEntityHandle& CollidedEntity)
 {
 	ProjectilesToDestroy.Enqueue(Entity);
 
@@ -380,7 +409,7 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& Project
 			if (CollidedEntity.IsValid() && CollidedEntity == OtherEntity.Entity)
 			{
 				// Deal full damage (not splash damage) to entity which was collided with.
-				DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World, true);
+				DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersThatHaveDied, PlayersToDestroy, World, true);
 				continue;
 			}
 			const FTransformFragment* OtherEntityTransformFragment = OtherEntityEntityView.GetFragmentDataPtr<FTransformFragment>();
@@ -391,7 +420,7 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& Project
 
 			if (!DidCollideViaLineTrace(*World, Location, OtherEntityTransformFragment->GetTransform().GetLocation(), DrawLineTraces))
 			{
-				DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World);
+				DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersThatHaveDied, PlayersToDestroy, World);
 			}
 
 		}
@@ -399,11 +428,11 @@ void HandleProjectileImpact(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& Project
 	else if (CollidedEntity.IsValid())
 	{
 		const FMassEntityView OtherEntityEntityView(EntitySubsystem, CollidedEntity);
-		DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersToDestroy, PlayersToDestroy, World);
+		DealDamage(Location, OtherEntityEntityView, ProjectileDamageFragment, SoldiersThatHaveDied, PlayersToDestroy, World);
 	}
 }
 
-void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TProjectileDamageObstacleItemArray& OutCloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy)
+void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHandle Entity, const UMassEntitySubsystem& EntitySubsystem, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid, const FTransformFragment& Location, const FAgentRadiusFragment& Radius, const FProjectileDamageFragment& ProjectileDamageFragment, TProjectileDamageObstacleItemArray& OutCloseEntities, const FMassPreviousLocationFragment& PreviousLocationFragment, const bool& DrawLineTraces, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersThatHaveDied, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy)
 {
 	UWorld* World = EntitySubsystem.GetWorld();
 
@@ -414,7 +443,7 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 	// If collide via line trace, we hit the environment, so destroy projectile and deal splash damage if needed.
 	if (DidCollideViaLineTrace(*World, PreviousLocationFragment.Location, CurrentLocation, DrawLineTraces))
 	{
-		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, OutCloseEntities, DrawLineTraces, EntitySubsystem, SoldiersToDestroy, PlayersToDestroy, FMassEntityHandle());
+		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, OutCloseEntities, DrawLineTraces, EntitySubsystem, SoldiersThatHaveDied, PlayersToDestroy, FMassEntityHandle());
 		return;
 	}
 
@@ -429,14 +458,18 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 			continue;
 		}
 
-		FMassEntityView ClosestOtherEntityView(EntitySubsystem, OtherEntity.Entity);
-
-		if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, DrawLineTraces, *World, ClosestOtherEntityView))
+		FMassEntityView OtherEntityView(EntitySubsystem, OtherEntity.Entity);
+		if (OtherEntityView.HasTag<FMassSoldierIsDyingTag>())
 		{
 			continue;
 		}
 
-		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, OutCloseEntities, DrawLineTraces, EntitySubsystem, SoldiersToDestroy, PlayersToDestroy, OtherEntity.Entity);
+		if (!DidCollideWithEntity(PreviousLocationFragment.Location, CurrentLocation, Radius.Radius, DrawLineTraces, *World, OtherEntityView))
+		{
+			continue;
+		}
+
+		HandleProjectileImpact(ProjectilesToDestroy, Entity, World, ProjectileDamageFragment, CurrentLocation, OutCloseEntities, DrawLineTraces, EntitySubsystem, SoldiersThatHaveDied, PlayersToDestroy, OtherEntity.Entity);
 
 		// If we got here, we've collided with an entity, so no need to check other close entities.
 		return;
@@ -446,7 +479,7 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 bool UMassProjectileDamageProcessor_UseParallelForEachEntityChunk = true;
 FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_UseParallelForEachEntityChunk(TEXT("pm.UMassProjectileDamageProcessor_UseParallelForEachEntityChunk"), UMassProjectileDamageProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassProjectileDamageProcessor::Execute to improve performance"));
 
-void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, const UWorld* World, const FMassExecutionContext& Context)
+void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersThatHaveDied, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, const UWorld* World, const FMassExecutionContext& Context)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor.ProcessQueues);
 
@@ -462,13 +495,31 @@ void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDes
 	// Destroy AI soldiers.
 	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
 	check(MilitaryStructureSubsystem);
-	while (!SoldiersToDestroy.IsEmpty())
+	while (!SoldiersThatHaveDied.IsEmpty())
 	{
-		FMassEntityHandle EntityToDestroy;
-		const bool bSuccess = SoldiersToDestroy.Dequeue(EntityToDestroy);
+		FMassEntityHandle SoldierEntityThatHasDied;
+		const bool bSuccess = SoldiersThatHaveDied.Dequeue(SoldierEntityThatHasDied);
 		check(bSuccess);
-		Context.Defer().DestroyEntity(EntityToDestroy);
-		MilitaryStructureSubsystem->DestroyEntity(EntityToDestroy);
+
+		Context.Defer().AddTag<FMassSoldierIsDyingTag>(SoldierEntityThatHasDied);
+		
+		Context.Defer().RemoveTag<FMassNeedsEnemyTargetTag>(SoldierEntityThatHasDied); // Ensure soldier no longer looks for enemy targets.
+		Context.Defer().RemoveTag<FMassWillNeedEnemyTargetTag>(SoldierEntityThatHasDied); // Ensure soldier no longer will get tag to look for enemy targets in future.
+
+		Context.Defer().RemoveTag<FMassNeedsNavMeshMoveTag>(SoldierEntityThatHasDied); // Ensure soldier no longer moves to next action in Nav Mesh.
+		Context.Defer().RemoveTag<FMassCommandableTag>(SoldierEntityThatHasDied); // Ensure soldier no longer follows commands.
+
+		Context.Defer().PushCommand(FCommandRemoveFragmentList(SoldierEntityThatHasDied,
+			{FProjectileDamagableFragment::StaticStruct(), // If a projectile hits soldier during death montage we won't try to restart death montage.
+			FMassNavigationObstacleGridCellLocationFragment::StaticStruct(), // We currently rely on avoidance obstacle grid to decide entities that projectiles can damage. TODO: Change to use target grid, then delete this line.
+			FMassVelocityFragment::StaticStruct(), // Ensure soldier no longer moves via UMassApplyMovementProcessor.
+			FMassTargetGridCellLocationFragment::StaticStruct()})); // Ensure soldier is no longer considered a potential target.
+
+		FMassDelayedDestructionFragment DelayedDestructionFragment;
+		DelayedDestructionFragment.SecondsLeftTilDestruction = 2.1f; // TODO: Make this configurable via ProjectileDamagable Trait?
+		Context.Defer().PushCommand(FCommandAddFragmentInstance(SoldierEntityThatHasDied, FConstStructView::Make(DelayedDestructionFragment)));
+		
+		MilitaryStructureSubsystem->DestroyEntity(SoldierEntityThatHasDied);
 	}
 
 	// Destroy player soldiers.
@@ -499,10 +550,10 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 	}
 
 	TQueue<FMassEntityHandle, EQueueMode::Mpsc> ProjectilesToDestroy;
-	TQueue<FMassEntityHandle, EQueueMode::Mpsc> SoldiersToDestroy;
+	TQueue<FMassEntityHandle, EQueueMode::Mpsc> SoldiersThatHaveDied;
 	TQueue<FMassEntityHandle, EQueueMode::Mpsc> PlayersToDestroy;
 
-	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &ProjectilesToDestroy, &SoldiersToDestroy, &PlayersToDestroy](FMassExecutionContext& Context)
+	auto ExecuteFunction = [&EntitySubsystem, &NavigationSubsystem = NavigationSubsystem, &ProjectilesToDestroy, &SoldiersThatHaveDied, &PlayersToDestroy](FMassExecutionContext& Context)
 	{
 		const int32 NumEntities = Context.GetNumEntities();
 
@@ -528,7 +579,7 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 
 		for (int32 EntityIndex = 0; EntityIndex < NumEntities; ++EntityIndex)
 		{
-			ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex], CloseEntities, PreviousLocationList[EntityIndex], DebugParameters.DrawLineTraces, ProjectilesToDestroy, SoldiersToDestroy, PlayersToDestroy);
+			ProcessProjectileDamageEntity(Context, Context.GetEntity(EntityIndex), EntitySubsystem, AvoidanceObstacleGrid, LocationList[EntityIndex], RadiusList[EntityIndex], ProjectileDamageList[EntityIndex], CloseEntities, PreviousLocationList[EntityIndex], DebugParameters.DrawLineTraces, ProjectilesToDestroy, SoldiersThatHaveDied, PlayersToDestroy);
 			PreviousLocationList[EntityIndex].Location = LocationList[EntityIndex].GetTransform().GetLocation();
 		}
 	};
@@ -542,5 +593,5 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 		EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
 	}
 
-	ProcessQueues(ProjectilesToDestroy, SoldiersToDestroy, PlayersToDestroy, EntitySubsystem.GetWorld(), Context);
+	ProcessQueues(ProjectilesToDestroy, SoldiersThatHaveDied, PlayersToDestroy, EntitySubsystem.GetWorld(), Context);
 }
