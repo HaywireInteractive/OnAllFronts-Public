@@ -13,13 +13,16 @@ public class ProjectM : ModuleRules
 			"StateTreeModule",
 			"StructUtils",
 			"UMG",
-            "MotionWarping",
-            "AnimToTexture",
-        });
+			"MotionWarping",
+			"ContextualAnimation",
+			"AnimToTexture",
+		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
+			// AI/MassAI Plugin Modules
 			"MassAIBehavior",
 			"MassAIDebug",
+			"MassZoneGraphNavigation",
 
 			// AI/MassCrowd Plugin Modules
 			"MassCrowd",
@@ -40,20 +43,20 @@ public class ProjectM : ModuleRules
 			"MassSimulation",
 			"MassSignals",
 
-            "Slate",
-            "SlateCore",
+			"Slate",
+			"SlateCore",
 
-            "NavigationSystem",
-        });
+			"NavigationSystem",
+		});
 
-        if (Target.bBuildDeveloperTools || (Target.Configuration != UnrealTargetConfiguration.Shipping && Target.Configuration != UnrealTargetConfiguration.Test))
-        {
-            PrivateDependencyModuleNames.Add("GameplayDebugger");
-            PublicDefinitions.Add("WITH_GAMEPLAY_DEBUGGER=1");
-        }
-        else
-        {
-            PublicDefinitions.Add("WITH_GAMEPLAY_DEBUGGER=0");
-        }
-    }
+		if (Target.bBuildDeveloperTools || (Target.Configuration != UnrealTargetConfiguration.Shipping && Target.Configuration != UnrealTargetConfiguration.Test))
+		{
+				PrivateDependencyModuleNames.Add("GameplayDebugger");
+				PublicDefinitions.Add("WITH_GAMEPLAY_DEBUGGER=1");
+		}
+		else
+		{
+				PublicDefinitions.Add("WITH_GAMEPLAY_DEBUGGER=0");
+		}
+	}
 }

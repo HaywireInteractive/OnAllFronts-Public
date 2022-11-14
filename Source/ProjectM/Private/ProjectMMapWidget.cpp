@@ -20,6 +20,7 @@
 #include "MassEnemyTargetFinderProcessor.h"
 
 #include <Character/CommanderCharacter.h>
+#include <MassProjectileDamageProcessor.h>
 
 #define LOCTEXT_NAMESPACE "MyNamespace" // TODO
 
@@ -99,6 +100,7 @@ void UProjectMMapWidget::ForEachMapDisplayableEntity(const FMapDisplayableEntity
   FMassEntityQuery EntityQuery;
   EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
   EntityQuery.AddRequirement<FTeamMemberFragment>(EMassFragmentAccess::ReadOnly);
+  EntityQuery.AddTagRequirement<FMassSoldierIsDyingTag>(EMassFragmentPresence::None);
   FMassExecutionContext Context(0.0f);
 
   EntityQuery.ForEachEntityChunk(*EntitySubsystem, Context, [&EntityExecuteFunction](FMassExecutionContext& Context)

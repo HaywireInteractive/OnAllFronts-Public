@@ -171,7 +171,10 @@ void FGameplayDebuggerCategory_ProjectM::CollectDataForEntity(const FMassNavMesh
 		const bool bIsEngaging = Context.DoesArchetypeHaveTag<FMassWillNeedEnemyTargetTag>();
 		FString ContactState = FString(bIsSearching ? TEXT("Searching") : bIsEngaging ? TEXT("Engaging") : TEXT(""));
 		Status += FString::Printf(TEXT("{pink}ContactState: %s\n"), *ContactState);
-		Status += FString::Printf(TEXT("{red}SquadIndex: %d\n{orange}SquadMemberIndex: %d\n"), EntityUnit->SquadIndex, NavMeshMoveFragment.SquadMemberIndex);
+		if (EntityUnit)
+		{
+			Status += FString::Printf(TEXT("{red}SquadIndex: %d\n{orange}SquadMemberIndex: %d\n"), EntityUnit->SquadIndex, NavMeshMoveFragment.SquadMemberIndex);
+		}
 		if (bNeedsNavMeshMove)
 		{
 			Status += FString::Printf(TEXT("{white}CurrentActionIndex: %d\n{yellow}ActionsRemaining: %d\n{turquoise}ActionsNum: %d\n{cyan}IsWaitingOnSquadMates: %d"), NavMeshMoveFragment.CurrentActionIndex, NavMeshMoveFragment.ActionsRemaining, NavMeshMoveFragment.ActionList.Get()->Actions.Num(), NavMeshMoveFragment.bIsWaitingOnSquadMates);

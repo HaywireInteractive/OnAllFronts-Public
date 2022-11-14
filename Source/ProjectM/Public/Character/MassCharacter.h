@@ -15,4 +15,7 @@ class PROJECTM_API AMassCharacter : public ACharacter
 public:
 	UPROPERTY(EditAnywhere, Category = "Mass")
 	TObjectPtr<UAnimToTextureDataAsset> AnimToTextureDataAsset;
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnCharacterDeath();
 };

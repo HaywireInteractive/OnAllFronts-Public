@@ -16,6 +16,13 @@ int16 UMassVisualEffectsSubsystem::FindOrAddEntityConfig(UMassEntityConfigAsset*
 
 void UMassVisualEffectsSubsystem::SpawnEntity(const int16 EntityConfigIndex, const FVector& Location)
 {
+	FTransform Transform;
+	Transform.SetLocation(Location);
+	SpawnEntity(EntityConfigIndex, Transform);
+}
+
+void UMassVisualEffectsSubsystem::SpawnEntity(const int16 EntityConfigIndex, const FTransform& Transform)
+{
 	UWorld* World = GetWorld();
 	UMassSpawnerSubsystem* SpawnerSystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
 	if (SpawnerSystem == nullptr)
@@ -47,7 +54,9 @@ void UMassVisualEffectsSubsystem::SpawnEntity(const int16 EntityConfigIndex, con
 
 	Transforms.Transforms.Reserve(1);
 	FTransform& SpawnDataTransform = Transforms.Transforms.AddDefaulted_GetRef();
-	SpawnDataTransform.SetLocation(Location);
+	SpawnDataTransform.SetLocation(Transform.GetLocation());
+	SpawnDataTransform.SetRotation(Transform.GetRotation());
+	SpawnDataTransform.SetScale3D(Transform.GetScale3D());
 
 	TArray<FMassEntityHandle> SpawnedEntities;
 	SpawnerSystem->SpawnEntities(EntityTemplate->GetTemplateID(), Result.NumEntities, Result.SpawnData, Result.SpawnDataProcessor, SpawnedEntities);
