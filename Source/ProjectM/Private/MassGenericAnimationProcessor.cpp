@@ -159,6 +159,94 @@ void UMassGenericAnimationProcessor::UpdateVertexAnimationState(UMassEntitySubsy
 	}
 }
 
+void UMassGenericAnimationProcessor::UpdateSkeletalAnimation(UMassEntitySubsystem& EntitySubsystem, float GlobalTime, TArrayView<FMassEntityHandle> ActorEntities)
+{
+	if (ActorEntities.Num() <= 0)
+	{
+		return;
+	}
+
+	for (FMassEntityHandle& Entity : ActorEntities)
+	{
+		FMassEntityView EntityView(EntitySubsystem, Entity);
+
+		FGenericAnimationFragment& AnimationData = EntityView.GetFragmentData<FGenericAnimationFragment>();
+		FTransformFragment& TransformFragment = EntityView.GetFragmentData<FTransformFragment>();
+		FMassRepresentationFragment& Visualization = EntityView.GetFragmentData<FMassRepresentationFragment>();
+
+		const FMassActorFragment& ActorFragment = EntityView.GetFragmentData<FMassActorFragment>();
+		const FMassLookAtFragment* LookAtFragment = EntityView.GetFragmentDataPtr<FMassLookAtFragment>();
+		const FMassMoveTargetFragment* MovementTargetFragment = EntityView.GetFragmentDataPtr<FMassMoveTargetFragment>();
+		const FMassSteeringFragment* SteeringFragment = EntityView.GetFragmentDataPtr<FMassSteeringFragment>();
+
+		const AActor* Actor = ActorFragment.Get();
+		UAnimInstance* AnimInstance = GetAnimInstanceFromActor(Actor);
+
+		const FMassGenericMontageFragment* MontageFragment = EntitySubsystem.GetFragmentDataPtr<FMassGenericMontageFragment>(Entity);
+		UAnimMontage* Montage = MontageFragment ? MontageFragment->MontageInstance.GetMontage() : nullptr;
+
+		if (Montage == nullptr)
+		{
+			continue;
+		}
+
+		if (AnimInstance && Actor)
+		{
+			// Don't play the montage again, even if it's blending out. UAnimInstance::GetCurrentActiveMontage and AnimInstance::Montage_IsPlaying return false if the montage is blending out.
+			bool bMontageAlreadyPlaying = false;
+			for (int32 InstanceIndex = 0; InstanceIndex < AnimInstance->MontageInstances.Num(); InstanceIndex++)
+			{
+				FAnimMontageInstance* MontageInstance = AnimInstance->MontageInstances[InstanceIndex];
+				if (MontageInstance && MontageInstance->Montage == Montage && MontageInstance->IsPlaying())
+				{
+					bMontageAlreadyPlaying = true;
+				}
+			}
+
+			if (!bMontageAlreadyPlaying)
+			{
+				UMotionWarpingComponent* MotionWarpingComponent = Actor->FindComponentByClass<UMotionWarpingComponent>();
+				if (MotionWarpingComponent && MontageFragment->InteractionRequest.AlignmentTrack != NAME_None)
+				{
+					const FName SyncPointName = MontageFragment->InteractionRequest.AlignmentTrack;
+					const FTransform& SyncTransform = MontageFragment->InteractionRequest.QueryResult.SyncTransform;
+					MotionWarpingComponent->AddOrUpdateWarpTargetFromTransform(SyncPointName, SyncTransform);
+				}
+
+				FAlphaBlendArgs BlendIn;
+				BlendIn = Montage->GetBlendInArgs();
+				// Instantly blend in if we swapped to skeletal mesh this frame to avoid pop
+				BlendIn.BlendTime = AnimationData.bSwappedThisFrame ? 0.0f : BlendIn.BlendTime;
+
+				AnimInstance->Montage_PlayWithBlendIn(Montage, BlendIn, 1.0f, EMontagePlayReturnType::MontageLength, MontageFragment->MontageInstance.GetPosition());
+			}
+
+			// Force an animation update if we swapped this frame to prevent t-posing
+			if (AnimationData.bSwappedThisFrame)
+			{
+				if (USkeletalMeshComponent* OwningComp = AnimInstance->GetOwningComponent())
+				{
+					TArray<USkeletalMeshComponent*> MeshComps;
+
+					// Tick main component and all attached parts to avoid a frame of t-posing
+					// We have to refresh bone transforms too because this can happen after the render state has been updated					
+
+					OwningComp->TickAnimation(0.0f, false);
+					OwningComp->RefreshBoneTransforms();
+
+					Actor->GetComponents<USkeletalMeshComponent>(MeshComps, true);
+					MeshComps.Remove(OwningComp);
+					for (USkeletalMeshComponent* MeshComp : MeshComps)
+					{
+						MeshComp->TickAnimation(0.0f, false);
+						MeshComp->RefreshBoneTransforms();
+					}
+				}
+			}
+		}
+	}
+}
+
 void UMassGenericAnimationProcessor::ConfigureQueries()
 {
 	AnimationEntityQuery_Conditional.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
@@ -382,6 +470,12 @@ void UMassGenericAnimationProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 				}
 			}
 		});
+	}
+
+	{
+		QUICK_SCOPE_CYCLE_COUNTER(UMassGenericAnimationProcessor_UpdateSkeletalAnimation);
+		// Pull out UAnimToTextureDataAsset from the inner loop to avoid the resolve cost, which is extremely high in PIE.
+		UMassGenericAnimationProcessor::UpdateSkeletalAnimation(EntitySubsystem, GlobalTime, MakeArrayView(ActorEntities));
 	}
 }
 
