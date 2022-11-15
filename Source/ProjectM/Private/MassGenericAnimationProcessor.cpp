@@ -123,9 +123,12 @@ void UMassGenericAnimationProcessor::UpdateVertexAnimationState(UMassEntitySubsy
 				if (bIsDying)
 				{
 					AnimationData.PlayRate = 1.0f;
-					StateIndex = 2; // TODO: don't hardcode
-					if (AnimationData.AnimationStateIndex != 2)
+					constexpr int32 DeathAnimationIndex = 2; // TODO: don't hardcode
+					StateIndex = DeathAnimationIndex;
+					if (AnimationData.AnimationStateIndex != DeathAnimationIndex)
 					{
+						// Setting this tells the animation when to start and since this animation doesn't loop we need to make sure we're not constantly setting this.
+						// Hence we only do this once, when first going into death animation.
 						AnimationData.GlobalStartTime = GlobalTime;
 					}
 				}
