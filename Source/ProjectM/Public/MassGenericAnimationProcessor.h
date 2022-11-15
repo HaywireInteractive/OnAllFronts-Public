@@ -4,26 +4,47 @@
 
 #include "MassObserverProcessor.h"
 #include "MassRepresentationTypes.h"
+#include "LightweightMontageInstance.h"
+#include "ContextualAnimSceneAsset.h"
+
 #include "MassGenericAnimationProcessor.generated.h"
 
 class UAnimToTextureDataAsset;
 struct FMassActorFragment;
 
-// TODO: Uncomment (and all references) when need montages and figure out what to do with City Sample AnimToTexture references like FLightweightMontageInstance.
-//USTRUCT()
-//struct PROJECTM_API FMassGenericMontageFragment : public FMassFragment
-//{
-//	GENERATED_BODY()
-//
-//	UE::VertexAnimation::FLightweightMontageInstance MontageInstance = UE::VertexAnimation::FLightweightMontageInstance();
-//	UE::CrowdInteractionAnim::FRequest InteractionRequest = UE::CrowdInteractionAnim::FRequest();
-//	UE::CrowdInteractionAnim::FMotionWarpingScratch MotionWarpingScratch = UE::CrowdInteractionAnim::FMotionWarpingScratch();
-//	FRootMotionMovementParams RootMotionParams = FRootMotionMovementParams();
-//	float SkippedTime = 0.0f;
-//
-//	void Request(const UE::CrowdInteractionAnim::FRequest& InRequest);
-//	void Clear();
-//};
+namespace UE::CrowdInteractionAnim
+{
+	struct FRequest
+	{
+		TWeakObjectPtr<class UContextualAnimSceneAsset> ContextualAnimAsset = nullptr;
+		FContextualAnimQueryResult QueryResult = FContextualAnimQueryResult();
+		FName InteractorRole;
+		FName AlignmentTrack;
+	};
+
+	struct FMotionWarpingScratch
+	{
+		float TimeRemaining = -1.0f;
+		float Duration = -1.0f;
+		FVector InitialLocation = FVector::ZeroVector;
+		FQuat InitialRotation = FQuat::Identity;
+	};
+} // namespace UE::CrowdInteractionAnim
+
+USTRUCT()
+struct PROJECTM_API FMassGenericMontageFragment : public FMassFragment
+{
+	GENERATED_BODY()
+
+	UE::VertexAnimation::FLightweightMontageInstance MontageInstance = UE::VertexAnimation::FLightweightMontageInstance();
+	UE::CrowdInteractionAnim::FRequest InteractionRequest = UE::CrowdInteractionAnim::FRequest();
+	UE::CrowdInteractionAnim::FMotionWarpingScratch MotionWarpingScratch = UE::CrowdInteractionAnim::FMotionWarpingScratch();
+	FRootMotionMovementParams RootMotionParams = FRootMotionMovementParams();
+	float SkippedTime = 0.0f;
+
+	void Request(const UE::CrowdInteractionAnim::FRequest& InRequest);
+	void Clear();
+};
 
 USTRUCT()
 struct PROJECTM_API FGenericAnimationFragment : public FMassFragment
@@ -66,8 +87,8 @@ protected:
 	UWorld* World = nullptr;
 
 	FMassEntityQuery AnimationEntityQuery_Conditional;
-	//FMassEntityQuery MontageEntityQuery;
-	//FMassEntityQuery MontageEntityQuery_Conditional;
+	FMassEntityQuery MontageEntityQuery;
+	FMassEntityQuery MontageEntityQuery_Conditional;
 };
 
 // Adapted from CitySample UCitySampleCrowdVisualizationFragmentInitializer.
@@ -81,8 +102,10 @@ public:
 
 protected:
 	virtual void ConfigureQueries() override;
+	virtual void Initialize(UObject& Owner) override;
 	virtual void Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context) override;
 
 protected:
 	FMassEntityQuery EntityQuery;
+	UWorld* World = nullptr;
 };

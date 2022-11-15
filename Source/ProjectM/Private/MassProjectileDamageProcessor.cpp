@@ -312,12 +312,12 @@ void DealDamage(const FVector& ImpactLocation, const FMassEntityView EntityToDea
 		const bool bHasPlayerTag = EntityToDealDamageToView.HasTag<FMassPlayerControllableCharacterTag>();
 		if (!bHasPlayerTag)
 		{
-			// TODO: Trigger death animation if actor
 			if (AMassCharacter* MassCharacter = GetMassCharacterForEntity(EntityToDealDamageToView))
 			{
-				MassCharacter->BP_OnCharacterDeath();
+				AsyncTask(ENamedThreads::GameThread, [MassCharacter](){
+					MassCharacter->BP_OnCharacterDeath();
+				});
 			}
-			// TODO: Trigger vertex animation if ISM
 			SoldiersThatHaveDied.Enqueue(EntityToDealDamageToView.GetEntity());
 		}
 		else {
@@ -512,7 +512,7 @@ void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDes
 		Context.Defer().PushCommand(FCommandRemoveFragmentList(SoldierEntityThatHasDied,
 			{FProjectileDamagableFragment::StaticStruct(), // If a projectile hits soldier during death montage we won't try to restart death montage.
 			FMassNavigationObstacleGridCellLocationFragment::StaticStruct(), // We currently rely on avoidance obstacle grid to decide entities that projectiles can damage. TODO: Change to use target grid, then delete this line.
-			FMassVelocityFragment::StaticStruct(), // Ensure soldier no longer moves via UMassApplyMovementProcessor.
+			//FMassVelocityFragment::StaticStruct(), // Ensure soldier no longer moves via UMassApplyMovementProcessor.
 			FMassTargetGridCellLocationFragment::StaticStruct()})); // Ensure soldier is no longer considered a potential target.
 
 		FMassDelayedDestructionFragment DelayedDestructionFragment;

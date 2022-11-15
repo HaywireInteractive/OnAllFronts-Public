@@ -43,6 +43,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "ContextualAnimation",
+			"Enabled": true
+		},
+		{
 			"Name": "MotionWarping",
 			"Enabled": true
 		}
