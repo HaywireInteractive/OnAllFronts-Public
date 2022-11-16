@@ -19,8 +19,10 @@ public class ProjectM : ModuleRules
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
+			// AI/MassAI Plugin Modules
 			"MassAIBehavior",
 			"MassAIDebug",
+			"MassZoneGraphNavigation",
 
 			// AI/MassCrowd Plugin Modules
 			"MassCrowd",

@@ -10,6 +10,7 @@
 #include "MassProjectileDamageProcessor.generated.h"
 
 class UMassNavigationSubsystem;
+class UMassSignalSubsystem;
 
 USTRUCT()
 struct FMassSoldierIsDyingTag : public FMassTag
@@ -151,6 +152,8 @@ protected:
 	virtual void ConfigureQueries() override;
 	virtual void Initialize(UObject& Owner) override;
 	virtual void Execute(UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context) override;
+
+	TObjectPtr<UMassSignalSubsystem> SignalSubsystem;
 
 private:
 	TObjectPtr<UMassNavigationSubsystem> NavigationSubsystem;

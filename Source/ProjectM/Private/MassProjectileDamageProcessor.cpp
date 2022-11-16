@@ -18,6 +18,8 @@
 #include "MassNavigationFragments.h"
 #include <MassNavMeshMoveProcessor.h>
 #include <MassMoveToCommandProcessor.h>
+#include "MassSignalSubsystem.h"
+#include <MassStateTreeTypes.h>
 
 static constexpr uint32 GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind = 20;
 typedef TArray<FMassNavigationObstacleItem, TFixedAllocator<GUMassProjectileWithDamageTrait_MaxClosestEntitiesToFind>> TProjectileDamageObstacleItemArray;
@@ -99,6 +101,7 @@ void UMassProjectileDamageProcessor::Initialize(UObject& Owner)
 	Super::Initialize(Owner);
 
 	NavigationSubsystem = UWorld::GetSubsystem<UMassNavigationSubsystem>(Owner.GetWorld());
+	SignalSubsystem = UWorld::GetSubsystem<UMassSignalSubsystem>(Owner.GetWorld());
 }
 
 static void FindCloseObstacles(const FVector& Center, const float SearchRadius, const FNavigationObstacleHashGrid2D& AvoidanceObstacleGrid,
@@ -479,7 +482,7 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 bool UMassProjectileDamageProcessor_UseParallelForEachEntityChunk = true;
 FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_UseParallelForEachEntityChunk(TEXT("pm.UMassProjectileDamageProcessor_UseParallelForEachEntityChunk"), UMassProjectileDamageProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassProjectileDamageProcessor::Execute to improve performance"));
 
-void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersThatHaveDied, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, const UWorld* World, const FMassExecutionContext& Context)
+void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersThatHaveDied, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, const UWorld* World, const FMassExecutionContext& Context, TObjectPtr<UMassSignalSubsystem> SignalSubsystem)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor.ProcessQueues);
 
@@ -495,6 +498,7 @@ void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDes
 	// Destroy AI soldiers.
 	UMilitaryStructureSubsystem* MilitaryStructureSubsystem = UWorld::GetSubsystem<UMilitaryStructureSubsystem>(World);
 	check(MilitaryStructureSubsystem);
+	TArray<FMassEntityHandle> EntitiesToSignalDeath;
 	while (!SoldiersThatHaveDied.IsEmpty())
 	{
 		FMassEntityHandle SoldierEntityThatHasDied;
@@ -512,14 +516,20 @@ void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDes
 		Context.Defer().PushCommand(FCommandRemoveFragmentList(SoldierEntityThatHasDied,
 			{FProjectileDamagableFragment::StaticStruct(), // If a projectile hits soldier during death montage we won't try to restart death montage.
 			FMassNavigationObstacleGridCellLocationFragment::StaticStruct(), // We currently rely on avoidance obstacle grid to decide entities that projectiles can damage. TODO: Change to use target grid, then delete this line.
-			//FMassVelocityFragment::StaticStruct(), // Ensure soldier no longer moves via UMassApplyMovementProcessor.
 			FMassTargetGridCellLocationFragment::StaticStruct()})); // Ensure soldier is no longer considered a potential target.
 
 		FMassDelayedDestructionFragment DelayedDestructionFragment;
 		DelayedDestructionFragment.SecondsLeftTilDestruction = 2.1f; // TODO: Make this configurable via ProjectileDamagable Trait?
 		Context.Defer().PushCommand(FCommandAddFragmentInstance(SoldierEntityThatHasDied, FConstStructView::Make(DelayedDestructionFragment)));
 		
+		EntitiesToSignalDeath.Add(SoldierEntityThatHasDied); // Required for soldier to start playing death animation.
+
 		MilitaryStructureSubsystem->DestroyEntity(SoldierEntityThatHasDied);
+	}
+
+	if (EntitiesToSignalDeath.Num())
+	{
+		SignalSubsystem->SignalEntities(UE::Mass::Signals::NewStateTreeTaskRequired, EntitiesToSignalDeath);
 	}
 
 	// Destroy player soldiers.
@@ -593,5 +603,5 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 		EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
 	}
 
-	ProcessQueues(ProjectilesToDestroy, SoldiersThatHaveDied, PlayersToDestroy, EntitySubsystem.GetWorld(), Context);
+	ProcessQueues(ProjectilesToDestroy, SoldiersThatHaveDied, PlayersToDestroy, EntitySubsystem.GetWorld(), Context, SignalSubsystem);
 }

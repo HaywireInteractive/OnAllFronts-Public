@@ -63,6 +63,8 @@ UInvalidTargetFinderProcessor::UInvalidTargetFinderProcessor()
 
 void UInvalidTargetFinderProcessor::Initialize(UObject& Owner)
 {
+	Super::Initialize(Owner);
+
 	SignalSubsystem = UWorld::GetSubsystem<UMassSignalSubsystem>(Owner.GetWorld());
 	TargetFinderSubsystem = UWorld::GetSubsystem<UMassTargetFinderSubsystem>(Owner.GetWorld());
 }

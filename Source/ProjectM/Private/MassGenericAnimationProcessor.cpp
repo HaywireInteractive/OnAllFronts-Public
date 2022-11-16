@@ -23,7 +23,6 @@
 #include "Kismet/GameplayStatics.h"
 #include "MassCrowdRepresentationSubsystem.h"
 #include "Character/MassCharacter.h"
-#include <MassProjectileDamageProcessor.h>
 
 void FMassGenericMontageFragment::Request(const UE::CrowdInteractionAnim::FRequest& InRequest)
 {
@@ -116,42 +115,32 @@ void UMassGenericAnimationProcessor::UpdateVertexAnimationState(UMassEntitySubsy
 			if (Sequence)
 			{
 				StateIndex = AnimationData.AnimToTextureData.IsValid() ? AnimationData.AnimToTextureData->GetIndexFromAnimSequence(Sequence) : 0;
+				if (AnimationData.AnimationStateIndex != StateIndex)
+				{
+					// Setting this tells the animation when to start and since this animation doesn't loop we need to make sure we're not constantly setting this.
+					// Hence we only do this once, when first going into the animation.
+					AnimationData.GlobalStartTime = GlobalTime;
+				}
 			}
 			else
 			{
-				const bool bIsDying = Context.DoesArchetypeHaveTag<FMassSoldierIsDyingTag>();
-				if (bIsDying)
+				// @todo: Make a better way to map desired anim states here. Currently the anim texture index to access is hard-coded.
+				const float VelocitySizeSq = Velocity.Value.SizeSquared();
+				const bool bIsWalking = Velocity.Value.SizeSquared() > MoveThresholdSq;
+				if (bIsWalking)
 				{
-					AnimationData.PlayRate = 1.0f;
-					constexpr int32 DeathAnimationIndex = 2; // TODO: don't hardcode
-					StateIndex = DeathAnimationIndex;
-					if (AnimationData.AnimationStateIndex != DeathAnimationIndex)
-					{
-						// Setting this tells the animation when to start and since this animation doesn't loop we need to make sure we're not constantly setting this.
-						// Hence we only do this once, when first going into death animation.
-						AnimationData.GlobalStartTime = GlobalTime;
-					}
+					StateIndex = 1;
+					const float AuthoredAnimSpeed = 140.0f;
+					const float PrevPlayRate = AnimationData.PlayRate;
+					AnimationData.PlayRate = FMath::Clamp(FMath::Sqrt(VelocitySizeSq / (AuthoredAnimSpeed * AuthoredAnimSpeed)), 0.8f, 2.0f);
+
+					// Need to conserve current frame on a playrate switch so (GlobalTime - Offset1) * Playrate1 == (GlobalTime - Offset2) * Playrate2
+					AnimationData.GlobalStartTime = GlobalTime - PrevPlayRate * (GlobalTime - AnimationData.GlobalStartTime) / AnimationData.PlayRate;
 				}
 				else
 				{
-					// @todo: Make a better way to map desired anim states here. Currently the anim texture index to access is hard-coded.
-					const float VelocitySizeSq = Velocity.Value.SizeSquared();
-					const bool bIsWalking = Velocity.Value.SizeSquared() > MoveThresholdSq;
-					if (bIsWalking)
-					{
-						StateIndex = 1;
-						const float AuthoredAnimSpeed = 140.0f;
-						const float PrevPlayRate = AnimationData.PlayRate;
-						AnimationData.PlayRate = FMath::Clamp(FMath::Sqrt(VelocitySizeSq / (AuthoredAnimSpeed * AuthoredAnimSpeed)), 0.8f, 2.0f);
-
-						// Need to conserve current frame on a playrate switch so (GlobalTime - Offset1) * Playrate1 == (GlobalTime - Offset2) * Playrate2
-						AnimationData.GlobalStartTime = GlobalTime - PrevPlayRate * (GlobalTime - AnimationData.GlobalStartTime) / AnimationData.PlayRate;
-					}
-					else
-					{
-						AnimationData.PlayRate = 1.0f;
-						StateIndex = 0;
-					}
+					AnimationData.PlayRate = 1.0f;
+					StateIndex = 0;
 				}
 			}
 			AnimationData.AnimationStateIndex = StateIndex;
