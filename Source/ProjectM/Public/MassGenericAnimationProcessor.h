@@ -12,6 +12,7 @@
 class UAnimToTextureDataAsset;
 struct FMassActorFragment;
 
+// TODO: Rename to remove "Crowd"
 namespace UE::CrowdInteractionAnim
 {
 	struct FRequest
