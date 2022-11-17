@@ -21,4 +21,5 @@ public:
 	int16 FindOrAddEntityConfig(UMassEntityConfigAsset* ExplosionEntityConfig);
 
 	void SpawnEntity(const int16 EntityConfigIndex, const FVector& Location);
+	void SpawnEntity(const int16 EntityConfigIndex, const FTransform& Transform);
 };

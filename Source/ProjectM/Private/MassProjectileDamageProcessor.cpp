@@ -482,9 +482,11 @@ void ProcessProjectileDamageEntity(FMassExecutionContext& Context, FMassEntityHa
 bool UMassProjectileDamageProcessor_UseParallelForEachEntityChunk = true;
 FAutoConsoleVariableRef CVarUMassProjectileDamageProcessor_UseParallelForEachEntityChunk(TEXT("pm.UMassProjectileDamageProcessor_UseParallelForEachEntityChunk"), UMassProjectileDamageProcessor_UseParallelForEachEntityChunk, TEXT("Use ParallelForEachEntityChunk in UMassProjectileDamageProcessor::Execute to improve performance"));
 
-void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersThatHaveDied, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, const UWorld* World, const FMassExecutionContext& Context, TObjectPtr<UMassSignalSubsystem> SignalSubsystem)
+void ProcessQueues(TQueue<FMassEntityHandle, EQueueMode::Mpsc>& ProjectilesToDestroy, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& SoldiersThatHaveDied, TQueue<FMassEntityHandle, EQueueMode::Mpsc>& PlayersToDestroy, UMassEntitySubsystem& EntitySubsystem, FMassExecutionContext& Context, TObjectPtr<UMassSignalSubsystem> SignalSubsystem)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UMassProjectileDamageProcessor.ProcessQueues);
+
+	const UWorld* World = EntitySubsystem.GetWorld();
 
 	// Destroy projectiles.
 	while (!ProjectilesToDestroy.IsEmpty())
@@ -603,5 +605,5 @@ void UMassProjectileDamageProcessor::Execute(UMassEntitySubsystem& EntitySubsyst
 		EntityQuery.ForEachEntityChunk(EntitySubsystem, Context, ExecuteFunction);
 	}
 
-	ProcessQueues(ProjectilesToDestroy, SoldiersThatHaveDied, PlayersToDestroy, EntitySubsystem.GetWorld(), Context, SignalSubsystem);
+	ProcessQueues(ProjectilesToDestroy, SoldiersThatHaveDied, PlayersToDestroy, EntitySubsystem, Context, SignalSubsystem);
 }

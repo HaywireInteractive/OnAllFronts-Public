@@ -48,12 +48,12 @@ void UMassSwapEntityOnDestructionProcessor::Execute(UMassEntitySubsystem& Entity
 				UMassVisualEffectsSubsystem* MassVisualEffectsSubsystem = UWorld::GetSubsystem<UMassVisualEffectsSubsystem>(EntitySubsystem.GetWorld());
 				check(MassVisualEffectsSubsystem);
 
-				const FVector& EntityLocation = TransformList[i].GetTransform().GetLocation();
+				const FTransform& EntityTransform = TransformList[i].GetTransform();
 
 				// Must be done async because we can't spawn Mass entities in the middle of a Mass processor's Execute method.
-				AsyncTask(ENamedThreads::GameThread, [MassVisualEffectsSubsystem, SwappedEntityConfigIndex = SwappedEntityConfigIndex, EntityLocation]()
+				AsyncTask(ENamedThreads::GameThread, [MassVisualEffectsSubsystem, SwappedEntityConfigIndex = SwappedEntityConfigIndex, EntityTransform]()
 				{
-					MassVisualEffectsSubsystem->SpawnEntity(SwappedEntityConfigIndex, EntityLocation);
+					MassVisualEffectsSubsystem->SpawnEntity(SwappedEntityConfigIndex, EntityTransform);
 				});
 			}
 		}
