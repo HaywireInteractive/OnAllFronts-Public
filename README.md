@@ -12,25 +12,25 @@ https://youtu.be/THMR3Jf4Tjo
 
 ProjectM is a proof of concept tactical shooter and strategy FPS / RTS game developed with [Unreal Engine 5](https://www.unrealengine.com/en-US/unreal-engine-5), leveraging the new [Mass Entity](https://docs.unrealengine.com/5.0/en-US/overview-of-mass-entity-in-unreal-engine/) ([ECS](https://en.wikipedia.org/wiki/Entity_component_system)) framework to have a very large number of entities not seen in traditional FPS games (tens or hundreds of thousands). Think [Squad](https://joinsquad.com/) meets [Foxhole](https://www.foxholegame.com/) meets [PlanetSide 2](https://www.planetside2.com/home) mixed in with massive number of AI controlled soldiers.
 
-The project is open sourced to make it easy for others to contribute and to help others learn the Mass Entity system which is not very well-documented/supported yet.
+Note that the project has transitioned to closed source so we could use paid assets, but this open source repo will stay around to help others learn the Mass Entity system which is not very well-documented/supported yet.
 
 ## Motivation
 
-In today's MilSim games players frequently end up doing things or seeing this that would not happen in an actual MilSim. Examples:
+In today's MilSim games players frequently end up doing things or seeing things that would not happen in an actual MilSim. Examples:
 - Soldiers magically spawn onto the battlefield
 - Areas of interest are captured by standing near them
 - Areas that should be defended have little or no one defending them (because it's boring)
 - Soldiers being revived who should be dead
 - Soldiers being healed much faster than they should be able to
 
-ProjectM aims to eliminate these unrealistic occurrences while keeping the game fun. It mainly does this by leveraging AI to do the not-so-fun stuff. Examples:
+ProjectM aims to eliminate these unrealistic occurrences while keeping the game fun. It mainly does this by leveraging AI to do the not-so-fun stuff such as:
 - Moving soldiers to the frontlines
 - Defending all areas of interest, even those with little activity
 - Logistics
 - Vehicle repairs
 - Medical evacuation (medevac)
 
-Human players will never spawn soldiers onto the battlefield. Instead they will take control of an AI-controller soldier already on the battlefield. Each match will last days/weeks, until all soldiers of one team are dead or main objectives have been accomplished.
+Human players will never spawn soldiers onto the battlefield. Instead they will possess an AI-controller soldier already on the battlefield. Each match will last until all soldiers of one team are dead or main objectives have been accomplished.
 
 # Phases
 
@@ -38,13 +38,13 @@ Currently this is a hobby project, so it's unclear how far it'll go. Therefore, 
 
 ## Phase 1: Demo
 - Single player: One human player and thousands of AI soldiers (no vehicles)
-- Single map
+- Epic's City Sample map
 
 ## Phase 2: Early Access
 
 - Multiplayer FPS game with per-server battles
 - Human and AI soldiers only (no vehicles)
-- Single map
+- Epic's City Sample map
 
 ## Phase 3: Release
 
