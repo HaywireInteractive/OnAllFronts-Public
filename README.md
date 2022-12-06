@@ -85,8 +85,7 @@ These ideas below would be explored in one of the phases above.
 
 # FAQ
 
-- Where can I ask questions or get involved in the project? Message Leroy#9486 on Discord or email leroytech231+gh@gmail.com.
-
+- Where can I ask questions or get involved in the project? Join our Discord server: https://discord.gg/j9RfjpJj
 
 # Development Environment Setup
 
