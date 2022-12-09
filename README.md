@@ -14,6 +14,8 @@ ProjectM is a proof of concept tactical shooter and strategy FPS / RTS game deve
 
 Note that the project has transitioned to closed source so we could use paid assets, but this open source repo will stay around to help others learn the Mass Entity system which is not very well-documented/supported yet.
 
+[Join our Discord Server here.](https://discord.gg/RkDmYEMU)
+
 ## Motivation
 
 In today's MilSim games players frequently end up doing things or seeing things that would not happen in an actual MilSim. Examples:
