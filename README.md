@@ -14,7 +14,7 @@ ProjectM is a tactical shooter and strategy FPS / RTS game developed with [Unrea
 
 Note that the project has transitioned to closed source so we could use paid assets, but this open source repo will stay around to help others learn the Mass Entity system which is not very well-documented/supported yet.
 
-[Join our Discord Server here.](https://discord.gg/RkDmYEMU)
+[Join our Discord Server here.](https://discord.gg/ZVCGmRWy)
 
 ## Motivation
 
@@ -87,7 +87,7 @@ These ideas below would be explored in one of the phases above.
 
 # FAQ
 
-- Where can I ask questions or get involved in the project? Join our Discord server: https://discord.gg/RkDmYEMU
+- Where can I ask questions or get involved in the project? Join our Discord server: https://discord.gg/ZVCGmRWy
 
 # Development Environment Setup
 
