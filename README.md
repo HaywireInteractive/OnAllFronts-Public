@@ -2,11 +2,9 @@
 
 ## Latest Demo
 
-20,000 soldier city battle:
+[![Artillery](https://img.youtube.com/vi/pimnY7-lyx4/0.jpg)](https://youtu.be/pimnY7-lyx4)
 
-[![20,000 soldier city battle](https://img.youtube.com/vi/t5wI5AmpveY/0.jpg)](https://youtu.be/t5wI5AmpveY)
-
-https://youtu.be/t5wI5AmpveY
+https://youtu.be/pimnY7-lyx4
 
 ## What is this?
 
