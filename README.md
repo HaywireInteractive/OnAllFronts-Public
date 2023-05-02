@@ -14,7 +14,7 @@ On All Fronts is a tactical shooter and strategy FPS / RTS game developed with [
 
 Note that the project has transitioned to closed source so we could use paid assets, but this open source repo will stay around to help others learn the Mass Entity system which is not very well-documented/supported yet.
 
-[Join our Discord Server here.](https://discord.gg/ZVCGmRWy)
+[Join our Discord Server here.](https://discord.gg/6Yj2MsQTjz)
 
 ## Motivation
 
