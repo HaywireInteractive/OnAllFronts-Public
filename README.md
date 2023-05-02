@@ -36,7 +36,7 @@ Human players will never spawn soldiers onto the battlefield. Instead they will 
 
 # Phases
 
-Currently this is a hobby project, so it's unclear how far it'll go. Therefore, the project is broken into multiple phases. For current status, see [Project Tracker](https://github.com/users/Leroy231/projects/1).
+The project is broken into multiple phases. For current status, see [Project Tracker](https://github.com/users/Leroy231/projects/1).
 
 ## Phase 1: Demo
 - Single player: One human player and thousands of AI soldiers (no vehicles)
