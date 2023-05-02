@@ -36,7 +36,7 @@ Human players will never spawn soldiers onto the battlefield. Instead they will 
 
 # Phases
 
-Currently this is a hobby project, so it's unclear how far it'll go. Therefore, the project is broken into multiple phases. For current status, see [Project Tracker](https://github.com/users/LeroyTechnologies/projects/1).
+Currently this is a hobby project, so it's unclear how far it'll go. Therefore, the project is broken into multiple phases. For current status, see [Project Tracker](https://github.com/users/Leroy231/projects/1).
 
 ## Phase 1: Demo
 - Single player: One human player and thousands of AI soldiers (no vehicles)
@@ -101,16 +101,16 @@ These ideas below would be explored in one of the phases above.
     1. In Visual Studio Installer make sure to select a .NET Framework SDK version, at least 4.6. ![image](https://user-images.githubusercontent.com/108254625/198902032-370cc297-1a42-4b91-9c29-f37ee5922ce3.png)
 
     1. If you don't have it installed, install latest .NET Core 3.1: https://dotnet.microsoft.com/en-us/download/dotnet?cid=getdotnetcore
-1. If you plan to modify ProjectM C++/C# code: Launch Visual Studio > Tools > Options
+1. If you plan to modify C++/C# code: Launch Visual Studio > Tools > Options
     1. Text Editor > C/C++ > Tabs > select "Keep tabs"
     1. Text Editor > C# > Tabs > select "Keep tabs"
     1. Text Editor > Advanced > uncheck "Use adaptive formatting"
 
 ## Quick Start
-ProjectM is structured as an Unreal Engine plugin. To quickly get started, we have an Unreal Engine starter project that already includes a reference to ProjectM. To use it:
+The project is structured as an Unreal Engine plugin. To quickly get started, we have an Unreal Engine starter project that already includes a reference to plugin. To use it:
 1. In GitHub Desktop:
     1. File > Clone repository > URL tab
-    1. URL: https://github.com/LeroyTechnologies/ProjectMStarter.git
+    1. URL: https://github.com/Leroy231/ProjectMStarter.git
     1. Local path: choose a folder on your machine where you want the Unreal Engine project created
     1. Click Clone
 1. In Windows Explorer double click the .uproject at the root of the folder where you cloned the project.
@@ -131,7 +131,7 @@ ProjectM is structured as an Unreal Engine plugin. To quickly get started, we ha
 1. Now in Content Drawer open "Plugins/ProjectM Content/Playgrounds/Maps/L_MediumWithTanks" level and use PIE to test out the project.
     1. You might have to build NavMesh paths via menu for move commands to work: Build > Build Paths.
     
-## Adding ProjectM Plugin to Existing Project
+## Adding Plugin to Existing Project
 1. If you want to use the [City Sample project](https://www.unrealengine.com/marketplace/en-US/product/city-sample) for developing in a large level, get the project from UE Marketplace and then create a project using that template.
 1. If there is no .sln in the project folder, generate VS project from right clicking .uproject in project folder.
 1. Open .sln in Visual Studio if it isn't already open.
@@ -145,9 +145,9 @@ ProjectM is structured as an Unreal Engine plugin. To quickly get started, we ha
     1. `cd` to project folder. This is the folder that has the .uproject file.
     1. If `Plugins` folder does not exist, `mkdir Plugins`.
     1. `cd Plugins`
-    1. `git clone https://github.com/LeroyTechnologies/ProjectM.git`
+    1. `git clone https://github.com/Leroy231/OnAllFronts.git`
 	1. If in City Sample: `rmdir -recurse AnimToTexture`
-	1. `git clone --branch projectm https://github.com/LeroyTechnologies/AnimToTexture.git`
+	1. `git clone --branch projectm https://github.com/Leroy231/AnimToTexture.git`
 1. Right click the .uproject file again and re-generate the solution to get the new files from the Plugins folder to show in VS.
 1. In order to get Mass ParallelForEachEntityChunk to actually parallelize, it requires passing an argument to editor on launch:
     1. In VS Solution Explorer, right click the project under Games folder > Properties.
@@ -155,12 +155,12 @@ ProjectM is structured as an Unreal Engine plugin. To quickly get started, we ha
 1. Rerun project from VS.
 1. Edit > Project Settings
     1. Engine - Input > Bindings
-        1. Ensure you have all the AxisMappings and ActionMappings from here: https://github.com/LeroyTechnologies/ProjectMStarter/blob/main/Config/DefaultInput.ini
+        1. Ensure you have all the AxisMappings and ActionMappings from here: https://github.com/Leroy231/ProjectMStarter/blob/main/Config/DefaultInput.ini
     1. Engine - Mass
 		1. Search for "MassUpdateISMProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassUpdateISMProcessor) > Auto Register with Processing Phases > uncheck. Note this will already be unchecked in the City Sample project.
 		1. Search for "MassGenericUpdateISMVertexAnimationProcessor" > Mass > Module Settings > Mass Entity > Processor CDOs > Index (for MassGenericUpdateISMVertexAnimationProcessor) > Auto Register with Processing Phases > check
 		1. Do the same as previous for "MassSimpleUpdateISMProcessor".
-    1. Engine - Navigation System > Agents > Supported Agents > Add agents based on the "SupportedAgents" towards bottom of this file: https://github.com/LeroyTechnologies/ProjectMStarter/blob/main/Config/DefaultEngine.ini
+    1. Engine - Navigation System > Agents > Supported Agents > Add agents based on the "SupportedAgents" towards bottom of this file: https://github.com/Leroy231/ProjectMStarter/blob/main/Config/DefaultEngine.ini
         1. Only the Name, Nav Agent Radius, and Nav Agent Height need to be set.
 1. Follow steps above in [Add Assets](#add-assets) section.
 
