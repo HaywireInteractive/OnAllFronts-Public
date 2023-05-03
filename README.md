@@ -32,9 +32,9 @@ On All Fronts aims to eliminate these unrealistic occurrences while keeping the 
 
 Human players will never spawn soldiers onto the battlefield. Instead they will possess an AI-controller soldier already on the battlefield. Each match will last until all soldiers of one team are dead or main objectives have been accomplished.
 
-# Phases
+# Roadmap
 
-The project is broken into multiple phases. For current status, see [Project Tracker](https://github.com/users/Leroy231/projects/1).
+The project is broken into multiple phases. For current status, see [Project Tracker](https://github.com/orgs/HaywireInteractive/projects/4/views/1).
 
 ## Phase 1: Demo
 - Single player: One human player and thousands of AI soldiers (no vehicles)
