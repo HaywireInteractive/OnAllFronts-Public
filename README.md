@@ -2,9 +2,7 @@
 
 ## Latest Demo
 
-[![Artillery](https://img.youtube.com/vi/pimnY7-lyx4/0.jpg)](https://youtu.be/pimnY7-lyx4)
-
-https://youtu.be/pimnY7-lyx4
+Check out our latest updates on our YouTube: https://www.youtube.com/@haywireinteractive/videos
 
 ## What is this?
 
